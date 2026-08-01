@@ -23,3 +23,11 @@
 PySide6/Qt WidgetsのGUI、PyQtGraphタイムライン、heap priority queue、整数microsecondsのevent scheduler、20秒のDemo、速度モード、GUI batch件数・wall-time budget、canonical JSON digestは今回の検証目的に合わせた **実装上の選択** であり、v2.0規範そのものではない。
 
 Demoの `clock_tick`、`demo_marker`、`demo_same_time_a/b`、`simulation_complete` は診断eventである。S、baseline、bundle、P/V、生命、Garden、H10、光刺激などの意味を持たせていない。
+
+## Stage 2仮想ユーザーとの境界
+
+`baseline_virtual_user_physiology_v0_1` はv2.0規範ではなく、Stage 2用にversion管理するsimulation assumptionである。v2.0はユーザー内部の生理生成式を規定せず、システム境界から見たブラックボックスとして扱う。
+
+Stage 2でv2.0から参照したのは、ユーザー、H10、Garden入力層、Runtimeなどの責務を混同しないシステム境界だけである。呼吸性sin波、slow wave、AR(1)、jitter、parameter既定値、clamp、diagnostic RMSSDは実装上の仮定であり、v2.0の規範値ではない。
+
+Stage 2の正式出力はheartbeat発生時刻だけである。仮想Polar H10、H10 RRI測定、Garden入力層、artifact処理、N生成はまだ未実装である。内部真値RRI/RMSSDをH10またはGarden信号として使用しない。

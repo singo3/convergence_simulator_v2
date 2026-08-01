@@ -100,6 +100,20 @@ class SimulationController(QObject):
 
         return self._engine.planned_events()
 
+    def replace_engine(self, engine: SimulationEngine) -> None:
+        """Replace a stopped scenario when pre-run settings are applied."""
+
+        if self._engine.clock.state is not ClockState.STOPPED:
+            raise RuntimeError("engine can only be replaced before simulation start")
+        self._engine = engine
+        self._real_elapsed_ns = 0
+        self._last_wall_ns = None
+        self._scaled_remainder_ns = 0
+        self._published_event_count = 0
+        self._force_max_until_complete = False
+        self.scenario_reset.emit(self._engine.planned_events())
+        self._publish()
+
     def current_snapshot(self) -> ControllerSnapshot:
         """Build the current engine-plus-diagnostics snapshot."""
 

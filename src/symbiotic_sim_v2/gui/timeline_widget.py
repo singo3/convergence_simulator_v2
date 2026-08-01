@@ -11,11 +11,12 @@ from symbiotic_sim_v2.domain.events import SimulationEvent
 from symbiotic_sim_v2.simulation.time_utils import us_to_seconds
 
 EVENT_STYLES: dict[str, tuple[int, str, str, str]] = {
-    "clock_tick": (0, "o", "#4DA3FF", "clock_tick"),
-    "demo_marker": (1, "t", "#38D996", "demo_marker"),
-    "demo_same_time_a": (2, "s", "#FFB648", "same_time_a"),
-    "demo_same_time_b": (3, "d", "#C78BFA", "same_time_b"),
-    "simulation_complete": (4, "star", "#FF647C", "simulation_complete"),
+    "heartbeat": (0, "o", "#FF647C", "heartbeat"),
+    "clock_tick": (1, "o", "#4DA3FF", "clock_tick"),
+    "demo_marker": (2, "t", "#38D996", "demo_marker"),
+    "demo_same_time_a": (3, "s", "#FFB648", "same_time_a"),
+    "demo_same_time_b": (4, "d", "#C78BFA", "same_time_b"),
+    "simulation_complete": (5, "star", "#FF647C", "simulation_complete"),
 }
 
 
@@ -35,7 +36,7 @@ class TimelineWidget(pg.PlotWidget):
         self.showGrid(x=True, y=True, alpha=0.18)
         self.setLabel("bottom", "仮想時間", units="秒")
         self.setLabel("left", "event type")
-        self.setYRange(-0.65, 4.65, padding=0)
+        self.setYRange(-0.65, 5.65, padding=0)
         self.getPlotItem().setMouseEnabled(x=True, y=False)
 
         self._current_line = pg.InfiniteLine(
@@ -72,7 +73,7 @@ class TimelineWidget(pg.PlotWidget):
         for event_type, typed_events in grouped.items():
             lane, symbol, color, _label = EVENT_STYLES.get(
                 event_type,
-                (4, "x", "#D1D5DB", event_type),
+                (5, "x", "#D1D5DB", event_type),
             )
             item = pg.ScatterPlotItem(
                 x=[us_to_seconds(event.scheduled_time_us) for event in typed_events],
@@ -102,7 +103,7 @@ class TimelineWidget(pg.PlotWidget):
         """Append executed-point outlines without regenerating planned plots."""
 
         for event in events:
-            lane = EVENT_STYLES.get(event.event_type, (4, "x", "#D1D5DB", ""))[0]
+            lane = EVENT_STYLES.get(event.event_type, (5, "x", "#D1D5DB", ""))[0]
             self._executed_x.append(us_to_seconds(event.scheduled_time_us))
             self._executed_y.append(lane)
         self._executed_item.setData(x=self._executed_x, y=self._executed_y)

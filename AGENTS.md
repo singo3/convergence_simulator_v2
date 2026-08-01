@@ -9,3 +9,9 @@
 - RuntimeへP/V中央比較、勝者・順位決定などのシステム固有ロジックを入れない。
 - 規範仕様ファイル自体を変更しない。旧シミュレーターからコードをコピーしない。
 - commit、push、PR作成はユーザーから明示指示があるまで行わない。
+- 仮想ユーザーが正式に出力するのは `HeartbeatEvent` だけとし、H10より前でRRI、RMSSD、N、Nd、Wを正式出力しない。
+- GUI/CSVの内部真値診断と、後続componentへ渡す正式なsystem signalを混同しない。
+- 生理モデルはv2.0規範ではなくsimulation assumptionとして独立version管理する。
+- Stage 2へexternal influence、光刺激、好み、刺激応答を追加しない。
+- Stageごとに独立commitを作り、push前にcompileall、全pytest、Ruff、headless、GUI smoke、digest回帰を検証する。
+- force push、force-with-lease、既存commitのamend/rebaseを行わない。
