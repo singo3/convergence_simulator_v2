@@ -157,7 +157,7 @@ run-until-end、1秒step、1-event step、速度、batch上限、snapshot頻度�
 
 ## GUI、headless、CSV
 
-GUIの主対象はGarden入力層である。Garden入力tabにはphase/S、RRIとartifact、RMSSD/N、N/S、RRI table、evaluation tableを表示し、仮想ユーザー、Polar H10、時間・event診断tabも維持する。GUIはcomponent snapshotとimmutable recordだけを読み、scheduler heapを直接操作しない。
+GUIの主対象はGarden入力層である。Garden入力tabにはphase/S、RRIとartifact、RMSSD/N、N/S、RRI table、evaluation tableを表示し、仮想ユーザー、Polar H10、時間・event診断tabも維持する。Garden入力層の右側診断領域は縦スクロール可能で、timeline、グラフ、判定表を十分な高さで表示する。GUIはcomponent snapshotとimmutable recordだけを読み、scheduler heapを直接操作しない。
 
 標準240秒scenarioはreal-time待機なしで実行できる。
 

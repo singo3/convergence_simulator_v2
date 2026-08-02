@@ -16,6 +16,12 @@ from symbiotic_sim_v2.garden.input_layer.records import (
 )
 from symbiotic_sim_v2.simulation.time_utils import us_to_seconds
 
+GARDEN_CHART_MIN_HEIGHT = 720
+GARDEN_CHART_TABS_MIN_HEIGHT = 680
+RRI_PLOT_MIN_HEIGHT = 420
+EVALUATION_PLOT_MIN_HEIGHT = 250
+SIGNAL_PLOT_MIN_HEIGHT = 200
+
 
 class GardenInputChart(QWidget):
     """Update pre-created plot items without reproducing Garden calculations."""
@@ -23,10 +29,12 @@ class GardenInputChart(QWidget):
     def __init__(self, config: GardenInputConfig, parent=None) -> None:
         super().__init__(parent)
         self.setObjectName("gardenInputChart")
+        self.setMinimumHeight(GARDEN_CHART_MIN_HEIGHT)
         root = QVBoxLayout(self)
         root.setContentsMargins(0, 0, 0, 0)
         self.tabs = QTabWidget(self)
         self.tabs.setObjectName("gardenChartTabs")
+        self.tabs.setMinimumHeight(GARDEN_CHART_TABS_MIN_HEIGHT)
         root.addWidget(self.tabs)
 
         self._build_rri_tab()
@@ -50,6 +58,7 @@ class GardenInputChart(QWidget):
     def _build_rri_tab(self) -> None:
         self.rri_graphics = self._graphics()
         self.rri_plot = self.rri_graphics.addPlot(row=0, col=0)
+        self._set_plot_row_height(self.rri_plot, RRI_PLOT_MIN_HEIGHT)
         self._configure_plot(self.rri_plot, "raw RRI・artifact", "RRI", "ms")
         self.rri_plot.addLegend(offset=(8, 8))
         self.valid_rri_item = self.rri_plot.plot(
@@ -89,6 +98,8 @@ class GardenInputChart(QWidget):
         self.evaluation_graphics = self._graphics()
         self.rmssd_plot = self.evaluation_graphics.addPlot(row=0, col=0)
         self.n_evaluation_plot = self.evaluation_graphics.addPlot(row=1, col=0)
+        for plot in (self.rmssd_plot, self.n_evaluation_plot):
+            self._set_plot_row_height(plot, EVALUATION_PLOT_MIN_HEIGHT)
         self._configure_plot(self.rmssd_plot, "評価窓RMSSD", "RMSSD", "ms")
         self._configure_plot(self.n_evaluation_plot, "評価確定点のN", "N")
         self.n_evaluation_plot.setXLink(self.rmssd_plot)
@@ -139,6 +150,8 @@ class GardenInputChart(QWidget):
         self.n_signal_plot = self.signal_graphics.addPlot(row=0, col=0)
         self.s_signal_plot = self.signal_graphics.addPlot(row=1, col=0)
         self.revision_plot = self.signal_graphics.addPlot(row=2, col=0)
+        for plot in (self.n_signal_plot, self.s_signal_plot, self.revision_plot):
+            self._set_plot_row_height(plot, SIGNAL_PLOT_MIN_HEIGHT)
         self._configure_plot(self.n_signal_plot, "GardenInputSignalEvent: N_current", "N")
         self._configure_plot(self.s_signal_plot, "GardenInputSignalEvent: S", "S")
         self._configure_plot(
@@ -173,6 +186,13 @@ class GardenInputChart(QWidget):
         self.s_item = self.s_signal_item
         self.valid_evaluation_revision_item = self.revision_item
         self.rejected_evaluation_item = self.rejected_rmssd_item
+
+    @staticmethod
+    def _set_plot_row_height(plot, minimum_height: int) -> None:
+        """Give same-tab plot rows equal public layout constraints."""
+
+        plot.setMinimumHeight(minimum_height)
+        plot.setPreferredHeight(minimum_height)
 
     @staticmethod
     def _current_line(plot) -> pg.InfiniteLine:

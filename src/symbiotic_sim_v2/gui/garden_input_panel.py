@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QEvent, Qt
 from PySide6.QtWidgets import (
     QFileDialog,
     QFormLayout,
@@ -12,8 +12,10 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QHeaderView,
     QLabel,
+    QLayout,
     QPushButton,
     QScrollArea,
+    QSizePolicy,
     QSplitter,
     QTableView,
     QTabWidget,
@@ -56,6 +58,10 @@ GARDEN_POLICY_NOTICE = (
     "RRI window membershipはmeasurement end timeを使うStage 4仮定です。"
     "baseline reject後の方針はStage 4実装上の最小安全方針です。"
 )
+GARDEN_TIMELINE_MIN_HEIGHT = 200
+GARDEN_TABLE_TABS_MIN_HEIGHT = 300
+GARDEN_CHART_TABLE_SPLITTER_MIN_HEIGHT = 1_075
+GARDEN_CHART_TABLE_INITIAL_SIZES = (740, 330)
 
 
 class GardenInputPanel(QWidget):
@@ -118,9 +124,9 @@ class GardenInputPanel(QWidget):
             flow_layout.addWidget(node, stretch=1)
         root.addWidget(flow_frame)
 
-        body = QSplitter(Qt.Orientation.Horizontal, self)
-        body.setObjectName("gardenBodySplitter")
-        self.fixed_scroll = QScrollArea(body)
+        self.body_splitter = QSplitter(Qt.Orientation.Horizontal, self)
+        self.body_splitter.setObjectName("gardenBodySplitter")
+        self.fixed_scroll = QScrollArea(self.body_splitter)
         self.fixed_scroll.setWidgetResizable(True)
         self.fixed_scroll.setMinimumWidth(365)
         self.fixed_scroll.setMaximumWidth(485)
@@ -171,13 +177,28 @@ class GardenInputPanel(QWidget):
         fixed_layout.addWidget(export_group)
         fixed_layout.addStretch(1)
         self.fixed_scroll.setWidget(fixed_container)
-        body.addWidget(self.fixed_scroll)
+        self.body_splitter.addWidget(self.fixed_scroll)
 
-        diagnostics = QWidget(body)
-        diagnostics_layout = QVBoxLayout(diagnostics)
+        self.diagnostics_scroll = QScrollArea(self.body_splitter)
+        self.diagnostics_scroll.setObjectName("gardenDiagnosticsScroll")
+        self.diagnostics_scroll.setWidgetResizable(True)
+        self.diagnostics_scroll.setVerticalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAsNeeded
+        )
+        self.diagnostics_scroll.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+        )
+        self.diagnostics_content = QWidget(self.diagnostics_scroll)
+        self.diagnostics_content.setObjectName("gardenDiagnosticsContent")
+        self.diagnostics_content.setSizePolicy(
+            QSizePolicy.Policy.Expanding,
+            QSizePolicy.Policy.Minimum,
+        )
+        diagnostics_layout = QVBoxLayout(self.diagnostics_content)
         diagnostics_layout.setContentsMargins(4, 0, 0, 0)
         diagnostics_layout.setSpacing(6)
-        state_frame = QFrame(diagnostics)
+        diagnostics_layout.setSizeConstraint(QLayout.SizeConstraint.SetMinimumSize)
+        state_frame = QFrame(self.diagnostics_content)
         state_frame.setObjectName("statusFrame")
         state_grid = QGridLayout(state_frame)
         state_grid.setContentsMargins(7, 4, 7, 4)
@@ -201,20 +222,30 @@ class GardenInputPanel(QWidget):
         )
         diagnostics_layout.addWidget(state_frame)
 
-        timeline_group = QGroupBox("240秒 phase / S タイムライン", diagnostics)
+        timeline_group = QGroupBox(
+            "240秒 phase / S タイムライン",
+            self.diagnostics_content,
+        )
         timeline_layout = QVBoxLayout(timeline_group)
         self.timeline = GardenInputTimeline(self._config, timeline_group)
-        self.timeline.setMinimumHeight(145)
+        self.timeline.setMinimumHeight(GARDEN_TIMELINE_MIN_HEIGHT)
         timeline_layout.addWidget(self.timeline)
         diagnostics_layout.addWidget(timeline_group)
 
-        chart_table_splitter = QSplitter(Qt.Orientation.Vertical, diagnostics)
-        self.chart = GardenInputChart(self._config, chart_table_splitter)
-        self.chart.setMinimumHeight(285)
-        chart_table_splitter.addWidget(self.chart)
+        self.chart_table_splitter = QSplitter(
+            Qt.Orientation.Vertical,
+            self.diagnostics_content,
+        )
+        self.chart_table_splitter.setObjectName("gardenChartTableSplitter")
+        self.chart_table_splitter.setMinimumHeight(
+            GARDEN_CHART_TABLE_SPLITTER_MIN_HEIGHT
+        )
+        self.chart = GardenInputChart(self._config, self.chart_table_splitter)
+        self.chart_table_splitter.addWidget(self.chart)
 
-        self.table_tabs = QTabWidget(chart_table_splitter)
+        self.table_tabs = QTabWidget(self.chart_table_splitter)
         self.table_tabs.setObjectName("gardenTableTabs")
+        self.table_tabs.setMinimumHeight(GARDEN_TABLE_TABS_MIN_HEIGHT)
         rri_table_page = QWidget(self.table_tabs)
         rri_table_layout = QVBoxLayout(rri_table_page)
         rri_table_layout.setContentsMargins(4, 4, 4, 4)
@@ -234,12 +265,25 @@ class GardenInputPanel(QWidget):
         self._configure_table(self.evaluation_table, self.evaluation_model)
         evaluation_layout.addWidget(self.evaluation_table)
         self.table_tabs.addTab(evaluation_page, "評価結果")
-        chart_table_splitter.addWidget(self.table_tabs)
-        chart_table_splitter.setSizes([430, 230])
-        diagnostics_layout.addWidget(chart_table_splitter, stretch=1)
-        body.addWidget(diagnostics)
-        body.setSizes([480, 1025])
-        root.addWidget(body, stretch=1)
+        self.chart_table_splitter.addWidget(self.table_tabs)
+        self.chart_table_splitter.setCollapsible(0, False)
+        self.chart_table_splitter.setCollapsible(1, False)
+        self.chart_table_splitter.setStretchFactor(0, 1)
+        self.chart_table_splitter.setStretchFactor(1, 0)
+        self.chart_table_splitter.setSizes(list(GARDEN_CHART_TABLE_INITIAL_SIZES))
+        diagnostics_layout.addWidget(self.chart_table_splitter)
+        self.diagnostics_scroll.setWidget(self.diagnostics_content)
+        self._diagnostic_scroll_wheel_targets = (
+            self.timeline.viewport(),
+            self.chart.rri_graphics.viewport(),
+            self.chart.evaluation_graphics.viewport(),
+            self.chart.signal_graphics.viewport(),
+        )
+        for target in self._diagnostic_scroll_wheel_targets:
+            target.installEventFilter(self)
+        self.body_splitter.addWidget(self.diagnostics_scroll)
+        self.body_splitter.setSizes([480, 1025])
+        root.addWidget(self.body_splitter, stretch=1)
 
         # Concise aliases support terminology used by the specification and smoke tests.
         self.current_phase_label = self.phase_label
@@ -282,6 +326,30 @@ class GardenInputPanel(QWidget):
                 QLabel#fixedConditionValue { color: #1E3A5F; font-weight: 600; }
             """
         )
+
+    def eventFilter(self, watched, event) -> bool:  # noqa: N802
+        """Route vertical plot-wheel gestures to the diagnostics scroll area."""
+
+        if (
+            watched in self._diagnostic_scroll_wheel_targets
+            and event.type() is QEvent.Type.Wheel
+        ):
+            pixel_delta = event.pixelDelta().y()
+            angle_delta = event.angleDelta().y()
+            scroll_delta = pixel_delta
+            if scroll_delta == 0 and angle_delta:
+                steps = angle_delta / 120.0
+                scroll_delta = round(
+                    steps
+                    * 3
+                    * self.diagnostics_scroll.verticalScrollBar().singleStep()
+                )
+            if scroll_delta:
+                scroll_bar = self.diagnostics_scroll.verticalScrollBar()
+                scroll_bar.setValue(scroll_bar.value() - scroll_delta)
+                event.accept()
+                return True
+        return super().eventFilter(watched, event)
 
     @staticmethod
     def _configure_table(table: QTableView, model) -> None:
