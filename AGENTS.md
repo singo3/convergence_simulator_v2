@@ -29,5 +29,12 @@
 - baseline初期化時のW=0.5を `W_anchor_session` として保存せず、同じ有効評価revisionを1秒signalごとに重複更新しない。
 - Stage 5AでGを0などの代替値として捏造せず `not_connected` とする。touch eventを配送せず、E、q、kをlive更新しない。
 - Stage 5AにGarden出力層、第2周、3生命資格競争、holder・勝者・順位決定、関係記憶探索を先回り実装しない。
+- Stage 5B RuntimeはP/Vを比較せず、各生命のtauをversion管理したpolicyで個別のtouch時刻へ写像してscheduleするだけとする。
+- Digital Lifeの正式touch payloadはID、role、signal識別子、Bだけとし、P、V、tau、offset、N/Nd/W/E/q/k/GをGardenへ渡さない。
+- Garden出力資格層は実際の `scheduled_time_us` とscheduler配送順だけでtouch到着順を決め、通常時にID順、role順、P/Vでholderを決めない。
+- Gは各生命が自己IDとfeedbackのholder IDを照合して計算し、GardenはGをpayloadへ含めない。
+- Eは毎signalの第2周で更新する。qは新しい有効なintervention bundle評価がありG=1の生命だけ更新し、baseline評価では更新しない。
+- 240秒closingでは新しい評価revisionを適用し、release前holderでfeedbackと全3生命の第2周を完了した後だけholderを解放する。
+- kと関係記憶の探索・trial・adoptionはStage 5Cまで実装しない。
 - Stageごとに独立commitを作り、push前にcompileall、全pytest、Ruff、headless、GUI smoke、digest回帰を検証する。
 - force push、force-with-lease、既存commitのamend/rebaseを行わない。

@@ -1,0 +1,219 @@
+{
+  "core_vectors": {
+    "b_round_trip_identity": {
+      "expected_exact_match": true,
+      "first_round_b": [
+        0.3472222222222222,
+        0.5,
+        0.5,
+        0.5
+      ],
+      "garden_record_b": [
+        0.3472222222222222,
+        0.5,
+        0.5,
+        0.5
+      ],
+      "returned_b": [
+        0.3472222222222222,
+        0.5,
+        0.5,
+        0.5
+      ],
+      "touch_event_b": [
+        0.3472222222222222,
+        0.5,
+        0.5,
+        0.5
+      ],
+      "touch_intent_b": [
+        0.3472222222222222,
+        0.5,
+        0.5,
+        0.5
+      ]
+    },
+    "e": {
+      "after_180_active_holder_signals": 0.15000000000000488,
+      "after_closing_s_zero": 0.14991222526166195,
+      "eta_e": 0.000902475465494823,
+      "g_zero_recovery": 0.3997659340310855,
+      "rho_e": 0.0005851649222862187,
+      "single_accumulation": 0.4005414852792969,
+      "single_recovery": 0.3997659340310855
+    },
+    "g": [
+      {
+        "digital_life_id": "life-green",
+        "expected": 1,
+        "qualification_holder_id": "life-green"
+      },
+      {
+        "digital_life_id": "life-red",
+        "expected": 0,
+        "qualification_holder_id": "life-green"
+      },
+      {
+        "digital_life_id": "life-blue",
+        "expected": 0,
+        "qualification_holder_id": null
+      }
+    ],
+    "q": [
+      {
+        "applied": true,
+        "expected": 0.6,
+        "g": 1,
+        "name": "positive",
+        "q": 0.5,
+        "skip_reason": "applied",
+        "w": 1.0
+      },
+      {
+        "applied": true,
+        "expected": 0.5,
+        "g": 1,
+        "name": "neutral",
+        "q": 0.5,
+        "skip_reason": "applied",
+        "w": 0.5
+      },
+      {
+        "applied": true,
+        "expected": 0.4,
+        "g": 1,
+        "name": "negative",
+        "q": 0.5,
+        "skip_reason": "applied",
+        "w": 0.0
+      },
+      {
+        "applied": false,
+        "expected": 0.5,
+        "g": 0,
+        "name": "g_zero",
+        "q": 0.5,
+        "skip_reason": "g_zero",
+        "w": 1.0
+      },
+      {
+        "applied": false,
+        "expected": 0.5,
+        "g": 1,
+        "name": "baseline_skip",
+        "q": 0.5,
+        "skip_reason": "baseline_not_intervention_evaluation",
+        "w": 1.0
+      }
+    ],
+    "qualification": [
+      {
+        "expected_holder_after": "life-green",
+        "first_arrival_id": "life-green",
+        "holder_before": null,
+        "name": "first_touch_assignment",
+        "s": 1
+      },
+      {
+        "expected_holder_after": "life-green",
+        "first_arrival_id": "life-red",
+        "holder_before": "life-green",
+        "name": "hold_during_active_session",
+        "s": 1
+      },
+      {
+        "closing_second_round_complete": true,
+        "expected_holder_after": null,
+        "holder_before": "life-green",
+        "name": "release_after_closing_second_round",
+        "s": 0
+      }
+    ]
+  },
+  "normative_source": {
+    "algorithm_version": "adaptive_random_search_confirmed_v1",
+    "document_version": "v2.0",
+    "profile_version": "symbiotic_signal_loop_reference_v1_0",
+    "sha256": "9707de5c07cbcb20603436b374f6a563b5d908206096f2a2204384ae91b22c73",
+    "size_bytes": 65759,
+    "state_schema_version": "relation_memory_state_v2"
+  },
+  "schema_version": "stage_05b_reference_vectors_v1",
+  "simulation_assumptions": {
+    "equal_arrival_tie_break": {
+      "arrival_time_us": 60500000,
+      "expected_order": [
+        "life-blue",
+        "life-green",
+        "life-red"
+      ],
+      "policy": "lexicographic_digital_life_id_on_equal_arrival_us",
+      "registration_input": [
+        "life-red",
+        "life-blue",
+        "life-green"
+      ]
+    },
+    "garden_output_model_version": "relax_with_light_garden_output_qualification_v0_1",
+    "runtime_model_version": "three_digital_life_runtime_v0_1",
+    "tau_delivery": {
+      "formula": "1 + floor(clip01(tau) * 999997)",
+      "round_finalize_offset_us": 999999,
+      "vectors": [
+        {
+          "expected_touch_offset_us": 1,
+          "tau": 0.0
+        },
+        {
+          "expected_touch_offset_us": 250000,
+          "tau": 0.25
+        },
+        {
+          "expected_touch_offset_us": 499999,
+          "tau": 0.5
+        },
+        {
+          "expected_touch_offset_us": 749998,
+          "tau": 0.75
+        },
+        {
+          "expected_touch_offset_us": 999998,
+          "tau": 1.0
+        }
+      ]
+    },
+    "tau_delivery_policy_version": "tau_to_microsecond_touch_delivery_v0_1"
+  },
+  "standard_fixture": {
+    "baseline_n": 0.1641195720593294,
+    "expected_active_output_count": 180,
+    "expected_feedback_count": 723,
+    "expected_final_green_e": 0.14991222526166195,
+    "expected_final_green_q": 0.5041270950772643,
+    "expected_first_touch_order": [
+      "life-green",
+      "life-blue",
+      "life-red"
+    ],
+    "expected_holder": "life-green",
+    "expected_inactive_output_count": 61,
+    "expected_touch_count": 540,
+    "initial_arrivals": [
+      {
+        "digital_life_id": "life-blue",
+        "tau": 0.6172979657335524,
+        "touch_offset_us": 617297
+      },
+      {
+        "digital_life_id": "life-green",
+        "tau": 0.5515408729267095,
+        "touch_offset_us": 551540
+      },
+      {
+        "digital_life_id": "life-red",
+        "tau": 0.6414876940566248,
+        "touch_offset_us": 641486
+      }
+    ]
+  }
+}

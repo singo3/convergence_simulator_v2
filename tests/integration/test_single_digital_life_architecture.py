@@ -328,21 +328,35 @@ def test_runtime_state_and_records_have_no_stage5b_state() -> None:
     assert fields.isdisjoint(forbidden)
 
 
-def test_no_garden_output_or_stage5b_module_has_been_added() -> None:
-    assert not (package_root() / "garden" / "output_layer").exists()
-    forbidden_stems = {
+def test_stage5a_core_remains_isolated_from_stage5b_extensions() -> None:
+    assert (package_root() / "garden" / "output_layer").is_dir()
+    assert {
+        "connected_component",
+        "second_round",
+        "second_round_records",
+        "touch_intent",
+    } <= {path.stem for path in digital_life_sources()}
+
+    imports = set().union(*(imported_module_names(path) for path in runtime_core_sources()))
+    forbidden_stage5b_imports = (
+        "symbiotic_sim_v2.digital_life.connected_component",
+        "symbiotic_sim_v2.digital_life.second_round",
+        "symbiotic_sim_v2.digital_life.touch_intent",
+        "symbiotic_sim_v2.garden.output_layer",
+        "symbiotic_sim_v2.runtime.multi_life",
+    )
+    assert all(
+        not name.startswith(forbidden_stage5b_imports)
+        for name in imports
+    )
+
+    forbidden_stage5c_stems = {
         "adoption",
         "exploration",
-        "garden_output",
-        "holder",
-        "qualification",
-        "second_round",
-        "touch",
         "trial",
     }
-
     assert {path.stem.lower() for path in digital_life_sources()}.isdisjoint(
-        forbidden_stems
+        forbidden_stage5c_stems
     )
 
 

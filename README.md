@@ -7,7 +7,8 @@
 - Stage 3「仮想Polar H10」: 完成
 - Stage 4「Garden入力層とセッションシグナル」: 完成
 - Stage 5A「1体のデジタル生命・第1周」: 完成
-- 現在のGUI主対象: Stage 5Aの1体のデジタル生命・第1周
+- Stage 5B「3生命・資格競争・第2周」: 完成
+- 現在のGUI主対象: Stage 5Bの3生命・Garden資格競争・第2周
 
 正式な信号経路は次のとおりです。
 
@@ -18,16 +19,20 @@
   → RriMeasurementEvent
   → Garden入力層
   → GardenInputSignalEvent (N, S)
-  → 1体のデジタル生命
-  → 第1周: Nd, W, P, V, B, tau
-  → Garden出力層（Stage 5Aでは未接続）
+  → red / green / blueの独立した第1周: Nd, W, P, V, B, tau
+  → 各tauを個別touch時刻へ写像
+  → DigitalLifeTouchEvent (ID, B)
+  → Garden出力資格層（actual arrivalでholder決定・保持）
+  → holder ID + 各生命自身のB
+  → 各生命の第2周: G, E, q（k固定）
+  → GardenQualifiedBEvent
 ```
 
 仮想ユーザーの正式出力は `HeartbeatEvent` だけです。仮想Polar H10は隣接するheartbeatの正式時刻差をraw RRIとして測定し、RRIを含む `RriMeasurementEvent` だけを正式出力します。H10はartifact判定、RMSSD、N、Nd、Wを扱いません。
 
 Garden入力層は `RriMeasurementEvent` だけをraw inputとし、artifactを除いた評価windowのRRIから実RMSSDとNを求めます。正式な1秒シグナル `GardenInputSignalEvent` はNとSを出力します。Stage 5Aのデジタル生命はこのformal signalと評価metadata eventだけを受け、Nd、W、P、V、B、tauを計算します。
 
-Stage 5AでGとGarden出力層は未接続です。第2周、E/q/kのlive更新、touch配送、3生命の資格競争、光刺激は未実装です。first-round record、GUI、CSVは開発用診断であり、Gardenへの正式出力ではありません。
+Stage 5BではG、E/q第2周、touch配送、3生命の資格競争を接続しました。RuntimeはP/Vを比較せずtauを個別scheduleへ写像するだけで、Gardenは実到着したID/Bだけからholderを決めます。k探索はStage 5C、GardenQualifiedBEventからHue/BPM/Iを作る光刺激はStage 6であり、まだ実装していません。
 
 現在の `ideal_polar_h10_rri_device_v0_1` は、誤差・欠損・遅延なしの理想的な入力デバイスを表すsimulation assumptionです。実機Polar H10のBLE GATT packet、firmware、電波、pairing、Polar SDKを再現するpacket-level emulatorではありません。
 
@@ -91,6 +96,19 @@ Stage 2のRRI、RMSSD、内部変動成分は仮想ユーザー内部の開発�
 - 1体のデジタル生命GUI、240秒headless JSON、2種類の開発診断CSV
 - Stage 4のevent stream/digestとStage 1〜4のCLI/schema/CSVを維持する回帰テスト
 
+### Stage 5B
+
+- red / green / blueの独立stateと同じGarden N/Sの個別演算
+- `three_digital_life_runtime_v0_1` とtauのinteger-microseconds個別配送
+- P/V/tauを含めずID/Bだけを運ぶ `digital_life_touch_event_v1`
+- actual arrivalだけによるholder assignment、S=1中の保持、closing第2周後の解放
+- recipient自身のBだけを返す `garden_interoceptive_feedback_event_v1`
+- 各生命内のID照合によるG、毎signalのE更新、新規有効BundleかつG=1だけのq更新
+- 全生命で固定kと `deferred_to_stage_5c`
+- 次Stage境界の `garden_qualified_b_event_v1`（Hue/BPM/Iは未実装）
+- 6 tab GUI、240秒headless JSON、4種類のCSV、5種類のStage 5B digest
+- Stage 1〜5A CLI/schema/digest/CSVを維持する回帰テスト
+
 ## Requirements / setup
 
 - Python 3.12以上
@@ -99,7 +117,7 @@ Stage 2のRRI、RMSSD、内部変動成分は仮想ユーザー内部の開発�
 - pytest / pytest-qt
 - Ruff
 
-Stage 5A固定検証環境はPython 3.13.4、PySide6 6.11.1、PyQtGraph 0.14.0、NumPy 2.5.1、pytest 9.1.1、pytest-qt 4.5.0、Ruff 0.16.1です。
+Stage 5B固定検証環境はPython 3.13.4、PySide6 6.11.1、PyQtGraph 0.14.0、NumPy 2.5.1、pytest 9.1.1、pytest-qt 4.5.0、Ruff 0.16.1です。
 
 プロジェクト直下の `.venv` をStage間で再利用します。
 
@@ -117,15 +135,16 @@ python3.13 -m venv .venv
 
 macOSでは、汎用launcher `環境共生型デジタル生命シミュレーターv2を起動.command` をダブルクリックできます。`時間シミュレーターを起動.command` も後方互換用に維持しています。
 
-GUI上部にはStage 1共通の時計、状態、速度、step controlsがあります。中央のtabは次の5つです。
+GUI上部にはStage 1共通の時計、状態、速度、step controlsがあります。中央のtabは次の6つです。
 
-1. デジタル生命: N/baseline/Nd/W、P/V/tau、E/q、k/B、1秒signal・評価table
-2. Garden入力層: phase/S、RRI/artifact、RMSSD/N、N/S、RRI・評価table
-3. 仮想ユーザー: Stage 2設定、内部真値の開発用診断
-4. Polar H10: ideal mode固定条件、raw RRI、真値比較、誤差、測定table
-5. 時間・イベント診断: timeline、実行済みevent log、wall/virtual time診断
+1. 3生命・資格競争: 3状態card、tau/touch、G/holder、E/q、P/V、B、touch/第2周table
+2. Garden出力資格層: holder timeline、資格規則、qualified B、qualification table
+3. Garden入力層: phase/S、RRI/artifact、RMSSD/N、N/S、RRI・評価table
+4. 仮想ユーザー: Stage 2設定、内部真値の開発用診断
+5. Polar H10: ideal mode固定条件、raw RRI、真値比較、誤差、測定table
+6. 時間・イベント診断: timeline、実行済みevent log、wall/virtual time診断
 
-仮想ユーザー設定とDigital Life roleは開始前またはreset後だけ変更できます。Digital Life roleはred/green/blue、標準はgreenです。H10にはnoise、latency、packet loss、artifact rateなどの調整parameterはありません。Garden入力のモデル値とpolicyは固定設定として表示し、GUIからscheduler内部heapを操作しません。
+仮想ユーザー設定は開始前またはreset後だけ変更できます。Stage 5Aの1体専用GUI/role fixtureも後方互換として残します。H10にはnoise、latency、packet loss、artifact rateなどの調整parameterはありません。Garden入力・出力のモデル値とpolicyは固定設定として表示し、GUIからscheduler内部heapを操作しません。
 
 ## Headless
 
@@ -166,9 +185,15 @@ red/green/blueのroleを指定できます。
 .venv/bin/python -m symbiotic_sim_v2 --headless-single-life-demo --life-role blue
 ```
 
-いずれもreal-time待機をせずJSONを標準出力します。package versionはStage 5Aとして `0.5.0` です。ただし既存JSON contractを変えないため、`--headless-h10-demo` の `project_version` は `0.3.0`、`--headless-garden-input-demo` は `0.4.0` を意図的に維持します。
+Stage 5Bの3生命・資格競争・第2周:
 
-既存Stage 1〜4 JSONは変更しません。Stage 3 JSONはraw RRI統計、一致比較、heartbeat/measurement/full-event digestを分離し、RMSSD、N、Nd、W、artifact評価を含めません。Stage 4 JSONはGardenのsession、N/S、4評価、artifact/evaluation/signal/full-event digestを診断表示し、NdとWを含めません。Stage 5A JSONは生命config、生得値、最終第1周値、first-round/evaluation-update/full-event digestと `G_status=not_connected` を表示し、actual G値、holder、touch order、実際のGarden出力を含めません。
+```bash
+.venv/bin/python -m symbiotic_sim_v2 --headless-three-life-competition-demo
+```
+
+いずれもreal-time待機をせずJSONを標準出力します。package versionはStage 5Bとして `0.6.0` です。ただし既存JSON contractを変えないため、Stage 3/4/5A headlessの `project_version` はそれぞれ `0.3.0`、`0.4.0`、`0.5.0` を意図的に維持します。
+
+既存Stage 1〜5A JSONは変更しません。Stage 5B JSONはholder、生命別E/q/G/k、touch/feedback/qualified B件数と分離digestを表示し、探索状態、Hue、BPM、I、光波形を含めません。
 
 ## 開発用CSV export
 
@@ -207,6 +232,18 @@ headlessで2ファイルを保存する例:
 ```bash
 .venv/bin/python -m symbiotic_sim_v2 --headless-single-life-demo \
   --export-single-life-csv artifacts/csv/stage-05a
+```
+
+Stage 5Bは次の4ファイルを保存します。
+
+- `stage_05b_digital_life_touches.csv`
+- `stage_05b_garden_qualification.csv`
+- `stage_05b_qualified_b_outputs.csv`
+- `stage_05b_digital_life_second_round.csv`
+
+```bash
+.venv/bin/python -m symbiotic_sim_v2 --headless-three-life-competition-demo \
+  --export-three-life-competition-csv artifacts/csv/stage-05b
 ```
 
 GUIからも診断CSVを保存できます。H10 CSVのraw device output列と `diagnostic_true_rri_*` / `absolute_error_us` / `match` 列は責務上分離され、`diagnostic_notice` 列で開発用比較であることを明示します。GardenはCSVではなく `RriMeasurementEvent` を直接受信し、Digital LifeもCSVではなくGarden formal eventを受信します。CSV exportの有無はsimulation結果とdigestを変えません。
@@ -256,6 +293,8 @@ GUIからも診断CSVを保存できます。H10 CSVのraw device output列と `
 Garden入力層はこの `RriMeasurementEvent` だけを受け、1秒周期の `GardenInputSignalEvent` に `n_current` と `s` を載せます。評価確定時の件数、artifact率、RMSSD、N、qualityは `GardenEvaluationFinalizedEvent` へ記録します。正式なsignal payloadにNdとWはありません。
 
 Stage 5A Digital Lifeの正式入力はこの `GardenInputSignalEvent` と `GardenEvaluationFinalizedEvent` だけです。N/Sはsignalからのみ取得し、evaluation eventはID/quality/revisionの由来metadataとして使用します。Gardenのcomponent/record、RRI、RMSSD、artifact内部値を参照しません。Stage 5A Digital Lifeに正式外部出力eventはなく、first-round/evaluation-update recordは開発用診断です。
+
+Stage 5Bの正式touchはID/role/signal/Bだけを含みます。Gardenはこの実到着順だけでholderを決め、各生命へholder IDとrecipient自身のBだけを返します。Gはfeedback payloadに含めず各生命が計算します。Garden出力はholderのBを含む `GardenQualifiedBEvent` ですが、光のHue/BPM/Iはまだ生成しません。
 
 ## Stage 4 Garden input model
 
@@ -325,6 +364,10 @@ tau = clip01(P / (P + V + 0.000001) + birth_phase)  # S=1のみ
 
 Stage 5AでE=0、q=0.5、`k_current=[0.5,0.5,0.5,0.5]` をlive更新しません。S=0でP=1、tau=nullです。240秒closingではBundle 2 revisionをNd/Wへ先に適用した後、S=0のP/tauを記録します。Gは `not_connected`、touch配送は0件です。
 
+## Stage 5B competition and second-round model
+
+3生命は同じN/Sを受けますが互いの内部値を参照しません。Runtimeは各tauを個別touch時刻へ写像するだけで、Gardenがactual arrivalからholderを決めます。holderはS=1中固定ですが全生命が毎signal touchします。各生命はID照合でGを計算し、毎signal Eを更新し、新規有効Bundle評価かつG=1だけqを更新します。更新E/qは次signalから使用し、kは固定です。240秒ではBundle 2を解放前holderへ帰属してからreleaseします。
+
 ## Deterministic digest baselines
 
 - Stage 1: `1c4217065fa29316e7ead83c4d604e87f9fe8fe46e82b689b5566dbc9890598d`
@@ -338,17 +381,19 @@ Stage 4はRRI artifact分類、4 evaluation、241件のN/S signal、full event�
 
 Stage 5Aは241件のfirst-round recordと、新しい有効評価またはrejected評価に対応するevaluation-update recordのdigestを分けます。Digital Lifeは新規eventを発行しないため、Stage 4とStage 5Aのfull event digestは同じです。roleを変えてもVirtualUser/H10/Gardenの結果は不変で、生命固有のP/B/tauとfirst-round digestだけが変化します。
 
+Stage 5Bはtouch、qualification、qualified B、feedback、生命別second roundを別々にdigest化します。標準runはtouch 540、feedback 723、active/inactive output 180/61、assignment/release各1です。run-to-end、step、速度、reset、snapshot頻度、GUI、CSV exportは結果を変えません。
+
 ## Test / lint / smoke
 
 ```bash
 .venv/bin/python -m compileall -q src tests
 QT_QPA_PLATFORM=offscreen .venv/bin/pytest -q
 .venv/bin/ruff check .
-QT_QPA_PLATFORM=offscreen .venv/bin/python -m symbiotic_sim_v2 --smoke-test --auto-close-ms 3500
+QT_QPA_PLATFORM=offscreen .venv/bin/python -m symbiotic_sim_v2 --smoke-test --auto-close-ms 4500
 ```
 
-テストはStage 1〜4全回帰に加え、Digital Life config、Hash01、Nd/W/P/V/B/tauのpure function、formal event boundary、baseline/revision/reject/240秒closing、role fixture、reset、全execution mode digest、headless、CSV、offscreen GUI、architecture分離を確認します。
+テストはStage 1〜5A全回帰に加え、3生命独立性、tau配送、touch schema、actual-arrival qualification、B往復、feedback routing、G/E/q/k、第2周同期、240秒closing、digest、headless、CSV、6-tab GUI、architecture分離を確認します。
 
 Stage 5Aの設計境界は [1体のデジタル生命・第1周](docs/stage-05a-single-digital-life-first-round.md)、式と分類は [Digital Life first-round model v0.1](docs/digital-life-first-round-model_v0.1.md) を参照してください。Stage 4の設計境界は [Garden入力層設計](docs/stage-04-garden-input-layer.md)、モデル値は [Garden input model v0.1](docs/relax-with-light-garden-input-model_v0.1.md)、境界所属の仮定は [RRI window membership policy v0.1](docs/rri-window-membership-policy_v0.1.md) にあります。規範との境界は [規範スコープ](docs/normative-scope.md) を参照してください。
 
-次工程は **Stage 5B: 3生命とGarden資格競争・第2周** です。Stage 5Aは1体の第1周までを実装し、G、Garden出力層、touch配送、E/q/k更新、holder/勝者/順位を先回り実装していません。3 bundle関係記憶探索は後続のStage 5Cです。
+Stage 5Bの設計境界は [3生命・資格競争・第2周](docs/stage-05b-three-life-competition-second-round.md)、配送仮定は [tau touch policy](docs/tau-touch-delivery-policy_v0.1.md)、Garden規則は [Garden output qualification model](docs/garden-output-qualification-model_v0.1.md) にあります。次工程は **Stage 5C: 3 bundle関係記憶探索** です。Stage 6の光物理写像もまだ実装していません。

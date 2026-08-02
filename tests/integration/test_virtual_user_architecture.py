@@ -26,8 +26,8 @@ def imported_module_names(path: Path) -> set[str]:
     return names
 
 
-def test_project_version_includes_completed_stage_5a() -> None:
-    assert __version__ == "0.5.0"
+def test_project_version_includes_completed_stage_5b() -> None:
+    assert __version__ == "0.6.0"
 
 
 def test_virtual_user_core_does_not_import_qt() -> None:

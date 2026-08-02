@@ -54,8 +54,8 @@ def referenced_identifier_names(path: Path) -> set[str]:
     return names
 
 
-def test_project_version_includes_completed_stage5a() -> None:
-    assert __version__ == "0.5.0"
+def test_project_version_includes_completed_stage5b() -> None:
+    assert __version__ == "0.6.0"
 
 
 def test_device_core_has_no_qt_or_pyqtgraph_imports() -> None:

@@ -1,4 +1,4 @@
-"""Command entry point for Stage 1-5A headless demos and the Stage 5A GUI."""
+"""Command entry point for Stage 1-5B headless demos and the Stage 5B GUI."""
 
 from __future__ import annotations
 
@@ -22,8 +22,10 @@ from symbiotic_sim_v2.devices.polar_h10.diagnostics import (
 )
 from symbiotic_sim_v2.devices.polar_h10.scenario import create_polar_h10_simulation
 from symbiotic_sim_v2.digital_life.config import (
+    ALGORITHM_VERSION,
     DIGITAL_LIFE_CONFIG_SCHEMA_VERSION,
     DIGITAL_LIFE_MODEL_VERSION,
+    STATE_SCHEMA_VERSION,
     digital_life_config_for_role,
 )
 from symbiotic_sim_v2.digital_life.diagnostics import (
@@ -33,6 +35,13 @@ from symbiotic_sim_v2.digital_life.diagnostics import (
     export_first_round_diagnostics_csv,
 )
 from symbiotic_sim_v2.digital_life.scenario import create_single_digital_life_simulation
+from symbiotic_sim_v2.digital_life.second_round_diagnostics import (
+    SECOND_ROUND_CSV_FILENAME,
+    export_second_round_diagnostics_csv,
+)
+from symbiotic_sim_v2.digital_life.second_round_records import (
+    DIGITAL_LIFE_SECOND_ROUND_RECORD_SCHEMA_VERSION,
+)
 from symbiotic_sim_v2.domain.event_types import GARDEN_PHASE_CHANGED_EVENT_TYPE
 from symbiotic_sim_v2.garden.input_layer.config import (
     BASELINE_INVALID_POLICY,
@@ -48,6 +57,23 @@ from symbiotic_sim_v2.garden.input_layer.diagnostics import (
     export_garden_input_diagnostics,
 )
 from symbiotic_sim_v2.garden.input_layer.scenario import create_garden_input_simulation
+from symbiotic_sim_v2.garden.output_layer.config import (
+    DIGITAL_LIFE_TOUCH_SCHEMA_VERSION,
+    GARDEN_INTEROCEPTIVE_FEEDBACK_SCHEMA_VERSION,
+    GARDEN_OUTPUT_MODEL_VERSION,
+    GARDEN_QUALIFICATION_STATE_SCHEMA_VERSION,
+    GARDEN_QUALIFIED_B_SCHEMA_VERSION,
+)
+from symbiotic_sim_v2.garden.output_layer.diagnostics import (
+    export_garden_output_diagnostics,
+)
+from symbiotic_sim_v2.runtime.multi_life.config import (
+    TAU_TOUCH_DELIVERY_POLICY_VERSION,
+    THREE_DIGITAL_LIFE_RUNTIME_MODEL_VERSION,
+)
+from symbiotic_sim_v2.runtime.multi_life.scenario import (
+    create_three_digital_life_competition_simulation,
+)
 from symbiotic_sim_v2.simulation.demo_scenario import create_demo_engine
 from symbiotic_sim_v2.virtual_user.config import VIRTUAL_USER_MODEL_VERSION, VirtualUserConfig
 from symbiotic_sim_v2.virtual_user.diagnostics import (
@@ -61,10 +87,11 @@ DOCUMENT_VERSION = "v2.0"
 PROFILE_VERSION = "symbiotic_signal_loop_reference_v1_0"
 STAGE_3_HEADLESS_PROJECT_VERSION = "0.3.0"
 STAGE_4_HEADLESS_PROJECT_VERSION = "0.4.0"
+STAGE_5A_HEADLESS_PROJECT_VERSION = "0.5.0"
 
 
 def _build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Symbiotic simulator Stage 5A")
+    parser = argparse.ArgumentParser(description="Symbiotic simulator Stage 5B")
     headless_group = parser.add_mutually_exclusive_group()
     headless_group.add_argument(
         "--headless-demo",
@@ -96,11 +123,16 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="run the 240-second Stage 5A single-Digital-Life first round",
     )
+    headless_group.add_argument(
+        "--headless-three-life-competition-demo",
+        action="store_true",
+        help="run the 240-second Stage 5B three-life competition and second round",
+    )
     parser.add_argument(
         "--life-role",
         choices=("red", "green", "blue"),
-        default="green",
-        help="select the Stage 5A Digital Life role preset (default: green)",
+        default=None,
+        help="select the backward-compatible Stage 5A GUI/CLI role preset",
     )
     parser.add_argument(
         "--smoke-test",
@@ -110,7 +142,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--auto-close-ms",
         type=int,
-        default=3500,
+        default=4500,
         help="GUI smoke-test auto-close delay in milliseconds",
     )
     parser.add_argument(
@@ -120,9 +152,15 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--screenshot-target",
-        choices=("window", "digital-life-graphs"),
+        choices=(
+            "window",
+            "digital-life-graphs",
+            "three-life-overview",
+            "touch-holder-second-round",
+            "garden-output-qualified-b",
+        ),
         default="window",
-        help="capture the whole window or the four Stage 5A graphs",
+        help="capture the selected Stage 5A/5B diagnostic view",
     )
     parser.add_argument(
         "--export-virtual-user-csv",
@@ -143,6 +181,11 @@ def _build_parser() -> argparse.ArgumentParser:
         "--export-single-life-csv",
         type=Path,
         help="write the two Stage 5A Digital Life diagnostic CSV files to a directory",
+    )
+    parser.add_argument(
+        "--export-three-life-competition-csv",
+        type=Path,
+        help="write the four Stage 5B competition diagnostic CSV files to a directory",
     )
     return parser
 
@@ -358,7 +401,7 @@ def run_headless_single_life_demo(
     snapshot = life.snapshot()
     intrinsic = life.intrinsic_profile
     result = {
-        "project_version": __version__,
+        "project_version": STAGE_5A_HEADLESS_PROJECT_VERSION,
         "document_version": life_config.document_version,
         "profile_version": life_config.profile_version,
         "algorithm_version": life_config.algorithm_version,
@@ -416,7 +459,168 @@ def run_headless_single_life_demo(
     return 0
 
 
-def run_gui(
+def run_headless_three_life_competition_demo(
+    export_csv: Path | None = None,
+) -> int:
+    """Run Stage 5B and emit qualification/second-round diagnostics as JSON."""
+
+    simulation = create_three_digital_life_competition_simulation()
+    simulation.engine.run_until_end()
+    garden = simulation.garden_output_component
+    garden_snapshot = garden.snapshot()
+    runtime_snapshot = simulation.runtime_coordinator.snapshot()
+    touch_records = garden.touch_records()
+    qualification_records = garden.qualification_records()
+    qualified_b_records = garden.qualified_b_records()
+    feedback_records = garden.feedback_records()
+    life_ids = tuple(sorted(simulation.digital_life_components))
+    life_snapshots = {
+        life_id: simulation.digital_life_components[life_id].snapshot()
+        for life_id in life_ids
+    }
+    touch_count_by_life = {
+        life_id: sum(record.digital_life_id == life_id for record in touch_records)
+        for life_id in life_ids
+    }
+    assignment_signal_index = garden_snapshot.qualification_assigned_signal_index
+    first_touch_order = [
+        record.digital_life_id
+        for record in touch_records
+        if record.signal_index == assignment_signal_index
+    ]
+    per_life = {
+        life_id: {
+            "role": snapshot.role,
+            "first_round_count": snapshot.first_round_count,
+            "second_round_count": snapshot.second_round_count,
+            "touch_count": snapshot.touch_dispatched_count,
+            "final_E": snapshot.e,
+            "final_q": snapshot.q,
+            "final_G": snapshot.current_g,
+            "final_k_anchor": snapshot.k_anchor,
+            "final_k_current": snapshot.k_current,
+            "q_update_count": snapshot.q_update_count,
+            "k_update_count": snapshot.k_update_count,
+        }
+        for life_id, snapshot in life_snapshots.items()
+    }
+    result = {
+        "project_version": __version__,
+        "document_version": DOCUMENT_VERSION,
+        "profile_version": PROFILE_VERSION,
+        "algorithm_version": ALGORITHM_VERSION,
+        "state_schema_version": STATE_SCHEMA_VERSION,
+        "runtime_model_version": THREE_DIGITAL_LIFE_RUNTIME_MODEL_VERSION,
+        "garden_output_model_version": GARDEN_OUTPUT_MODEL_VERSION,
+        "qualification_state_schema_version": (
+            GARDEN_QUALIFICATION_STATE_SCHEMA_VERSION
+        ),
+        "tau_delivery_policy_version": TAU_TOUCH_DELIVERY_POLICY_VERSION,
+        "event_schema_versions": {
+            "touch": DIGITAL_LIFE_TOUCH_SCHEMA_VERSION,
+            "interoceptive_feedback": (
+                GARDEN_INTEROCEPTIVE_FEEDBACK_SCHEMA_VERSION
+            ),
+            "qualified_b": GARDEN_QUALIFIED_B_SCHEMA_VERSION,
+            "second_round_record": (
+                DIGITAL_LIFE_SECOND_ROUND_RECORD_SCHEMA_VERSION
+            ),
+        },
+        "final_virtual_time_us": simulation.engine.clock.current_time_us,
+        "final_state": simulation.engine.clock.state.value,
+        "executed_event_count": len(simulation.engine.executed_events()),
+        "garden_signal_count": len(
+            simulation.garden_input_component.signal_records()
+        ),
+        "touch_count": len(touch_records),
+        "feedback_count": len(feedback_records),
+        "qualified_b_output_count": len(qualified_b_records),
+        "active_output_count": garden_snapshot.active_output_count,
+        "inactive_output_count": garden_snapshot.inactive_output_count,
+        "assignment_count": garden_snapshot.assignment_count,
+        "release_count": garden_snapshot.release_count,
+        "qualification_holder_id_during_session": (
+            garden_snapshot.last_assigned_holder_id
+        ),
+        "final_qualification_holder_id": (
+            garden_snapshot.qualification_holder_id
+        ),
+        "holder_assignment_signal_index": assignment_signal_index,
+        "holder_assignment_time_us": (
+            garden_snapshot.qualification_assignment_time_us
+        ),
+        "touch_count_by_life": touch_count_by_life,
+        "first_touch_order": first_touch_order,
+        "per_life": per_life,
+        "per_life_first_round_count": {
+            life_id: snapshot.first_round_count
+            for life_id, snapshot in life_snapshots.items()
+        },
+        "per_life_second_round_count": {
+            life_id: snapshot.second_round_count
+            for life_id, snapshot in life_snapshots.items()
+        },
+        "per_life_final_E": {
+            life_id: snapshot.e for life_id, snapshot in life_snapshots.items()
+        },
+        "per_life_final_q": {
+            life_id: snapshot.q for life_id, snapshot in life_snapshots.items()
+        },
+        "per_life_final_G": {
+            life_id: snapshot.current_g
+            for life_id, snapshot in life_snapshots.items()
+        },
+        "per_life_final_k": {
+            life_id: snapshot.k_current
+            for life_id, snapshot in life_snapshots.items()
+        },
+        "per_life_q_update_count": {
+            life_id: snapshot.q_update_count
+            for life_id, snapshot in life_snapshots.items()
+        },
+        "k_update_count": sum(
+            snapshot.k_update_count for snapshot in life_snapshots.values()
+        ),
+        "completed_round_count": runtime_snapshot.completed_round_count,
+        "qualification_record_count": len(qualification_records),
+        "touch_digest": garden.touch_digest(),
+        "qualification_digest": garden.qualification_digest(),
+        "qualified_b_digest": garden.qualified_b_digest(),
+        "feedback_digest": garden.feedback_digest(),
+        "second_round_digest_by_life": {
+            life_id: simulation.digital_life_components[life_id].second_round_digest()
+            for life_id in life_ids
+        },
+        "full_event_digest": simulation.engine.deterministic_digest(),
+    }
+    if export_csv is not None:
+        export_csv.mkdir(parents=True, exist_ok=True)
+        garden_paths = export_garden_output_diagnostics(export_csv, garden)
+        combined_second_round = tuple(
+            sorted(
+                (
+                    record
+                    for component in simulation.digital_life_components.values()
+                    for record in component.second_round_records()
+                ),
+                key=lambda record: (record.signal_index, record.digital_life_id),
+            )
+        )
+        second_round_path = export_second_round_diagnostics_csv(
+            export_csv / SECOND_ROUND_CSV_FILENAME,
+            combined_second_round,
+        )
+        result["diagnostic_csvs"] = {
+            "touches": str(garden_paths.touches),
+            "qualification": str(garden_paths.qualification),
+            "qualified_b": str(garden_paths.qualified_b),
+            "second_round": str(second_round_path),
+        }
+    print(json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True))
+    return 0
+
+
+def run_single_life_gui(
     *,
     smoke_test: bool,
     auto_close_ms: int,
@@ -424,7 +628,7 @@ def run_gui(
     screenshot_target: str = "window",
     life_role: str = "green",
 ) -> int:
-    """Start the Qt application; smoke mode performs a bounded control sequence."""
+    """Start the backward-compatible Stage 5A single-life Qt application."""
 
     if auto_close_ms <= 0:
         raise ValueError("--auto-close-ms must be positive")
@@ -599,6 +803,199 @@ def run_gui(
     return app.exec()
 
 
+def run_gui(
+    *,
+    smoke_test: bool,
+    auto_close_ms: int,
+    screenshot: Path | None,
+    screenshot_target: str = "window",
+) -> int:
+    """Start the Stage 5B six-tab GUI over the shared production factory."""
+
+    if auto_close_ms <= 0:
+        raise ValueError("--auto-close-ms must be positive")
+    if os.environ.get("LC_ALL", "") in {"", "C", "C.UTF-8", "POSIX"}:
+        os.environ["LC_ALL"] = "en_US.UTF-8"
+    if os.environ.get("LANG", "") in {"", "C", "C.UTF-8", "POSIX"}:
+        os.environ["LANG"] = "en_US.UTF-8"
+
+    from PySide6.QtCore import QTimer
+    from PySide6.QtGui import QFont, QFontDatabase
+    from PySide6.QtWidgets import QApplication
+
+    from symbiotic_sim_v2.gui.controller import SimulationController
+    from symbiotic_sim_v2.gui.three_life_window import ThreeDigitalLifeMainWindow
+
+    app = QApplication.instance() or QApplication(sys.argv[:1])
+    available_fonts = set(QFontDatabase.families())
+    for family in (".AppleSystemUIFont", "Noto Sans", "DejaVu Sans", "Arial"):
+        if family in available_fonts:
+            app.setFont(QFont(family))
+            break
+    simulation = create_three_digital_life_competition_simulation()
+    controller = SimulationController(simulation.engine)
+    window = ThreeDigitalLifeMainWindow(controller, simulation)
+    app.aboutToQuit.connect(controller.shutdown)
+    window.show()
+
+    smoke_failures: list[str] = []
+    if smoke_test:
+        def finish_smoke_run() -> None:
+            # The button below exercises the normal bounded GUI path. Finish the
+            # same production engine synchronously so dense offscreen chart draws
+            # cannot make the fixed 4500 ms smoke contract machine-dependent.
+            if window.simulation.engine.clock.state.value != "completed":
+                window.simulation.engine.run_until_end()
+            controller.set_speed(controller.speed_mode)
+
+        actions = (
+            (50, window.start_button.click),
+            (100, window.pause_button.click),
+            (150, window.resume_button.click),
+            (200, window.pause_button.click),
+            (250, window.step_second_button.click),
+            (300, window.step_event_button.click),
+            (350, lambda: window.speed_combo.setCurrentIndex(1)),
+            (400, lambda: window.speed_combo.setCurrentIndex(2)),
+            (450, lambda: window.speed_combo.setCurrentIndex(3)),
+            (500, window.reset_button.click),
+            (600, window.run_to_end_button.click),
+            (650, finish_smoke_run),
+            (900, lambda: window.tabs.setCurrentIndex(0)),
+            (1_000, lambda: window.tabs.setCurrentIndex(1)),
+            (1_100, lambda: window.tabs.setCurrentIndex(2)),
+            (1_200, lambda: window.tabs.setCurrentIndex(3)),
+            (1_300, lambda: window.tabs.setCurrentIndex(4)),
+            (1_400, lambda: window.tabs.setCurrentIndex(5)),
+            (1_500, lambda: window.tabs.setCurrentIndex(0)),
+        )
+        for delay_ms, action in actions:
+            QTimer.singleShot(delay_ms, action)
+
+        def validate_smoke() -> None:
+            failures: list[str] = []
+            expected_tabs = (
+                "3生命・資格競争",
+                "Garden出力資格層",
+                "Garden入力層",
+                "仮想ユーザー",
+                "Polar H10",
+                "時間・イベント診断",
+            )
+            actual_tabs = tuple(
+                window.tabs.tabText(index) for index in range(window.tabs.count())
+            )
+            if actual_tabs != expected_tabs:
+                failures.append(f"tabs={actual_tabs!r}")
+            active = window.simulation
+            if active.engine.clock.state.value != "completed":
+                failures.append(f"state={active.engine.clock.state.value}")
+            if len(active.virtual_user_component.heartbeat_records()) != 280:
+                failures.append("heartbeat count")
+            if len(active.polar_h10_component.measurement_records()) != 279:
+                failures.append("RRI count")
+            if len(active.garden_input_component.signal_records()) != 241:
+                failures.append("Garden signal count")
+            garden_snapshot = active.garden_output_component.snapshot()
+            expected_garden = (
+                garden_snapshot.total_touch_count == 540
+                and garden_snapshot.feedback_count == 723
+                and garden_snapshot.active_output_count == 180
+                and garden_snapshot.inactive_output_count == 61
+                and garden_snapshot.assignment_count == 1
+                and garden_snapshot.release_count == 1
+                and garden_snapshot.last_assigned_holder_id == "life-green"
+                and garden_snapshot.qualification_holder_id is None
+            )
+            if not expected_garden:
+                failures.append(f"Garden output={garden_snapshot!r}")
+            for life_id, component in active.digital_life_components.items():
+                snapshot = component.snapshot()
+                if (
+                    snapshot.first_round_count != 241
+                    or snapshot.second_round_count != 241
+                    or snapshot.touch_dispatched_count != 180
+                    or snapshot.current_g != 0
+                    or snapshot.k_update_count != 0
+                ):
+                    failures.append(f"life={life_id}:{snapshot!r}")
+            green = active.green_life_component.snapshot()
+            if green.e <= 0.14 or green.q_update_count != 3:
+                failures.append("green E/q")
+            multi_panel = window.multi_life_panel
+            if (
+                multi_panel.chart.first_round_count != 723
+                or multi_panel.chart.second_round_count != 723
+                or multi_panel.chart.touch_count != 540
+                or multi_panel.touch_model.rowCount() != 540
+                or multi_panel.second_round_model.rowCount() != 723
+            ):
+                failures.append("multi-life chart/table data")
+            output_panel = window.garden_output_panel
+            if (
+                output_panel.chart.qualification_count != 241
+                or output_panel.chart.qualified_b_count != 241
+                or output_panel.qualification_model.rowCount() != 241
+            ):
+                failures.append("Garden output chart/table data")
+            if window.virtual_user_panel.chart.record_count != 280:
+                failures.append("Virtual User chart")
+            if window.polar_h10_panel.chart.record_count != 279:
+                failures.append("H10 chart")
+            if window.garden_input_panel.chart.signal_count != 241:
+                failures.append("Garden input chart")
+            event_types = {event.event_type for event in active.engine.executed_events()}
+            required_types = {
+                "digital_life_touch",
+                "garden_qualified_b",
+                "garden_interoceptive_feedback",
+                "garden_holder_release",
+            }
+            if not required_types <= event_types:
+                failures.append("Stage 5B event types")
+            if failures:
+                smoke_failures.extend(failures)
+                print("GUI smoke failed: " + "; ".join(failures), file=sys.stderr)
+                app.quit()
+
+        # Stage 5B publishes several dense charts while bounded max-speed batches
+        # execute.  Validate near (but safely before) the requested close time so
+        # the smoke test remains deterministic on slower offscreen renderers.
+        QTimer.singleShot(max(2_000, auto_close_ms - 200), validate_smoke)
+        QTimer.singleShot(auto_close_ms, app.quit)
+
+    if screenshot is not None:
+        screenshot.parent.mkdir(parents=True, exist_ok=True)
+
+        def save_screenshot() -> None:
+            targets = {
+                "window": window,
+                "three-life-overview": window,
+                "touch-holder-second-round": (
+                    window.multi_life_panel.chart_table_splitter
+                ),
+                "garden-output-qualified-b": (
+                    window.garden_output_panel.diagnostics_content
+                ),
+            }
+            if screenshot_target == "garden-output-qualified-b":
+                window.tabs.setCurrentWidget(window.garden_output_panel)
+            elif screenshot_target in {
+                "three-life-overview",
+                "touch-holder-second-round",
+            }:
+                window.tabs.setCurrentWidget(window.multi_life_panel)
+            target = targets.get(screenshot_target, window)
+            if not target.grab().save(str(screenshot)):
+                raise RuntimeError(f"failed to save screenshot: {screenshot}")
+
+        screenshot_delay_ms = max(1_500, auto_close_ms - 100) if smoke_test else 250
+        QTimer.singleShot(screenshot_delay_ms, save_screenshot)
+
+    exit_code = app.exec()
+    return 1 if smoke_failures else exit_code
+
+
 def main(argv: list[str] | None = None) -> int:
     """Parse CLI options without importing Qt on the headless path."""
 
@@ -611,6 +1008,14 @@ def main(argv: list[str] | None = None) -> int:
         raise ValueError("--export-garden-input-csv requires --headless-garden-input-demo")
     if args.export_single_life_csv is not None and not args.headless_single_life_demo:
         raise ValueError("--export-single-life-csv requires --headless-single-life-demo")
+    if (
+        args.export_three_life_competition_csv is not None
+        and not args.headless_three_life_competition_demo
+    ):
+        raise ValueError(
+            "--export-three-life-competition-csv requires "
+            "--headless-three-life-competition-demo"
+        )
     if args.headless_demo or args.headless_time_demo:
         return run_headless_demo()
     if args.headless_virtual_user_demo:
@@ -621,15 +1026,26 @@ def main(argv: list[str] | None = None) -> int:
         return run_headless_garden_input_demo(args.export_garden_input_csv)
     if args.headless_single_life_demo:
         return run_headless_single_life_demo(
-            life_role=args.life_role,
+            life_role=args.life_role or "green",
             export_csv=args.export_single_life_csv,
+        )
+    if args.headless_three_life_competition_demo:
+        return run_headless_three_life_competition_demo(
+            args.export_three_life_competition_csv
+        )
+    if args.life_role is not None or args.screenshot_target == "digital-life-graphs":
+        return run_single_life_gui(
+            smoke_test=args.smoke_test,
+            auto_close_ms=args.auto_close_ms,
+            screenshot=args.screenshot,
+            screenshot_target=args.screenshot_target,
+            life_role=args.life_role or "green",
         )
     return run_gui(
         smoke_test=args.smoke_test,
         auto_close_ms=args.auto_close_ms,
         screenshot=args.screenshot,
         screenshot_target=args.screenshot_target,
-        life_role=args.life_role,
     )
 
 

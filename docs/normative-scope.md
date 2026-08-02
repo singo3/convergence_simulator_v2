@@ -63,3 +63,13 @@ Stage 5Aは、session baseline相対のNd、Ndと別概念のW、`Phi_P`、N/q/E
 `DigitalLifeFirstRoundRecord`、`DigitalLifeEvaluationUpdateRecord`、snapshot、GUI表示、headless JSON、CSVは **開発用診断** であり、Gardenや後続componentへ配送する規範signalではない。Stage 5AのDigital Lifeは正式外部出力eventを発行しない。tauは0〜1の論理値であり、microsecondsの配送予約ではない。
 
 G、Garden出力層、touch配送、第2周、3生命の資格競争、holder・勝者・順位決定、E/q/kのlive更新、関係記憶探索は未実装である。`G_status=not_connected` は `G=0` の代用値ではない。E/q更新のpure functionは後続Stageの参照用に単体実装されるが、Stage 5Aのlive componentには接続されない。
+
+## Stage 5Bの3生命・資格競争・第2周との境界
+
+Stage 5Bでv2.0から接続したCore範囲は、3体のデジタル生命による独立した第1周、自律touch、実際の到着順によるGarden資格付与と保持、自己IDとholder IDの照合によるG、E/qの第2周、およびholderのBを次Stageへ渡す `GardenQualifiedBEvent` までである。Runtimeは各生命を同期するが、P/Vを中央比較せず、勝者や順位を決定しない。Gardenが生命由来の正式入力として受け取るのは実到着したIDとBのみである。
+
+v2.0はtauを0〜1の論理到達値として定義するが、integer microsecondsへの写像は定義しない。`tau_to_microsecond_touch_delivery_v0_1` のoffset式、finalize予約時刻、および同一microsecondでの辞書順ID登録は **simulation implementation assumption** である。この配送policyはtauの大小をRuntimeに比較させるものではない。
+
+Gardenの `first_touch_when_empty`、`while_s_is_1`、closing第2周完了後のrelease、各recipientへその生命自身のBだけを返す方式も、Stage 5Bでversion管理するGarden出力資格modelの実装仕様である。240秒closingではBundle 2の新しい有効revisionを第1周で適用し、release前holderを含むfeedbackで第2周を完了した後だけholderを解放する。
+
+Stage 5Bではkを初期値のまま固定し、3 bundle関係記憶探索、trial/adoption、k更新はStage 5Cの責務とする。Hue、blink BPM、saturation、brightness、光波形Iの生成はStage 6の責務であり、Stage 5Bは実装しない。

@@ -124,15 +124,31 @@ def test_headless_life_csvs_have_exact_columns_and_are_observational(tmp_path) -
     assert output["full_event_digest"] == STAGE_4_FULL_EVENT_DIGEST
 
     expected = (
-        (FIRST_ROUND_CSV_FILENAME, FIRST_ROUND_CSV_FIELDS, 241),
-        (EVALUATION_UPDATE_CSV_FILENAME, EVALUATION_UPDATE_CSV_FIELDS, 4),
+        (
+            FIRST_ROUND_CSV_FILENAME,
+            FIRST_ROUND_CSV_FIELDS,
+            241,
+            70_966,
+            "10cf8d4b77b6a1f74ed4b5a0fe092c4bbc608276ea94dd9173cac3197faf63ac",
+        ),
+        (
+            EVALUATION_UPDATE_CSV_FILENAME,
+            EVALUATION_UPDATE_CSV_FIELDS,
+            4,
+            772,
+            "1983f408976411aa2af23bba00b3ab7562e4a31917c18395d446555bc9919b08",
+        ),
     )
-    for filename, fields, row_count in expected:
-        with (tmp_path / filename).open(encoding="utf-8", newline="") as csv_file:
+    for filename, fields, row_count, byte_count, sha256 in expected:
+        path = tmp_path / filename
+        with path.open(encoding="utf-8", newline="") as csv_file:
             reader = csv.DictReader(csv_file)
             rows = list(reader)
             assert tuple(reader.fieldnames or ()) == fields
         assert len(rows) == row_count
+        payload = path.read_bytes()
+        assert len(payload) == byte_count
+        assert hashlib.sha256(payload).hexdigest() == sha256
 
 
 def test_stage4_csv_bytes_remain_identical_after_stage5a(tmp_path) -> None:

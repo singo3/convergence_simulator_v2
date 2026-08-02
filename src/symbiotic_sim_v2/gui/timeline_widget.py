@@ -23,6 +23,12 @@ EVENT_STYLES: dict[str, tuple[int, str, str, str]] = {
     "garden_evaluation_finalized": (9, "star", "#F59E0B", "evaluation_finalized"),
     "garden_input_signal_trigger": (10, "o", "#A78BFA", "signal_trigger"),
     "garden_input_signal": (11, "d", "#C084FC", "garden_input_signal"),
+    "garden_output_no_touch_finalize": (12, "t", "#94A3B8", "no_touch_finalize"),
+    "digital_life_touch": (13, "o", "#FB7185", "digital_life_touch"),
+    "garden_output_round_finalize": (14, "t", "#F97316", "output_finalize"),
+    "garden_qualified_b": (15, "d", "#2DD4BF", "qualified_B"),
+    "garden_interoceptive_feedback": (16, "s", "#60A5FA", "feedback"),
+    "garden_holder_release": (17, "star", "#FACC15", "holder_release"),
 }
 
 
@@ -42,7 +48,8 @@ class TimelineWidget(pg.PlotWidget):
         self.showGrid(x=True, y=True, alpha=0.18)
         self.setLabel("bottom", "仮想時間", units="秒")
         self.setLabel("left", "event type")
-        self.setYRange(-0.65, 11.65, padding=0)
+        highest_lane = max(style[0] for style in EVENT_STYLES.values())
+        self.setYRange(-0.65, highest_lane + 0.65, padding=0)
         self.getPlotItem().setMouseEnabled(x=True, y=False)
 
         self._current_line = pg.InfiniteLine(
