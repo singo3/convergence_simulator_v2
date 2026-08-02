@@ -13,5 +13,10 @@
 - GUI/CSVの内部真値診断と、後続componentへ渡す正式なsystem signalを混同しない。
 - 生理モデルはv2.0規範ではなくsimulation assumptionとして独立version管理する。
 - Stage 2へexternal influence、光刺激、好み、刺激応答を追加しない。
+- H10は `HeartbeatEvent.scheduled_time_us` の隣接差だけをRRIとして測定し、`VirtualUserComponent`、`HeartbeatRecord`、生理モデルの内部stateを参照しない。
+- H10の正式出力は `RriMeasurementEvent` だけとし、RMSSD、N、Nd、Wを計算しない。
+- H10でartifact判定、範囲除外、中央値判定、補間を行わず、正のraw RRIをclipまたは修正しない。
+- RRI判定、artifact、RMSSD、N/Nd/W、baseline、セッション信号など将来のGarden入力層の処理を先回り実装しない。
+- `ideal_polar_h10_rri_device_v0_1` の理想測定と、将来のnoise、loss、delayなどのfault modelを混同せず、別version・別Stage・別設定で管理する。
 - Stageごとに独立commitを作り、push前にcompileall、全pytest、Ruff、headless、GUI smoke、digest回帰を検証する。
 - force push、force-with-lease、既存commitのamend/rebaseを行わない。

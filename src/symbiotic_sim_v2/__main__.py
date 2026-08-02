@@ -1,4 +1,4 @@
-"""Command entry point for Stage 1/2 headless demos and the Stage 2 GUI."""
+"""Command entry point for Stage 1-3 headless demos and the Stage 3 GUI."""
 
 from __future__ import annotations
 
@@ -9,6 +9,18 @@ import statistics
 import sys
 from pathlib import Path
 
+from symbiotic_sim_v2 import __version__
+from symbiotic_sim_v2.devices.polar_h10.config import (
+    POLAR_H10_MODEL_VERSION,
+    RRI_EVENT_SCHEMA_VERSION,
+    PolarH10Config,
+)
+from symbiotic_sim_v2.devices.polar_h10.diagnostics import (
+    H10_DIAGNOSTIC_NOTICE,
+    compare_rri_measurements,
+    export_rri_measurement_diagnostics_csv,
+)
+from symbiotic_sim_v2.devices.polar_h10.scenario import create_polar_h10_simulation
 from symbiotic_sim_v2.simulation.demo_scenario import create_demo_engine
 from symbiotic_sim_v2.virtual_user.config import VIRTUAL_USER_MODEL_VERSION, VirtualUserConfig
 from symbiotic_sim_v2.virtual_user.diagnostics import (
@@ -20,7 +32,7 @@ from symbiotic_sim_v2.virtual_user.scenario import create_virtual_user_simulatio
 
 
 def _build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Symbiotic simulator Stage 2")
+    parser = argparse.ArgumentParser(description="Symbiotic simulator Stage 3")
     headless_group = parser.add_mutually_exclusive_group()
     headless_group.add_argument(
         "--headless-demo",
@@ -36,6 +48,11 @@ def _build_parser() -> argparse.ArgumentParser:
         "--headless-virtual-user-demo",
         action="store_true",
         help="run the 180-second Stage 2 baseline virtual user",
+    )
+    headless_group.add_argument(
+        "--headless-h10-demo",
+        action="store_true",
+        help="run the 180-second Stage 3 ideal Polar H10 simulation",
     )
     parser.add_argument(
         "--smoke-test",
@@ -57,6 +74,11 @@ def _build_parser() -> argparse.ArgumentParser:
         "--export-virtual-user-csv",
         type=Path,
         help="write Stage 2 true-value diagnostics CSV on a headless virtual-user run",
+    )
+    parser.add_argument(
+        "--export-h10-csv",
+        type=Path,
+        help="write Stage 3 raw-RRI and true-value comparison diagnostics CSV",
     )
     return parser
 
@@ -124,6 +146,60 @@ def run_headless_virtual_user_demo(export_csv: Path | None = None) -> int:
     return 0
 
 
+def run_headless_h10_demo(export_csv: Path | None = None) -> int:
+    """Run the standard ideal H10 and emit raw-signal diagnostics as JSON."""
+
+    virtual_user_config = VirtualUserConfig()
+    polar_h10_config = PolarH10Config(expected_user_id=virtual_user_config.user_id)
+    simulation = create_polar_h10_simulation(virtual_user_config, polar_h10_config)
+    simulation.engine.run_until_end()
+    heartbeat_records = simulation.virtual_user_component.heartbeat_records()
+    measurement_records = simulation.polar_h10_component.measurement_records()
+    comparisons = compare_rri_measurements(measurement_records, heartbeat_records)
+    measured_rri_ms = tuple(record.rri_ms for record in measurement_records)
+    written_csv: Path | None = None
+    if export_csv is not None:
+        written_csv = export_rri_measurement_diagnostics_csv(
+            export_csv,
+            measurement_records,
+            heartbeat_records,
+        )
+    result = {
+        "project_version": __version__,
+        "virtual_user_model_version": VIRTUAL_USER_MODEL_VERSION,
+        "polar_h10_model_version": POLAR_H10_MODEL_VERSION,
+        "rri_event_schema_version": RRI_EVENT_SCHEMA_VERSION,
+        "virtual_user_config": virtual_user_config.to_dict(),
+        "polar_h10_config": polar_h10_config.to_dict(),
+        "final_virtual_time_us": simulation.engine.clock.current_time_us,
+        "final_state": simulation.engine.clock.state.value,
+        "executed_event_count": len(simulation.engine.executed_events()),
+        "heartbeat_count": len(heartbeat_records),
+        "observed_heartbeat_count": (
+            simulation.polar_h10_component.snapshot().observed_heartbeat_count
+        ),
+        "rri_measurement_count": len(measurement_records),
+        "first_rri_event_time_us": measurement_records[0].event_time_us,
+        "last_rri_event_time_us": measurement_records[-1].event_time_us,
+        "first_measured_rri_us": measurement_records[0].rri_us,
+        "last_measured_rri_us": measurement_records[-1].rri_us,
+        "mean_measured_rri_ms": statistics.fmean(measured_rri_ms),
+        "minimum_measured_rri_ms": min(measured_rri_ms),
+        "maximum_measured_rri_ms": max(measured_rri_ms),
+        "matched_measurement_count": sum(record.match for record in comparisons),
+        "mismatched_measurement_count": sum(not record.match for record in comparisons),
+        "maximum_absolute_error_us": max(record.absolute_error_us for record in comparisons),
+        "heartbeat_digest": simulation.virtual_user_component.heartbeat_digest(),
+        "rri_measurement_digest": simulation.polar_h10_component.measurement_digest(),
+        "full_event_digest": simulation.engine.deterministic_digest(),
+        "diagnostic_notice": H10_DIAGNOSTIC_NOTICE,
+    }
+    if written_csv is not None:
+        result["diagnostic_csv"] = str(written_csv)
+    print(json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True))
+    return 0
+
+
 def run_gui(*, smoke_test: bool, auto_close_ms: int, screenshot: Path | None) -> int:
     """Start the Qt application; smoke mode performs a bounded control sequence."""
 
@@ -142,7 +218,7 @@ def run_gui(*, smoke_test: bool, auto_close_ms: int, screenshot: Path | None) ->
     from PySide6.QtWidgets import QApplication
 
     from symbiotic_sim_v2.gui.controller import SimulationController
-    from symbiotic_sim_v2.gui.virtual_user_window import VirtualUserMainWindow
+    from symbiotic_sim_v2.gui.polar_h10_window import PolarH10MainWindow
 
     app = QApplication.instance() or QApplication(sys.argv[:1])
     available_fonts = set(QFontDatabase.families())
@@ -150,9 +226,9 @@ def run_gui(*, smoke_test: bool, auto_close_ms: int, screenshot: Path | None) ->
         if family in available_fonts:
             app.setFont(QFont(family))
             break
-    simulation = create_virtual_user_simulation()
+    simulation = create_polar_h10_simulation()
     controller = SimulationController(simulation.engine)
-    window = VirtualUserMainWindow(controller, simulation)
+    window = PolarH10MainWindow(controller, simulation)
     app.aboutToQuit.connect(controller.shutdown)
     window.show()
 
@@ -169,11 +245,47 @@ def run_gui(*, smoke_test: bool, auto_close_ms: int, screenshot: Path | None) ->
             (450, lambda: window.speed_combo.setCurrentIndex(3)),
             (500, window.reset_button.click),
             (550, window.run_to_end_button.click),
-            (650, lambda: window.tabs.setCurrentIndex(1)),
-            (750, lambda: window.tabs.setCurrentIndex(0)),
+            (650, lambda: window.tabs.setCurrentIndex(0)),
+            (725, lambda: window.tabs.setCurrentIndex(1)),
+            (800, lambda: window.tabs.setCurrentIndex(2)),
+            (875, lambda: window.tabs.setCurrentIndex(1)),
         )
         for delay_ms, action in actions:
             QTimer.singleShot(delay_ms, action)
+
+        def validate_smoke() -> None:
+            failures: list[str] = []
+            expected_tabs = ("仮想ユーザー", "Polar H10", "時間・イベント診断")
+            actual_tabs = tuple(
+                window.tabs.tabText(index) for index in range(window.tabs.count())
+            )
+            if actual_tabs != expected_tabs:
+                failures.append(f"tabs={actual_tabs!r}")
+            if simulation.engine.clock.state.value != "completed":
+                failures.append(f"state={simulation.engine.clock.state.value}")
+            heartbeat_records = simulation.virtual_user_component.heartbeat_records()
+            measurement_records = simulation.polar_h10_component.measurement_records()
+            if len(heartbeat_records) != 211:
+                failures.append(f"heartbeat_count={len(heartbeat_records)}")
+            if len(measurement_records) != 210:
+                failures.append(f"rri_count={len(measurement_records)}")
+            if window.virtual_user_panel.chart.record_count != 211:
+                failures.append("virtual-user chart data missing")
+            if window.polar_h10_panel.chart.record_count != 210:
+                failures.append("H10 comparison chart data missing")
+            error_data = window.polar_h10_panel.chart.error_item.yData
+            if error_data is None or len(error_data) != 210 or any(error_data):
+                failures.append("H10 error chart is not the 210-point zero series")
+            if window.polar_h10_panel.measurement_model.rowCount() != 210:
+                failures.append("H10 table rows missing")
+            event_types = {event.event_type for event in simulation.engine.executed_events()}
+            if not {"heartbeat", "rri_measurement"} <= event_types:
+                failures.append("timeline event types missing")
+            if failures:
+                print("GUI smoke failed: " + "; ".join(failures), file=sys.stderr)
+                app.exit(1)
+
+        QTimer.singleShot(1200, validate_smoke)
         QTimer.singleShot(auto_close_ms, app.quit)
 
     if screenshot is not None:
@@ -183,7 +295,7 @@ def run_gui(*, smoke_test: bool, auto_close_ms: int, screenshot: Path | None) ->
             if not window.grab().save(str(screenshot)):
                 raise RuntimeError(f"failed to save screenshot: {screenshot}")
 
-        QTimer.singleShot(900 if smoke_test else 250, save_screenshot)
+        QTimer.singleShot(1100 if smoke_test else 250, save_screenshot)
 
     return app.exec()
 
@@ -192,12 +304,16 @@ def main(argv: list[str] | None = None) -> int:
     """Parse CLI options without importing Qt on the headless path."""
 
     args = _build_parser().parse_args(argv)
+    if args.export_virtual_user_csv is not None and not args.headless_virtual_user_demo:
+        raise ValueError("--export-virtual-user-csv requires --headless-virtual-user-demo")
+    if args.export_h10_csv is not None and not args.headless_h10_demo:
+        raise ValueError("--export-h10-csv requires --headless-h10-demo")
     if args.headless_demo or args.headless_time_demo:
         return run_headless_demo()
     if args.headless_virtual_user_demo:
         return run_headless_virtual_user_demo(args.export_virtual_user_csv)
-    if args.export_virtual_user_csv is not None:
-        raise ValueError("--export-virtual-user-csv requires --headless-virtual-user-demo")
+    if args.headless_h10_demo:
+        return run_headless_h10_demo(args.export_h10_csv)
     return run_gui(
         smoke_test=args.smoke_test,
         auto_close_ms=args.auto_close_ms,

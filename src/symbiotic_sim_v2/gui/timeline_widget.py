@@ -17,6 +17,7 @@ EVENT_STYLES: dict[str, tuple[int, str, str, str]] = {
     "demo_same_time_a": (3, "s", "#FFB648", "same_time_a"),
     "demo_same_time_b": (4, "d", "#C78BFA", "same_time_b"),
     "simulation_complete": (5, "star", "#FF647C", "simulation_complete"),
+    "rri_measurement": (6, "d", "#22D3EE", "rri_measurement"),
 }
 
 
@@ -36,7 +37,7 @@ class TimelineWidget(pg.PlotWidget):
         self.showGrid(x=True, y=True, alpha=0.18)
         self.setLabel("bottom", "仮想時間", units="秒")
         self.setLabel("left", "event type")
-        self.setYRange(-0.65, 5.65, padding=0)
+        self.setYRange(-0.65, 6.65, padding=0)
         self.getPlotItem().setMouseEnabled(x=True, y=False)
 
         self._current_line = pg.InfiniteLine(

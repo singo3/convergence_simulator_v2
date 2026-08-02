@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from symbiotic_sim_v2.domain.event_priorities import SIMULATION_COMPLETE_EVENT_PRIORITY
+from symbiotic_sim_v2.domain.event_types import SIMULATION_COMPLETE_EVENT_TYPE
 from symbiotic_sim_v2.simulation.scheduler import EventScheduler
 from symbiotic_sim_v2.simulation.time_utils import MICROSECONDS_PER_SECOND
 
@@ -12,7 +14,7 @@ TICK_PRIORITY = 10
 SAME_TIME_A_PRIORITY = 20
 SAME_TIME_B_PRIORITY = 30
 MARKER_PRIORITY = 40
-COMPLETION_PRIORITY = 100
+COMPLETION_PRIORITY = SIMULATION_COMPLETE_EVENT_PRIORITY
 DEMO_SOURCE = "stage_01_diagnostic"
 
 
@@ -68,7 +70,7 @@ class DemoScenario:
         )
         scheduler.schedule_at(
             DEMO_DURATION_US,
-            "simulation_complete",
+            SIMULATION_COMPLETE_EVENT_TYPE,
             source=DEMO_SOURCE,
             priority=COMPLETION_PRIORITY,
             payload={"diagnostic_only": True, "status": "complete"},

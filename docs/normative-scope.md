@@ -1,4 +1,4 @@
-# Stage 1の規範スコープ
+# 規範スコープ
 
 ## 唯一の規範仕様
 
@@ -30,4 +30,12 @@ Demoの `clock_tick`、`demo_marker`、`demo_same_time_a/b`、`simulation_comple
 
 Stage 2でv2.0から参照したのは、ユーザー、H10、Garden入力層、Runtimeなどの責務を混同しないシステム境界だけである。呼吸性sin波、slow wave、AR(1)、jitter、parameter既定値、clamp、diagnostic RMSSDは実装上の仮定であり、v2.0の規範値ではない。
 
-Stage 2の正式出力はheartbeat発生時刻だけである。仮想Polar H10、H10 RRI測定、Garden入力層、artifact処理、N生成はまだ未実装である。内部真値RRI/RMSSDをH10またはGarden信号として使用しない。
+Stage 2の正式出力はheartbeat発生時刻だけである。Stage 2単体はH10 RRI測定、Garden入力層、artifact処理、N生成を実装しない。内部真値RRI/RMSSDをH10またはGarden信号として使用しない。
+
+## Stage 3仮想Polar H10との境界
+
+v2.0では、入力デバイスであるPolar H10の正式出力はRRIである。H10はRMSSD、N、Nd、Wを計算せず、artifact判定、baseline、セッション信号S、evaluation qualityの確定も担わない。RRI絶対範囲、直近有効RRIの中央値との偏差、artifact率、RMSSD、N、baseline、S生成は将来のGarden入力層の責務である。
+
+Stage 3は、`HeartbeatEvent` の隣接する正式時刻差からraw RRIを測定し、`RriMeasurementEvent` を出力する入力デバイス境界を実装する。`ideal_polar_h10_rri_device_v0_1` の「正確な観測、noiseなし、lossなし、delayなし」という具体設計、integer microseconds、event priority 50、canonical JSON digest、GUI、CSVは **simulation assumptionまたは実装上の選択** であり、v2.0規範そのものではない。
+
+H10 coreは仮想ユーザーの `HeartbeatRecord` や生理モデル内部stateを参照しない。GUI、CSV、headless JSONが示す内部真値との誤差比較は、理想H10の測定実装を確認する開発用診断である。Gardenへの正式信号は `RriMeasurementEvent` だけであり、Garden入力層自体はStage 3では未実装である。

@@ -4,15 +4,18 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from symbiotic_sim_v2.domain.event_priorities import SIMULATION_COMPLETE_EVENT_PRIORITY
+from symbiotic_sim_v2.domain.event_types import SIMULATION_COMPLETE_EVENT_TYPE
 from symbiotic_sim_v2.simulation.engine import SimulationEngine
 from symbiotic_sim_v2.simulation.scheduler import EventScheduler
+from symbiotic_sim_v2.simulation.time_utils import seconds_to_us
 from symbiotic_sim_v2.virtual_user.component import (
     HEARTBEAT_EVENT_TYPE,
     VirtualUserComponent,
 )
 from symbiotic_sim_v2.virtual_user.config import VirtualUserConfig
 
-VIRTUAL_USER_COMPLETION_PRIORITY = 100
+VIRTUAL_USER_COMPLETION_PRIORITY = SIMULATION_COMPLETE_EVENT_PRIORITY
 VIRTUAL_USER_SCENARIO_SOURCE = "virtual_user_scenario"
 
 
@@ -33,7 +36,7 @@ class VirtualUserScenario:
     def end_time_us(self) -> int:
         """Convert whole configuration seconds to exact integer microseconds."""
 
-        return self.config.duration_seconds * 1_000_000
+        return seconds_to_us(self.config.duration_seconds)
 
     def schedule(self, scheduler: EventScheduler) -> None:
         """Reset component state and recreate initial heartbeat/completion events."""
@@ -44,7 +47,7 @@ class VirtualUserScenario:
         self.component.schedule_initial(scheduler)
         scheduler.schedule_at(
             self.end_time_us,
-            "simulation_complete",
+            SIMULATION_COMPLETE_EVENT_TYPE,
             source=VIRTUAL_USER_SCENARIO_SOURCE,
             priority=VIRTUAL_USER_COMPLETION_PRIORITY,
             payload={"scenario": "stage_02_baseline_virtual_user"},

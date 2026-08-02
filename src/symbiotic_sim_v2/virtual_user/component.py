@@ -6,6 +6,9 @@ import hashlib
 import json
 from dataclasses import dataclass
 
+from symbiotic_sim_v2.domain.event_priorities import HEARTBEAT_EVENT_PRIORITY
+from symbiotic_sim_v2.domain.event_sources import VIRTUAL_USER_EVENT_SOURCE
+from symbiotic_sim_v2.domain.event_types import HEARTBEAT_EVENT_TYPE
 from symbiotic_sim_v2.domain.events import SimulationEvent
 from symbiotic_sim_v2.simulation.engine import SimulationEngine
 from symbiotic_sim_v2.simulation.scheduler import EventScheduler
@@ -16,9 +19,7 @@ from symbiotic_sim_v2.virtual_user.diagnostics import (
 )
 from symbiotic_sim_v2.virtual_user.physiology import RriComputation, calculate_next_rri
 
-HEARTBEAT_EVENT_TYPE = "heartbeat"
-HEARTBEAT_EVENT_SOURCE = "virtual_user"
-HEARTBEAT_EVENT_PRIORITY = 40
+HEARTBEAT_EVENT_SOURCE = VIRTUAL_USER_EVENT_SOURCE
 
 
 @dataclass(frozen=True, slots=True)

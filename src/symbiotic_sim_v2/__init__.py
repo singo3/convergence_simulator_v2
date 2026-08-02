@@ -1,3 +1,3 @@
-"""Environment-symbiotic digital-life simulator, Stage 1 time foundation."""
+"""Environment-symbiotic digital-life simulator through Stage 3."""
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"
