@@ -1,3 +1,3 @@
-"""Environment-symbiotic digital-life simulator through Stage 3."""
+"""Environment-symbiotic digital-life simulator through Stage 4."""
 
-__version__ = "0.3.0"
+__version__ = "0.4.0"

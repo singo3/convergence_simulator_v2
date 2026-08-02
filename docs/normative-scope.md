@@ -39,3 +39,15 @@ v2.0では、入力デバイスであるPolar H10の正式出力はRRIである�
 Stage 3は、`HeartbeatEvent` の隣接する正式時刻差からraw RRIを測定し、`RriMeasurementEvent` を出力する入力デバイス境界を実装する。`ideal_polar_h10_rri_device_v0_1` の「正確な観測、noiseなし、lossなし、delayなし」という具体設計、integer microseconds、event priority 50、canonical JSON digest、GUI、CSVは **simulation assumptionまたは実装上の選択** であり、v2.0規範そのものではない。
 
 H10 coreは仮想ユーザーの `HeartbeatRecord` や生理モデル内部stateを参照しない。GUI、CSV、headless JSONが示す内部真値との誤差比較は、理想H10の測定実装を確認する開発用診断である。Gardenへの正式信号は `RriMeasurementEvent` だけであり、Garden入力層自体はStage 3では未実装である。
+
+## Stage 4 Garden入力層との境界
+
+v2.0でGarden入力層が担う規範上の責務は、H10が出力するRRIを受け、RRI artifact判定、評価区間ごとのRMSSD、固定式によるN、baseline、1秒周期のセッションシグナルSを生成し、後続のデジタル生命へ渡すことである。v2.0のRelax with Light参照値として、300〜2000 msのRRI絶対範囲、直近有効RRI中央値から20%を超える偏差、artifact率5%/10%、RMSSD 15〜80 msのN正規化、30秒discardと30秒evaluation、baseline 60秒と3 bundle・計180秒、1秒シグナルを使用する。
+
+Stage 4はこのうち、正式な `RriMeasurementEvent` の受信、artifact分類、評価window内の実RMSSD計算、`N = clip01((RMSSD_ms - 15) / 65)`、session baselineの確定と固定、評価quality、NとSを含む `GardenInputSignalEvent`、評価metadataの `GardenEvaluationFinalizedEvent`、GUI・headless・診断CSVを実装する。CSVや仮想ユーザー内部真値はGardenの正式入力ではない。artifactを補間せず、discard/outsideのRRIを評価RMSSDへ含めない。
+
+Ndはデジタル生命の状態、Wは情動系の値であり、Stage 4 Garden入力層には実装しない。デジタル生命、Garden出力層、光刺激、ユーザー刺激応答も後続Stageの責務である。
+
+v2.0は、window境界をまたぐRRIをどのwindowへ所属させるかを明示していない。Stage 4の `measurement_end_time`、すなわち `RriMeasurementEvent.scheduled_time_us` を半開区間へ当てはめる方式は **simulation implementation assumption** である。詳細は [RRI window membership policy v0.1](rri-window-membership-policy_v0.1.md) に分離する。
+
+v2.0はbaseline評価が無効だった場合の再試行や後続bundleの扱いを固定していない。Stage 4の `keep_s_zero_and_skip_main_evaluations`、すなわち時間は240秒まで進めるがSを0に保ち、main evaluationをrejectedとしてNを更新しない方式も **simulation implementation assumption** である。これは生理・信号処理の規範値ではなく、別versionで交換可能な失敗時policyである。

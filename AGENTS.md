@@ -16,7 +16,13 @@
 - H10は `HeartbeatEvent.scheduled_time_us` の隣接差だけをRRIとして測定し、`VirtualUserComponent`、`HeartbeatRecord`、生理モデルの内部stateを参照しない。
 - H10の正式出力は `RriMeasurementEvent` だけとし、RMSSD、N、Nd、Wを計算しない。
 - H10でartifact判定、範囲除外、中央値判定、補間を行わず、正のraw RRIをclipまたは修正しない。
-- RRI判定、artifact、RMSSD、N/Nd/W、baseline、セッション信号など将来のGarden入力層の処理を先回り実装しない。
+- H10へRRI判定、artifact、RMSSD、N、baseline、セッション信号などGarden入力層の処理を混入させない。
 - `ideal_polar_h10_rri_device_v0_1` の理想測定と、将来のnoise、loss、delayなどのfault modelを混同せず、別version・別Stage・別設定で管理する。
+- Garden入力層がraw inputとして受け取る正式信号は `RriMeasurementEvent` だけとし、仮想ユーザー、H10 component、内部真値、診断CSVを入力にしない。
+- Garden入力層の正式出力はNとSを含む `GardenInputSignalEvent` とし、評価確定metadataは `GardenEvaluationFinalizedEvent` で通知する。NdとWをGarden入力層へ実装しない。
+- Nは固定式 `clip01((RMSSD_ms - 15) / 65)` だけで計算し、baseline、過去N、Nd、Wを式へ混ぜない。session baselineは比較用の固定値として扱う。
+- artifact RRIをclipまたは補間せず、valid historyと評価RMSSDから除外する。discard/outside RRIは分類と履歴更新の対象にしても、評価windowのRMSSDへ使用しない。
+- rejected evaluationではN、session baseline、valid revisionを更新しない。
+- RRIの評価window所属policyをversion管理し、現在はmeasurement end timeによる半開区間 `measurement_end_time` を明示する。
 - Stageごとに独立commitを作り、push前にcompileall、全pytest、Ruff、headless、GUI smoke、digest回帰を検証する。
 - force push、force-with-lease、既存commitのamend/rebaseを行わない。

@@ -2,3 +2,4 @@
 
 VIRTUAL_USER_EVENT_SOURCE = "virtual_user"
 POLAR_H10_EVENT_SOURCE = "polar_h10"
+GARDEN_INPUT_EVENT_SOURCE = "garden_input"

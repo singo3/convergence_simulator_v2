@@ -1,0 +1,1 @@
+"""Garden-facing simulation components."""

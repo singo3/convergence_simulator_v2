@@ -54,8 +54,8 @@ def referenced_identifier_names(path: Path) -> set[str]:
     return names
 
 
-def test_project_version_is_stage3() -> None:
-    assert __version__ == "0.3.0"
+def test_project_version_includes_completed_stage4() -> None:
+    assert __version__ == "0.4.0"
 
 
 def test_device_core_has_no_qt_or_pyqtgraph_imports() -> None:
@@ -145,7 +145,6 @@ def test_no_old_simulator_import_or_reference_exists_in_stage3_sources() -> None
     assert "convergence_simulator" not in source
 
 
-def test_garden_input_layer_has_not_been_implemented_in_stage3() -> None:
-    package_root = project_package_root()
-    assert not (package_root / "garden").exists()
-    assert not any("garden" in path.name.lower() for path in package_root.rglob("*.py"))
+def test_stage3_h10_package_remains_independent_from_stage4_garden_core() -> None:
+    imports = set().union(*(imported_module_names(path) for path in h10_sources()))
+    assert all("symbiotic_sim_v2.garden" not in name for name in imports)

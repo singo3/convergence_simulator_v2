@@ -1,4 +1,4 @@
-"""Command entry point for Stage 1-3 headless demos and the Stage 3 GUI."""
+"""Command entry point for Stage 1-4 headless demos and the Stage 4 GUI."""
 
 from __future__ import annotations
 
@@ -21,6 +21,21 @@ from symbiotic_sim_v2.devices.polar_h10.diagnostics import (
     export_rri_measurement_diagnostics_csv,
 )
 from symbiotic_sim_v2.devices.polar_h10.scenario import create_polar_h10_simulation
+from symbiotic_sim_v2.domain.event_types import GARDEN_PHASE_CHANGED_EVENT_TYPE
+from symbiotic_sim_v2.garden.input_layer.config import (
+    BASELINE_INVALID_POLICY,
+    GARDEN_EVALUATION_SCHEMA_VERSION,
+    GARDEN_INPUT_MODEL_VERSION,
+    GARDEN_INPUT_SIGNAL_SCHEMA_VERSION,
+    GARDEN_MANIFEST_VERSION,
+    GARDEN_PHASE_SCHEMA_VERSION,
+    RRI_WINDOW_MEMBERSHIP_POLICY,
+    GardenInputConfig,
+)
+from symbiotic_sim_v2.garden.input_layer.diagnostics import (
+    export_garden_input_diagnostics,
+)
+from symbiotic_sim_v2.garden.input_layer.scenario import create_garden_input_simulation
 from symbiotic_sim_v2.simulation.demo_scenario import create_demo_engine
 from symbiotic_sim_v2.virtual_user.config import VIRTUAL_USER_MODEL_VERSION, VirtualUserConfig
 from symbiotic_sim_v2.virtual_user.diagnostics import (
@@ -30,9 +45,13 @@ from symbiotic_sim_v2.virtual_user.diagnostics import (
 )
 from symbiotic_sim_v2.virtual_user.scenario import create_virtual_user_simulation
 
+DOCUMENT_VERSION = "v2.0"
+PROFILE_VERSION = "symbiotic_signal_loop_reference_v1_0"
+STAGE_3_HEADLESS_PROJECT_VERSION = "0.3.0"
+
 
 def _build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Symbiotic simulator Stage 3")
+    parser = argparse.ArgumentParser(description="Symbiotic simulator Stage 4")
     headless_group = parser.add_mutually_exclusive_group()
     headless_group.add_argument(
         "--headless-demo",
@@ -53,6 +72,11 @@ def _build_parser() -> argparse.ArgumentParser:
         "--headless-h10-demo",
         action="store_true",
         help="run the 180-second Stage 3 ideal Polar H10 simulation",
+    )
+    headless_group.add_argument(
+        "--headless-garden-input-demo",
+        action="store_true",
+        help="run the 240-second Stage 4 Garden input-layer simulation",
     )
     parser.add_argument(
         "--smoke-test",
@@ -79,6 +103,11 @@ def _build_parser() -> argparse.ArgumentParser:
         "--export-h10-csv",
         type=Path,
         help="write Stage 3 raw-RRI and true-value comparison diagnostics CSV",
+    )
+    parser.add_argument(
+        "--export-garden-input-csv",
+        type=Path,
+        help="write the three Stage 4 Garden diagnostic CSV files to a directory",
     )
     return parser
 
@@ -165,7 +194,7 @@ def run_headless_h10_demo(export_csv: Path | None = None) -> int:
             heartbeat_records,
         )
     result = {
-        "project_version": __version__,
+        "project_version": STAGE_3_HEADLESS_PROJECT_VERSION,
         "virtual_user_model_version": VIRTUAL_USER_MODEL_VERSION,
         "polar_h10_model_version": POLAR_H10_MODEL_VERSION,
         "rri_event_schema_version": RRI_EVENT_SCHEMA_VERSION,
@@ -200,6 +229,83 @@ def run_headless_h10_demo(export_csv: Path | None = None) -> int:
     return 0
 
 
+def run_headless_garden_input_demo(export_csv: Path | None = None) -> int:
+    """Run the standard Stage 4 input layer and emit deterministic N/S JSON."""
+
+    garden_config = GardenInputConfig()
+    simulation = create_garden_input_simulation(garden_input_config=garden_config)
+    simulation.engine.run_until_end()
+    garden = simulation.garden_input_component
+    snapshot = garden.snapshot()
+    evaluations = [
+        {
+            "evaluation_id": record.evaluation_id,
+            "kind": record.evaluation_kind,
+            "bundle_index": record.bundle_index,
+            "total_rri_count": record.total_rri_count,
+            "artifact_rri_count": record.artifact_rri_count,
+            "valid_rri_count": record.valid_rri_count,
+            "artifact_rate": record.artifact_rate,
+            "rmssd_ms": record.rmssd_ms,
+            "n": record.n,
+            "quality": record.quality,
+            "is_valid": record.is_valid,
+            "reject_reasons": list(record.reject_reasons),
+        }
+        for record in garden.evaluation_records()
+    ]
+    result = {
+        "project_version": __version__,
+        "document_version": DOCUMENT_VERSION,
+        "profile_version": PROFILE_VERSION,
+        "virtual_user_model_version": VIRTUAL_USER_MODEL_VERSION,
+        "polar_h10_model_version": POLAR_H10_MODEL_VERSION,
+        "rri_event_schema_version": RRI_EVENT_SCHEMA_VERSION,
+        "garden_manifest_version": GARDEN_MANIFEST_VERSION,
+        "garden_input_model_version": GARDEN_INPUT_MODEL_VERSION,
+        "garden_input_signal_schema_version": GARDEN_INPUT_SIGNAL_SCHEMA_VERSION,
+        "garden_evaluation_schema_version": GARDEN_EVALUATION_SCHEMA_VERSION,
+        "garden_phase_schema_version": GARDEN_PHASE_SCHEMA_VERSION,
+        "rri_window_membership_policy": RRI_WINDOW_MEMBERSHIP_POLICY,
+        "baseline_invalid_policy": BASELINE_INVALID_POLICY,
+        "virtual_user_config": simulation.virtual_user_config.to_dict(),
+        "polar_h10_config": simulation.polar_h10_config.to_dict(),
+        "garden_input_config": garden_config.to_dict(),
+        "final_virtual_time_us": simulation.engine.clock.current_time_us,
+        "final_state": simulation.engine.clock.state.value,
+        "executed_event_count": len(simulation.engine.executed_events()),
+        "heartbeat_count": len(simulation.virtual_user_component.heartbeat_records()),
+        "rri_measurement_count": len(simulation.polar_h10_component.measurement_records()),
+        "garden_signal_count": len(garden.signal_records()),
+        "phase_event_count": sum(
+            event.event_type == GARDEN_PHASE_CHANGED_EVENT_TYPE
+            for event in simulation.engine.executed_events()
+        ),
+        "evaluation_count": len(garden.evaluation_records()),
+        "received_rri_count": snapshot.received_rri_count,
+        "valid_rri_count": snapshot.valid_rri_count,
+        "artifact_rri_count": snapshot.artifact_rri_count,
+        "baseline_available": snapshot.baseline_available,
+        "N_baseline_session": snapshot.n_baseline_session,
+        "N_current": snapshot.n_current,
+        "valid_evaluation_revision": snapshot.valid_evaluation_revision,
+        "evaluations": evaluations,
+        "artifact_digest": garden.artifact_digest(),
+        "evaluation_digest": garden.evaluation_digest(),
+        "signal_digest": garden.signal_digest(),
+        "full_event_digest": simulation.engine.deterministic_digest(),
+    }
+    if export_csv is not None:
+        paths = export_garden_input_diagnostics(export_csv, garden)
+        result["diagnostic_csvs"] = {
+            "rri_classification": str(paths.rri_classification),
+            "evaluations": str(paths.evaluations),
+            "signals": str(paths.signals),
+        }
+    print(json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True))
+    return 0
+
+
 def run_gui(*, smoke_test: bool, auto_close_ms: int, screenshot: Path | None) -> int:
     """Start the Qt application; smoke mode performs a bounded control sequence."""
 
@@ -218,7 +324,7 @@ def run_gui(*, smoke_test: bool, auto_close_ms: int, screenshot: Path | None) ->
     from PySide6.QtWidgets import QApplication
 
     from symbiotic_sim_v2.gui.controller import SimulationController
-    from symbiotic_sim_v2.gui.polar_h10_window import PolarH10MainWindow
+    from symbiotic_sim_v2.gui.garden_input_window import GardenInputMainWindow
 
     app = QApplication.instance() or QApplication(sys.argv[:1])
     available_fonts = set(QFontDatabase.families())
@@ -226,9 +332,9 @@ def run_gui(*, smoke_test: bool, auto_close_ms: int, screenshot: Path | None) ->
         if family in available_fonts:
             app.setFont(QFont(family))
             break
-    simulation = create_polar_h10_simulation()
+    simulation = create_garden_input_simulation()
     controller = SimulationController(simulation.engine)
-    window = PolarH10MainWindow(controller, simulation)
+    window = GardenInputMainWindow(controller, simulation)
     app.aboutToQuit.connect(controller.shutdown)
     window.show()
 
@@ -248,38 +354,72 @@ def run_gui(*, smoke_test: bool, auto_close_ms: int, screenshot: Path | None) ->
             (650, lambda: window.tabs.setCurrentIndex(0)),
             (725, lambda: window.tabs.setCurrentIndex(1)),
             (800, lambda: window.tabs.setCurrentIndex(2)),
-            (875, lambda: window.tabs.setCurrentIndex(1)),
+            (875, lambda: window.tabs.setCurrentIndex(3)),
+            (950, lambda: window.tabs.setCurrentIndex(0)),
         )
         for delay_ms, action in actions:
             QTimer.singleShot(delay_ms, action)
 
         def validate_smoke() -> None:
             failures: list[str] = []
-            expected_tabs = ("仮想ユーザー", "Polar H10", "時間・イベント診断")
-            actual_tabs = tuple(
-                window.tabs.tabText(index) for index in range(window.tabs.count())
+            expected_tabs = (
+                "Garden入力層",
+                "仮想ユーザー",
+                "Polar H10",
+                "時間・イベント診断",
             )
+            actual_tabs = tuple(window.tabs.tabText(index) for index in range(window.tabs.count()))
             if actual_tabs != expected_tabs:
                 failures.append(f"tabs={actual_tabs!r}")
             if simulation.engine.clock.state.value != "completed":
                 failures.append(f"state={simulation.engine.clock.state.value}")
             heartbeat_records = simulation.virtual_user_component.heartbeat_records()
             measurement_records = simulation.polar_h10_component.measurement_records()
-            if len(heartbeat_records) != 211:
+            garden = simulation.garden_input_component
+            if len(heartbeat_records) != 280:
                 failures.append(f"heartbeat_count={len(heartbeat_records)}")
-            if len(measurement_records) != 210:
+            if len(measurement_records) != 279:
                 failures.append(f"rri_count={len(measurement_records)}")
-            if window.virtual_user_panel.chart.record_count != 211:
+            if len(garden.rri_records()) != 279:
+                failures.append(f"garden_rri_count={len(garden.rri_records())}")
+            if len(garden.signal_records()) != 241:
+                failures.append(f"garden_signal_count={len(garden.signal_records())}")
+            if len(garden.evaluation_records()) != 4:
+                failures.append(f"evaluation_count={len(garden.evaluation_records())}")
+            if window.virtual_user_panel.chart.record_count != 280:
                 failures.append("virtual-user chart data missing")
-            if window.polar_h10_panel.chart.record_count != 210:
+            if window.polar_h10_panel.chart.record_count != 279:
                 failures.append("H10 comparison chart data missing")
             error_data = window.polar_h10_panel.chart.error_item.yData
-            if error_data is None or len(error_data) != 210 or any(error_data):
-                failures.append("H10 error chart is not the 210-point zero series")
-            if window.polar_h10_panel.measurement_model.rowCount() != 210:
+            if error_data is None or len(error_data) != 279 or any(error_data):
+                failures.append("H10 error chart is not the 279-point zero series")
+            if window.polar_h10_panel.measurement_model.rowCount() != 279:
                 failures.append("H10 table rows missing")
+            garden_panel = window.garden_input_panel
+            if garden_panel.chart.rri_count != 279:
+                failures.append("Garden RRI chart data missing")
+            if garden_panel.chart.evaluation_count != 4:
+                failures.append("Garden evaluation chart data missing")
+            if garden_panel.chart.signal_count != 241:
+                failures.append("Garden N/S chart data missing")
+            if garden_panel.rri_model.rowCount() != 279:
+                failures.append("Garden RRI table rows missing")
+            if garden_panel.evaluation_model.rowCount() != 4:
+                failures.append("Garden evaluation table rows missing")
+            if garden_panel.timeline.phase_region_count != 8:
+                failures.append("Garden phase timeline regions missing")
+            if garden_panel.timeline.signal_count != 241:
+                failures.append("Garden S timeline data missing")
             event_types = {event.event_type for event in simulation.engine.executed_events()}
-            if not {"heartbeat", "rri_measurement"} <= event_types:
+            if (
+                not {
+                    "heartbeat",
+                    "rri_measurement",
+                    "garden_input_signal",
+                    "garden_evaluation_finalized",
+                }
+                <= event_types
+            ):
                 failures.append("timeline event types missing")
             if failures:
                 print("GUI smoke failed: " + "; ".join(failures), file=sys.stderr)
@@ -308,12 +448,16 @@ def main(argv: list[str] | None = None) -> int:
         raise ValueError("--export-virtual-user-csv requires --headless-virtual-user-demo")
     if args.export_h10_csv is not None and not args.headless_h10_demo:
         raise ValueError("--export-h10-csv requires --headless-h10-demo")
+    if args.export_garden_input_csv is not None and not args.headless_garden_input_demo:
+        raise ValueError("--export-garden-input-csv requires --headless-garden-input-demo")
     if args.headless_demo or args.headless_time_demo:
         return run_headless_demo()
     if args.headless_virtual_user_demo:
         return run_headless_virtual_user_demo(args.export_virtual_user_csv)
     if args.headless_h10_demo:
         return run_headless_h10_demo(args.export_h10_csv)
+    if args.headless_garden_input_demo:
+        return run_headless_garden_input_demo(args.export_garden_input_csv)
     return run_gui(
         smoke_test=args.smoke_test,
         auto_close_ms=args.auto_close_ms,

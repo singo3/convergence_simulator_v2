@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "symbiotic-sim-v2"
-version = "0.3.0"
-description = "Deterministic virtual time, virtual user, and ideal Polar H10 simulator"
+version = "0.4.0"
+description = "Deterministic virtual time, physiology, RRI, and Garden input simulator"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [

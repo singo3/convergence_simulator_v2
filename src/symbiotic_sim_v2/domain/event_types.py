@@ -2,4 +2,9 @@
 
 HEARTBEAT_EVENT_TYPE = "heartbeat"
 RRI_MEASUREMENT_EVENT_TYPE = "rri_measurement"
+GARDEN_PHASE_CHANGED_EVENT_TYPE = "garden_phase_changed"
+GARDEN_EVALUATION_FINALIZE_TRIGGER_EVENT_TYPE = "garden_evaluation_finalize_trigger"
+GARDEN_EVALUATION_FINALIZED_EVENT_TYPE = "garden_evaluation_finalized"
+GARDEN_INPUT_SIGNAL_TRIGGER_EVENT_TYPE = "garden_input_signal_trigger"
+GARDEN_INPUT_SIGNAL_EVENT_TYPE = "garden_input_signal"
 SIMULATION_COMPLETE_EVENT_TYPE = "simulation_complete"
