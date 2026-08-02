@@ -35,6 +35,14 @@
 - active qualified Bはholder touchの実到着時刻に1回だけ出力し、formal eventへeffective timeを明示する。round finalizeで再出力しない。
 - qualified Bの早期出力によってfeedbackと第2周の時刻を早めず、round finalizeを全touch確認とfeedback・第2周同期の境界として維持する。
 - Stage 5B.1でStage 6、Hue、BPM、光波形I、VirtualUserの光応答を先回り実装しない。
+- Stage 6の正式入力は `GardenQualifiedBEvent v2` だけとし、MapperがDigital Life、Garden output component/record、P、V、tau、W、E、q、k、Gを参照しない。
+- Garden Light MapperとVirtual Light Deviceの責務を分離し、B→I写像はGarden側、command保持・位相・state/segmentはdevice側で実装する。
+- QTimer、wall time、GUI frame数を正式光時計にせず、integer microsecondsの仮想時刻からcontinuous phaseを解析的に計算する。
+- same physical commandの再通知やBPM/Hue変更でphaseをresetせず、inactive→activeだけphase 0から再開する。
+- light commandは次commandまで保持し、inactiveはblack/offとする。GUIのQColor/RGB pixelをformal eventやdevice coreに入れない。
+- `Hue_degree=360F` のformal値を保持し、F=1の360 degreeをGUI描画のmoduloでformal 0 degreeに書き換えない。
+- 高頻度のlight frame eventをSimulationEngineへscheduleせず、waveform sampleはsimulation完了後に `state_at()` から固定virtual gridで導出する。
+- Stage 6は `LightStimulusStateEvent` だけをStage 7の正式光入力境界とし、segment、fixed-grid waveform、GUI preview、CSVをformal signalと混同しない。VirtualUserのHeartbeat/RRI・生理やStage 5Cの関係記憶探索を先回り実装しない。
 - Garden出力資格層は実際の `scheduled_time_us` とscheduler配送順だけでtouch到着順を決め、通常時にID順、role順、P/Vでholderを決めない。
 - Gは各生命が自己IDとfeedbackのholder IDを照合して計算し、GardenはGをpayloadへ含めない。
 - Eは毎signalの第2周で更新する。qは新しい有効なintervention bundle評価がありG=1の生命だけ更新し、baseline評価では更新しない。

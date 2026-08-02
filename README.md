@@ -9,7 +9,8 @@
 - Stage 5A「1体のデジタル生命・第1周」: 完成
 - Stage 5B「3生命・資格競争・第2周」: 完成
 - Stage 5B.1「Garden出力境界・qualified B実効時刻補正」: 完成
-- 現在のGUI主対象: Stage 5B.1の3生命・Garden資格競争・出力時刻診断
+- Stage 6「Garden Light Mapper・仮想光点滅device」: 完成
+- 現在のGUI主対象: Stage 6のB→I、連続位相、光stimulus segment診断
 
 正式な信号経路は次のとおりです。
 
@@ -25,6 +26,10 @@
   → DigitalLifeTouchEvent (ID, B)
   → Garden出力資格層（actual arrivalでholder決定・保持）
   → GardenQualifiedBEvent v2（holder touchと同じeffective time）
+  → Garden Light Mapper（Hue=360F, BPM=10+155T）
+  → LightCommandEvent = I
+  → Virtual PC Light Device（continuous sine phase）
+  → LightStimulusStateEvent（Stage 7正式境界）
   → round finalize（全touch確認・feedback同期）
   → holder ID + 各生命自身のB
   → 各生命の第2周: G, E, q（k固定）
@@ -34,7 +39,7 @@
 
 Garden入力層は `RriMeasurementEvent` だけをraw inputとし、artifactを除いた評価windowのRRIから実RMSSDとNを求めます。正式な1秒シグナル `GardenInputSignalEvent` はNとSを出力します。Stage 5Aのデジタル生命はこのformal signalと評価metadata eventだけを受け、Nd、W、P、V、B、tauを計算します。
 
-Stage 5BではG、E/q第2周、touch配送、3生命の資格競争を接続しました。Stage 5B.1では生命由来touchをID/Bだけのv2境界へ絞り、active qualified Bをround finalizeではなくholder touchの実到着時刻に出力するよう補正しました。roleはRuntime/GUI診断だけに残し、Garden coreは参照しません。k探索はStage 5C、qualified B v2からHue/BPM/Iを作る光刺激はStage 6であり、まだ実装していません。
+Stage 5BではG、E/q第2周、touch配送、3生命の資格競争を接続しました。Stage 5B.1では生命由来touchをID/Bだけのv2境界へ絞り、active qualified Bをholder touchの実到着時刻に出力します。Stage 6はこのformal eventだけを入力に、FをHue、Tをblink BPMへ写像し、仮想時計から連続sine位相を解析的に再構成します。A/Dは監査用source Bに残しますが光parameterへは使いません。光に反応するVirtualUserとStage 5Cの関係記憶探索はまだ実装していません。
 
 現在の `ideal_polar_h10_rri_device_v0_1` は、誤差・欠損・遅延なしの理想的な入力デバイスを表すsimulation assumptionです。実機Polar H10のBLE GATT packet、firmware、電波、pairing、Polar SDKを再現するpacket-level emulatorではありません。
 
@@ -120,6 +125,19 @@ Stage 2のRRI、RMSSD、内部変動成分は仮想ユーザー内部の開発�
 - round finalizeはqualified Bを再出力せず、全touch確認・feedback・第2周同期だけを担当
 - touch order、holder、G、E、q、k、feedback時刻、closing releaseをStage 5Bから維持
 
+### Stage 6
+
+- `relax_with_light_b_to_i_mapper_v0_1`、`relax_with_light_pc_hsv_sine_mapping_v0_1`、`light_command_event_v1`
+- `Hue=360F`、`blink_BPM=10+155T`、Saturation 100%、Value 35〜50%のsine波
+- A/Dはsource Bとして保存するが光parameterへ不使用
+- `virtual_pc_light_device_v0_1` とabsolute virtual-timeのcontinuous phase
+- same command/Hue/BPM変更時のphase継続、inactive後のactiveだけreset
+- `continuous_phase_integrator_v0_1`、`hold_until_next_command_v0_1`、`light_off_black_v0_1`
+- 半開区間 `light_stimulus_segment_v1` と `fixed_virtual_grid_20ms_v0_1` 診断
+- Stage 7正式境界 `light_stimulus_state_event_v1`
+- 20ms固定virtual grid診断、headless JSON、4種類CSV、7タブGUI
+- GUI previewは校正済み物理光でなく、光はまだHeartbeat/RRIを変えない
+
 ## Requirements / setup
 
 - Python 3.12以上
@@ -128,7 +146,7 @@ Stage 2のRRI、RMSSD、内部変動成分は仮想ユーザー内部の開発�
 - pytest / pytest-qt
 - Ruff
 
-Stage 5B.1固定検証環境はPython 3.13.4、PySide6 6.11.1、PyQtGraph 0.14.0、NumPy 2.5.1、pytest 9.1.1、pytest-qt 4.5.0、Ruff 0.16.1です。
+Stage 6固定検証環境はPython 3.13.4、PySide6 6.11.1、PyQtGraph 0.14.0、NumPy 2.5.1、pytest 9.1.1、pytest-qt 4.5.0、Ruff 0.16.1です。
 
 プロジェクト直下の `.venv` をStage間で再利用します。
 
@@ -146,14 +164,15 @@ python3.13 -m venv .venv
 
 macOSでは、汎用launcher `環境共生型デジタル生命シミュレーターv2を起動.command` をダブルクリックできます。`時間シミュレーターを起動.command` も後方互換用に維持しています。
 
-GUI上部にはStage 1共通の時計、状態、速度、step controlsがあります。中央のtabは次の6つです。
+GUI上部にはStage 1共通の時計、状態、速度、step controlsがあります。中央のtabは次の7つです。
 
-1. 3生命・資格競争: 3状態card、tau/touch、G/holder、E/q、P/V、B、touch/第2周table
-2. Garden出力資格層: holder timeline、資格規則、qualified B、qualification table
-3. Garden入力層: phase/S、RRI/artifact、RMSSD/N、N/S、RRI・評価table
-4. 仮想ユーザー: Stage 2設定、内部真値の開発用診断
-5. Polar H10: ideal mode固定条件、raw RRI、真値比較、誤差、測定table
-6. 時間・イベント診断: timeline、実行済みevent log、wall/virtual time診断
+1. 光点滅シミュレーター: current HSV/phase、opt-in preview、waveform、parameter、command/segment表。previewは初期OFFで、10倍・100倍・最速では自動OFF
+2. 3生命・資格競争: 3状態card、tau/touch、G/holder、E/q、P/V、B、touch/第2周table
+3. Garden出力資格層: holder timeline、資格規則、qualified B、qualification table
+4. Garden入力層: phase/S、RRI/artifact、RMSSD/N、N/S、RRI・評価table
+5. 仮想ユーザー: Stage 2設定、内部真値の開発用診断
+6. Polar H10: ideal mode固定条件、raw RRI、真値比較、誤差、測定table
+7. 時間・イベント診断: timeline、実行済みevent log、wall/virtual time診断
 
 仮想ユーザー設定は開始前またはreset後だけ変更できます。Stage 5Aの1体専用GUI/role fixtureも後方互換として残します。H10にはnoise、latency、packet loss、artifact rateなどの調整parameterはありません。Garden入力・出力のモデル値とpolicyは固定設定として表示し、GUIからscheduler内部heapを操作しません。
 
@@ -202,7 +221,13 @@ Stage 5Bの3生命・資格競争・第2周:
 .venv/bin/python -m symbiotic_sim_v2 --headless-three-life-competition-demo
 ```
 
-いずれもreal-time待機をせずJSONを標準出力します。package versionはStage 5B.1として `0.6.1` です。ただし既存JSON contractを変えないため、Stage 3/4/5A headlessの `project_version` はそれぞれ `0.3.0`、`0.4.0`、`0.5.0` を意図的に維持します。
+Stage 6のGarden Light Mapper・仮想光device:
+
+```bash
+.venv/bin/python -m symbiotic_sim_v2 --headless-light-device-demo
+```
+
+いずれもreal-time待機をせずJSONを標準出力します。package versionは `0.7.0` です。既存JSON contractを変えないため、Stage 3/4/5A/5B.1 headlessの `project_version` はそれぞれ `0.3.0`、`0.4.0`、`0.5.0`、`0.6.1` を意図的に維持します。
 
 既存Stage 1〜5A JSONは変更しません。Stage 5B JSONはholder、生命別E/q/G/k、touch/feedback/qualified B件数と分離digestを表示し、探索状態、Hue、BPM、I、光波形を含めません。
 
@@ -257,6 +282,18 @@ Stage 5Bは次の4ファイルを保存します。
   --export-three-life-competition-csv artifacts/csv/stage-05b
 ```
 
+Stage 6は次の4ファイルを保存します。
+
+- `stage_06_light_commands.csv`
+- `stage_06_light_stimulus_states.csv`
+- `stage_06_light_stimulus_segments.csv`
+- `stage_06_light_waveform_samples_20ms.csv`
+
+```bash
+.venv/bin/python -m symbiotic_sim_v2 --headless-light-device-demo \
+  --export-light-device-csv artifacts/csv/stage-06
+```
+
 GUIからも診断CSVを保存できます。H10 CSVのraw device output列と `diagnostic_true_rri_*` / `absolute_error_us` / `match` 列は責務上分離され、`diagnostic_notice` 列で開発用比較であることを明示します。GardenはCSVではなく `RriMeasurementEvent` を直接受信し、Digital LifeもCSVではなくGarden formal eventを受信します。CSV exportの有無はsimulation結果とdigestを変えません。
 
 ## Formal event boundaries
@@ -305,7 +342,7 @@ Garden入力層はこの `RriMeasurementEvent` だけを受け、1秒周期の `
 
 Stage 5A Digital Lifeの正式入力はこの `GardenInputSignalEvent` と `GardenEvaluationFinalizedEvent` だけです。N/Sはsignalからのみ取得し、evaluation eventはID/quality/revisionの由来metadataとして使用します。Gardenのcomponent/record、RRI、RMSSD、artifact内部値を参照しません。Stage 5A Digital Lifeに正式外部出力eventはなく、first-round/evaluation-update recordは開発用診断です。
 
-Stage 5B.1の正式touch v2はID、signal識別metadata、Bだけを含み、role、P、V、tauは含みません。参加IDはRuntime/session rosterからGardenへ注入され、Garden coreはroleを参照せずactual arrival orderだけでholderを決めます。active `GardenQualifiedBEvent` v2はholder touchの実到着時刻を `effective_time_us` として同じmicrosecondに出力され、round finalizeでは再出力されません。各生命へのfeedbackと第2周は従来どおりround finalize後です。Stage 6はこのevent streamを唯一の入力として次commandまで保持できますが、Hue/BPM/Iと光波形はまだ生成しません。
+Stage 5B.1の正式touch v2はID、signal識別metadata、Bだけを含み、role、P、V、tauは含みません。参加IDはRuntime/session rosterからGardenへ注入され、Garden coreはroleを参照せずactual arrival orderだけでholderを決めます。active `GardenQualifiedBEvent` v2はholder touchの実到着時刻を `effective_time_us` として同じmicrosecondに出力され、round finalizeでは再出力されません。Stage 6 Mapperはこのeventだけから `LightCommandEvent=I` を作り、Deviceは同時刻の `LightStimulusStateEvent` と半開区間segmentを作ります。各生命へのfeedbackと第2周は従来どおりround finalize後です。
 
 ## Stage 4 Garden input model
 
@@ -379,6 +416,14 @@ Stage 5AでE=0、q=0.5、`k_current=[0.5,0.5,0.5,0.5]` をlive更新しません
 
 3生命は同じN/Sを受けますが互いの内部値を参照しません。Runtimeは各tauを個別touch時刻へ写像するだけで、Gardenがactual arrivalからholderを決めます。holderはS=1中固定ですが全生命が毎signal touchします。active qualified Bはそのsignalのholder touch時刻から有効で、round finalizeは全touchを確認してfeedbackと第2周を同期します。各生命はID照合でGを計算し、毎signal Eを更新し、新規有効Bundle評価かつG=1だけqを更新します。更新E/qは次signalから使用し、kは固定です。240秒ではinactive commandを出し、Bundle 2を解放前holderへ帰属してからreleaseします。
 
+## Stage 6 B→I and virtual light model
+
+Stage 6のMapperは `GardenQualifiedBEvent v2` だけを受け、`Hue=360F`、`BPM=10+155T`、Saturation=1.0、Value=`0.425+0.075sin(2πphase)` の `LightCommandEvent` を生成します。A/Dはsource Bとして保存しますが光parameterに使いません。
+
+F=1のformal Hueは360.0のまま保持します。render Hueの0.0へのmodulo、event priority/schema、位相開始・継続、command hold、inactive black、segment、20ms sampling、GUI previewは、v2.0が具体化していないStage 6のversion管理されたsimulation implementation assumptionです。
+
+Virtual Light Deviceはcommandを次commandまで保持し、integer microsecondsのabsolute virtual timeからphase/Valueを解析的に求めます。same commandやBPM/Hue変更でphaseをresetせず、inactiveからactiveのみphase 0へresetします。inactiveは黒、formal outputは `LightStimulusStateEvent`、監査記録は半開区間 `LightStimulusSegment` です。
+
 ## Deterministic digest baselines
 
 - Stage 1: `1c4217065fa29316e7ead83c4d604e87f9fe8fe46e82b689b5566dbc9890598d`
@@ -394,17 +439,21 @@ Stage 5Aは241件のfirst-round recordと、新しい有効評価またはreject
 
 Stage 5B.1はtouch、qualification、qualified B、feedback、生命別second roundを別々にdigest化します。標準runはtouch 540、feedback 723、active/inactive output 180/61、assignment/release各1です。touch/qualified B/full event digestはv2 schemaと補正時刻を反映し、qualification/feedback/second roundの意味は維持します。run-to-end、step、速度、reset、snapshot頻度、GUI、CSV exportは結果を変えません。
 
+Stage 6はcommand、stimulus state、segment、20ms fixed-grid waveform、full eventを分離digest化します。標準runは241 command/state、240 segment、12001 sampleで、run mode、reset、snapshot頻度、GUI preview、CSV exportに対して同一です。固定値は [Stage 6 reference vectors](docs/conformance/stage-06-reference-vectors.json) をsource of truthとし、[Stage 6設計文書](docs/stage-06-light-blink-simulator.md) に監査用一覧を記載します。
+
 ## Test / lint / smoke
 
 ```bash
-.venv/bin/python -m compileall -q src tests
+.venv/bin/python -m compileall -q src tests tools
 QT_QPA_PLATFORM=offscreen .venv/bin/pytest -q
 .venv/bin/ruff check .
-QT_QPA_PLATFORM=offscreen .venv/bin/python -m symbiotic_sim_v2 --smoke-test --auto-close-ms 4500
+QT_QPA_PLATFORM=offscreen .venv/bin/python -m symbiotic_sim_v2 --smoke-test --auto-close-ms 5500
 ```
 
-テストはStage 1〜5A全回帰に加え、3生命独立性、tau配送、touch schema、actual-arrival qualification、B往復、feedback routing、G/E/q/k、第2周同期、240秒closing、digest、headless、CSV、6-tab GUI、architecture分離を確認します。
+テストはStage 1〜5B.1全回帰に加え、strict B→I境界、連続phase、command equivalence、state query、segment、fixed sampling、digest、headless、CSV、7-tab GUI、architecture分離を確認します。
 
 Stage 5Aの設計境界は [1体のデジタル生命・第1周](docs/stage-05a-single-digital-life-first-round.md)、式と分類は [Digital Life first-round model v0.1](docs/digital-life-first-round-model_v0.1.md) を参照してください。Stage 4の設計境界は [Garden入力層設計](docs/stage-04-garden-input-layer.md)、モデル値は [Garden input model v0.1](docs/relax-with-light-garden-input-model_v0.1.md)、境界所属の仮定は [RRI window membership policy v0.1](docs/rri-window-membership-policy_v0.1.md) にあります。規範との境界は [規範スコープ](docs/normative-scope.md) を参照してください。
 
-Stage 5Bの設計境界は [3生命・資格競争・第2周](docs/stage-05b-three-life-competition-second-round.md)、配送仮定は [tau touch policy](docs/tau-touch-delivery-policy_v0.1.md) にあります。Stage 5B.1の補正は [出力境界・時刻補正](docs/stage-05b1-output-boundary-timing-correction.md)、Garden規則は [Garden output qualification model v0.2](docs/garden-output-qualification-model_v0.2.md)、発行policyは [qualified B emission policy v0.1](docs/qualified-b-emission-policy_v0.1.md) を参照してください。次工程は **Stage 6: 光点滅シミュレーター** です。Stage 5Cの関係記憶探索もまだ実装していません。
+Stage 5Bの設計境界は [3生命・資格競争・第2周](docs/stage-05b-three-life-competition-second-round.md)、配送仮定は [tau touch policy](docs/tau-touch-delivery-policy_v0.1.md) にあります。Stage 5B.1の補正は [出力境界・時刻補正](docs/stage-05b1-output-boundary-timing-correction.md)、Garden規則は [Garden output qualification model v0.2](docs/garden-output-qualification-model_v0.2.md)、発行policyは [qualified B emission policy v0.1](docs/qualified-b-emission-policy_v0.1.md) を参照してください。
+
+Stage 6は [光点滅シミュレーター](docs/stage-06-light-blink-simulator.md)、[B→I mapping](docs/b-to-i-light-mapping-model_v0.1.md)、[Virtual Light Device](docs/virtual-light-device-model_v0.1.md)、[continuous phase policy](docs/continuous-phase-policy_v0.1.md) を参照してください。次工程は **Stage 7: 光に反応する仮想ユーザー** です。Stage 5Cの関係記憶探索も未実装です。

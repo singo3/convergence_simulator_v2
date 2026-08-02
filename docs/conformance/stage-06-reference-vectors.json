@@ -1,0 +1,350 @@
+{
+  "fixed_grid": {
+    "engine_sample_event_count": 0,
+    "sample_count": 12001,
+    "sample_interval_us": 20000,
+    "samples": [
+      {
+        "active": false,
+        "phase_cycles": null,
+        "sample_index": 0,
+        "time_us": 0,
+        "value": 0.0
+      },
+      {
+        "active": false,
+        "phase_cycles": null,
+        "sample_index": 3027,
+        "time_us": 60540000,
+        "value": 0.0
+      },
+      {
+        "active": true,
+        "phase_cycles": 0.0123375,
+        "sample_index": 3028,
+        "time_us": 60560000,
+        "value": 0.4308080888639701
+      },
+      {
+        "active": false,
+        "phase_cycles": null,
+        "sample_index": 12000,
+        "time_us": 240000000,
+        "value": 0.0
+      }
+    ]
+  },
+  "formal_boundaries": {
+    "active_ordered_priorities": [
+      60,
+      65,
+      66,
+      67,
+      70,
+      80
+    ],
+    "closing_ordered_priorities": [
+      25,
+      30,
+      31,
+      65,
+      66,
+      67,
+      80,
+      90,
+      100
+    ],
+    "inactive_ordered_priorities": [
+      31,
+      65,
+      66,
+      67,
+      80
+    ],
+    "light_command": {
+      "event_type": "light_command",
+      "exact_payload_fields_sorted": [
+        "active",
+        "blink_bpm",
+        "command_effective_time_us",
+        "command_hold_policy_version",
+        "garden_id",
+        "hue_degree",
+        "inactive_output_policy_version",
+        "mapping_version",
+        "phase_policy_version",
+        "qualification_holder_id",
+        "render_hue_degree",
+        "saturation",
+        "schema_version",
+        "source_b_a",
+        "source_b_d",
+        "source_b_f",
+        "source_b_t",
+        "source_effective_time_us",
+        "source_signal_index",
+        "source_signal_time_us",
+        "value_amplitude",
+        "value_center",
+        "value_max",
+        "value_min",
+        "waveform"
+      ],
+      "priority": 66,
+      "schema_version": "light_command_event_v1",
+      "source": "garden_light_mapper"
+    },
+    "light_stimulus_state": {
+      "event_type": "light_stimulus_state",
+      "exact_payload_fields_sorted": [
+        "active",
+        "blink_bpm",
+        "command_equivalent_to_previous",
+        "command_hold_policy_version",
+        "device_id",
+        "effective_time_us",
+        "hue_degree",
+        "inactive_output_policy_version",
+        "mapping_version",
+        "phase_cycles_at_start",
+        "phase_policy_version",
+        "phase_reset",
+        "physical_parameters_changed",
+        "qualification_holder_id",
+        "render_hue_degree",
+        "saturation",
+        "schema_version",
+        "source_b_a",
+        "source_b_d",
+        "source_b_f",
+        "source_b_t",
+        "source_signal_index",
+        "source_signal_time_us",
+        "value_amplitude",
+        "value_at_start",
+        "value_center",
+        "value_max",
+        "value_min",
+        "waveform"
+      ],
+      "formal_rgb_present": false,
+      "priority": 67,
+      "schema_version": "light_stimulus_state_event_v1",
+      "source": "virtual_light_device"
+    },
+    "qualified_b": {
+      "event_type": "garden_qualified_b",
+      "priority": 65,
+      "schema_version": "garden_qualified_b_event_v2",
+      "source": "garden_output"
+    },
+    "round_finalize_priority": 70
+  },
+  "mapping_vectors": {
+    "a_d_invariance": {
+      "expected_blink_bpm": 126.25,
+      "expected_hue_degree": 90.0,
+      "first_b": [
+        0.25,
+        0.0,
+        0.75,
+        0.0
+      ],
+      "physical_output_equal": true,
+      "second_b": [
+        0.25,
+        1.0,
+        0.75,
+        1.0
+      ]
+    },
+    "blink_bpm": [
+      {
+        "blink_bpm": 10.0,
+        "t": 0.0
+      },
+      {
+        "blink_bpm": 87.5,
+        "t": 0.5
+      },
+      {
+        "blink_bpm": 165.0,
+        "t": 1.0
+      }
+    ],
+    "hue": [
+      {
+        "f": 0.0,
+        "formal_hue_degree": 0.0,
+        "render_hue_degree": 0.0
+      },
+      {
+        "f": 0.5,
+        "formal_hue_degree": 180.0,
+        "render_hue_degree": 180.0
+      },
+      {
+        "f": 1.0,
+        "formal_hue_degree": 360.0,
+        "render_hue_degree": 0.0
+      }
+    ],
+    "inactive": {
+      "active": false,
+      "blink_bpm": null,
+      "holder_id": null,
+      "hue_degree": null,
+      "render_hue_degree": null,
+      "saturation": 0.0,
+      "source_b": null,
+      "value_amplitude": 0.0,
+      "value_center": 0.0,
+      "value_max": 0.0,
+      "value_min": 0.0,
+      "waveform": "off"
+    },
+    "standard_green": {
+      "blink_bpm": 87.5,
+      "formal_hue_degree": 125.0,
+      "render_hue_degree": 125.0,
+      "saturation": 1.0,
+      "source_b": [
+        0.3472222222222222,
+        0.5,
+        0.5,
+        0.5
+      ],
+      "value_amplitude": 0.075,
+      "value_center": 0.425,
+      "value_max": 0.5,
+      "value_min": 0.35,
+      "waveform": "sine"
+    }
+  },
+  "normative_source": {
+    "algorithm_version": "adaptive_random_search_confirmed_v1",
+    "document_version": "v2.0",
+    "profile_version": "symbiotic_signal_loop_reference_v1_0",
+    "sha256": "9707de5c07cbcb20603436b374f6a563b5d908206096f2a2204384ae91b22c73",
+    "size_bytes": 65759,
+    "state_schema_version": "relation_memory_state_v2"
+  },
+  "phase_and_waveform_vectors": [
+    {
+      "phase_cycles": 0.0,
+      "value": 0.425
+    },
+    {
+      "phase_cycles": 0.25,
+      "value": 0.5
+    },
+    {
+      "phase_cycles": 0.5,
+      "value": 0.425
+    },
+    {
+      "phase_cycles": 0.75,
+      "value": 0.35
+    },
+    {
+      "phase_cycles": 1.0,
+      "value": 0.425
+    }
+  ],
+  "schema_version": "stage_06_reference_vectors_v1",
+  "simulation_assumptions": {
+    "command_hold_policy_version": "hold_until_next_command_v0_1",
+    "garden_light_mapper_model_version": "relax_with_light_b_to_i_mapper_v0_1",
+    "inactive_output_policy_version": "light_off_black_v0_1",
+    "light_command_schema_version": "light_command_event_v1",
+    "light_stimulus_segment_schema_version": "light_stimulus_segment_v1",
+    "light_stimulus_state_schema_version": "light_stimulus_state_event_v1",
+    "mapping_version": "relax_with_light_pc_hsv_sine_mapping_v0_1",
+    "phase_policy_version": "continuous_phase_integrator_v0_1",
+    "project_version": "0.7.0",
+    "virtual_light_device_model_version": "virtual_pc_light_device_v0_1",
+    "waveform_sample_policy_version": "fixed_virtual_grid_20ms_v0_1"
+  },
+  "standard_scenario": {
+    "active_command_count": 180,
+    "active_segment_count": 180,
+    "closing_inactive_effective_time_us": 240000000,
+    "command_digest": "306648650d4b286a48b3f9188f7fd640764b05fb135c581c4b9d00b487d06020",
+    "equivalent_command_count": 238,
+    "executed_event_count": 3287,
+    "final_active": false,
+    "final_phase": null,
+    "final_value": 0.0,
+    "first_active_effective_time_us": 60551540,
+    "first_active_holder_id": "life-green",
+    "first_active_phase_cycles": 0.0,
+    "first_active_value": 0.425,
+    "full_event_digest": "f2ef166cd2bbea252d2c848b7f67d80cad1840534fe736d792087639b5b2a833",
+    "inactive_command_count": 61,
+    "inactive_segment_count": 60,
+    "last_active_effective_time_us": 239589850,
+    "light_command_count": 241,
+    "light_stimulus_state_event_count": 241,
+    "phase_continuation_count": 179,
+    "phase_reset_count": 1,
+    "physical_parameter_change_count": 3,
+    "qualified_b_input_count": 241,
+    "segment_count": 240,
+    "segment_digest": "9dabc1b018b52f9be603ba164655f3c5fa79ff4f6579ae8a6bfd48047d8fd763",
+    "stimulus_state_digest": "1dbf214e1448802a665031f73fb798cdbf04471210aeddf438c68b72b616265e",
+    "waveform_sample_digest": "a075f488a588d7d2f78548e4ae339e7cac59c88f8e4508b2a89f0ca6e36cc0c0"
+  },
+  "transition_vectors": {
+    "active_to_inactive": {
+      "equivalent_to_previous": false,
+      "phase_cycles_at_start": null,
+      "phase_reset": false,
+      "physical_parameters_changed": true,
+      "value_at_start": 0.0
+    },
+    "changed_bpm": {
+      "equivalent_to_previous": false,
+      "phase_continues": true,
+      "phase_reset": false,
+      "physical_parameters_changed": true
+    },
+    "changed_hue": {
+      "equivalent_to_previous": false,
+      "phase_continues": true,
+      "phase_reset": false,
+      "physical_parameters_changed": true
+    },
+    "first_inactive": {
+      "equivalent_to_previous": false,
+      "phase_cycles_at_start": null,
+      "phase_reset": false,
+      "physical_parameters_changed": true,
+      "value_at_start": 0.0
+    },
+    "inactive_reassertion": {
+      "equivalent_to_previous": true,
+      "phase_cycles_at_start": null,
+      "phase_reset": false,
+      "physical_parameters_changed": false,
+      "value_at_start": 0.0
+    },
+    "inactive_to_active": {
+      "equivalent_to_previous": false,
+      "phase_cycles_at_start": 0.0,
+      "phase_reset": true,
+      "physical_parameters_changed": true,
+      "value_at_start": 0.425
+    },
+    "inactive_to_active_again": {
+      "phase_cycles_at_start": 0.0,
+      "phase_reset": true,
+      "value_at_start": 0.425
+    },
+    "same_active_command": {
+      "equivalent_to_previous": true,
+      "phase_continues": true,
+      "phase_reset": false,
+      "physical_parameters_changed": false
+    }
+  }
+}

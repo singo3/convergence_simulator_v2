@@ -1,4 +1,4 @@
-"""Command entry point for Stage 1-5B headless demos and the Stage 5B GUI."""
+"""Command entry point for Stage 1-6 headless demos and the Stage 6 GUI."""
 
 from __future__ import annotations
 
@@ -21,6 +21,15 @@ from symbiotic_sim_v2.devices.polar_h10.diagnostics import (
     export_rri_measurement_diagnostics_csv,
 )
 from symbiotic_sim_v2.devices.polar_h10.scenario import create_polar_h10_simulation
+from symbiotic_sim_v2.devices.virtual_light.config import (
+    LIGHT_STIMULUS_SEGMENT_SCHEMA_VERSION,
+    LIGHT_STIMULUS_STATE_SCHEMA_VERSION,
+    VIRTUAL_LIGHT_DEVICE_MODEL_VERSION,
+    WAVEFORM_SAMPLE_POLICY_VERSION,
+)
+from symbiotic_sim_v2.devices.virtual_light.diagnostics import (
+    export_light_diagnostics,
+)
 from symbiotic_sim_v2.digital_life.config import (
     ALGORITHM_VERSION,
     DIGITAL_LIFE_CONFIG_SCHEMA_VERSION,
@@ -57,6 +66,14 @@ from symbiotic_sim_v2.garden.input_layer.diagnostics import (
     export_garden_input_diagnostics,
 )
 from symbiotic_sim_v2.garden.input_layer.scenario import create_garden_input_simulation
+from symbiotic_sim_v2.garden.light_mapper.config import (
+    B_TO_I_MAPPING_VERSION,
+    COMMAND_HOLD_POLICY_VERSION,
+    CONTINUOUS_PHASE_POLICY_VERSION,
+    GARDEN_LIGHT_MAPPER_MODEL_VERSION,
+    INACTIVE_OUTPUT_POLICY_VERSION,
+    LIGHT_COMMAND_SCHEMA_VERSION,
+)
 from symbiotic_sim_v2.garden.output_layer.config import (
     DIGITAL_LIFE_TOUCH_SCHEMA_VERSION,
     GARDEN_INTEROCEPTIVE_FEEDBACK_SCHEMA_VERSION,
@@ -67,6 +84,9 @@ from symbiotic_sim_v2.garden.output_layer.config import (
 )
 from symbiotic_sim_v2.garden.output_layer.diagnostics import (
     export_garden_output_diagnostics,
+)
+from symbiotic_sim_v2.runtime.light_simulation.scenario import (
+    create_light_feedback_simulation,
 )
 from symbiotic_sim_v2.runtime.multi_life.config import (
     TAU_TOUCH_DELIVERY_POLICY_VERSION,
@@ -89,10 +109,11 @@ PROFILE_VERSION = "symbiotic_signal_loop_reference_v1_0"
 STAGE_3_HEADLESS_PROJECT_VERSION = "0.3.0"
 STAGE_4_HEADLESS_PROJECT_VERSION = "0.4.0"
 STAGE_5A_HEADLESS_PROJECT_VERSION = "0.5.0"
+STAGE_5B1_HEADLESS_PROJECT_VERSION = "0.6.1"
 
 
 def _build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Symbiotic simulator Stage 5B.1")
+    parser = argparse.ArgumentParser(description="Symbiotic simulator Stage 6")
     headless_group = parser.add_mutually_exclusive_group()
     headless_group.add_argument(
         "--headless-demo",
@@ -132,6 +153,11 @@ def _build_parser() -> argparse.ArgumentParser:
             "Garden output timing"
         ),
     )
+    headless_group.add_argument(
+        "--headless-light-device-demo",
+        action="store_true",
+        help="run the 240-second Stage 6 Garden-to-virtual-light simulation",
+    )
     parser.add_argument(
         "--life-role",
         choices=("red", "green", "blue"),
@@ -146,7 +172,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--auto-close-ms",
         type=int,
-        default=4500,
+        default=5500,
         help="GUI smoke-test auto-close delay in milliseconds",
     )
     parser.add_argument(
@@ -162,9 +188,12 @@ def _build_parser() -> argparse.ArgumentParser:
             "three-life-overview",
             "touch-holder-second-round",
             "garden-output-qualified-b",
+            "light-output-overview",
+            "continuous-phase-waveform",
+            "light-command-segments",
         ),
         default="window",
-        help="capture the selected Stage 5A/5B diagnostic view",
+        help="capture the selected Stage 5A/5B/6 diagnostic view",
     )
     parser.add_argument(
         "--export-virtual-user-csv",
@@ -190,6 +219,11 @@ def _build_parser() -> argparse.ArgumentParser:
         "--export-three-life-competition-csv",
         type=Path,
         help="write the four Stage 5B competition diagnostic CSV files to a directory",
+    )
+    parser.add_argument(
+        "--export-light-device-csv",
+        type=Path,
+        help="write the four Stage 6 light diagnostic CSV files to a directory",
     )
     return parser
 
@@ -527,7 +561,7 @@ def run_headless_three_life_competition_demo(
         for life_id, snapshot in life_snapshots.items()
     }
     result = {
-        "project_version": __version__,
+        "project_version": STAGE_5B1_HEADLESS_PROJECT_VERSION,
         "document_version": DOCUMENT_VERSION,
         "profile_version": PROFILE_VERSION,
         "algorithm_version": ALGORITHM_VERSION,
@@ -662,6 +696,100 @@ def run_headless_three_life_competition_demo(
             "qualification": str(garden_paths.qualification),
             "qualified_b": str(garden_paths.qualified_b),
             "second_round": str(second_round_path),
+        }
+    print(json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True))
+    return 0
+
+
+def run_headless_light_device_demo(export_csv: Path | None = None) -> int:
+    """Run Stage 6 and emit deterministic Garden-to-light diagnostics."""
+
+    simulation = create_light_feedback_simulation()
+    simulation.engine.run_until_end()
+    upstream = simulation.upstream_simulation
+    mapper = simulation.garden_light_mapper_component
+    device = simulation.virtual_light_device_component
+    qualified_b_records = upstream.garden_output_component.qualified_b_records()
+    command_records = mapper.command_records()
+    state_records = device.stimulus_state_records()
+    segment_records = device.stimulus_segments()
+    waveform_samples = device.waveform_samples()
+    active_commands = tuple(record for record in command_records if record.active)
+    inactive_commands = tuple(record for record in command_records if not record.active)
+    active_segments = tuple(record for record in segment_records if record.active)
+    inactive_segments = tuple(record for record in segment_records if not record.active)
+    first_active_command = active_commands[0]
+    first_active_state = state_records[first_active_command.command_index]
+    final_snapshot = device.snapshot()
+
+    result = {
+        "project_version": __version__,
+        "document_version": DOCUMENT_VERSION,
+        "profile_version": PROFILE_VERSION,
+        "algorithm_version": ALGORITHM_VERSION,
+        "state_schema_version": STATE_SCHEMA_VERSION,
+        "garden_light_mapper_model_version": GARDEN_LIGHT_MAPPER_MODEL_VERSION,
+        "mapping_version": B_TO_I_MAPPING_VERSION,
+        "light_command_schema_version": LIGHT_COMMAND_SCHEMA_VERSION,
+        "virtual_light_device_model_version": VIRTUAL_LIGHT_DEVICE_MODEL_VERSION,
+        "light_stimulus_state_schema_version": (
+            LIGHT_STIMULUS_STATE_SCHEMA_VERSION
+        ),
+        "light_stimulus_segment_schema_version": (
+            LIGHT_STIMULUS_SEGMENT_SCHEMA_VERSION
+        ),
+        "phase_policy_version": CONTINUOUS_PHASE_POLICY_VERSION,
+        "command_hold_policy_version": COMMAND_HOLD_POLICY_VERSION,
+        "inactive_output_policy_version": INACTIVE_OUTPUT_POLICY_VERSION,
+        "waveform_sample_policy_version": WAVEFORM_SAMPLE_POLICY_VERSION,
+        "final_virtual_time_us": simulation.engine.clock.current_time_us,
+        "final_state": simulation.engine.clock.state.value,
+        "executed_event_count": len(simulation.engine.executed_events()),
+        "qualified_b_input_count": len(qualified_b_records),
+        "light_command_count": len(command_records),
+        "light_stimulus_state_event_count": len(state_records),
+        "segment_count": len(segment_records),
+        "active_command_count": len(active_commands),
+        "inactive_command_count": len(inactive_commands),
+        "active_segment_count": len(active_segments),
+        "inactive_segment_count": len(inactive_segments),
+        "first_active_effective_time_us": first_active_command.effective_time_us,
+        "last_active_effective_time_us": active_commands[-1].effective_time_us,
+        "closing_inactive_effective_time_us": (
+            inactive_commands[-1].effective_time_us
+        ),
+        "first_active_holder_id": first_active_command.qualification_holder_id,
+        "first_active_source_b": first_active_command.source_b,
+        "first_active_hue_degree": first_active_command.hue_degree,
+        "first_active_blink_bpm": first_active_command.blink_bpm,
+        "first_active_phase_cycles": first_active_state.phase_cycles_at_start,
+        "first_active_value": first_active_state.value_at_start,
+        "phase_reset_count": final_snapshot.phase_reset_count,
+        "phase_continuation_count": final_snapshot.phase_continuation_count,
+        "equivalent_command_count": final_snapshot.equivalent_command_count,
+        "physical_parameter_change_count": (
+            final_snapshot.physical_parameter_change_count
+        ),
+        "final_active": final_snapshot.active,
+        "final_value": final_snapshot.current_value,
+        "final_phase": final_snapshot.phase_cycles,
+        "waveform_sample_interval_us": (
+            simulation.virtual_light_device_config.diagnostic_sample_interval_us
+        ),
+        "waveform_sample_count": len(waveform_samples),
+        "command_digest": mapper.command_digest(),
+        "stimulus_state_digest": device.stimulus_state_digest(),
+        "segment_digest": device.segment_digest(),
+        "waveform_sample_digest": device.waveform_sample_digest(),
+        "full_event_digest": simulation.engine.deterministic_digest(),
+    }
+    if export_csv is not None:
+        paths = export_light_diagnostics(export_csv, device, command_records)
+        result["diagnostic_csvs"] = {
+            "commands": str(paths.commands),
+            "stimulus_states": str(paths.stimulus_states),
+            "stimulus_segments": str(paths.stimulus_segments),
+            "waveform_samples": str(paths.waveform_samples),
         }
     print(json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True))
     return 0
@@ -857,7 +985,7 @@ def run_gui(
     screenshot: Path | None,
     screenshot_target: str = "window",
 ) -> int:
-    """Start the Stage 5B six-tab GUI over the shared production factory."""
+    """Start the Stage 6 seven-tab GUI over the shared production factory."""
 
     if auto_close_ms <= 0:
         raise ValueError("--auto-close-ms must be positive")
@@ -871,7 +999,7 @@ def run_gui(
     from PySide6.QtWidgets import QApplication
 
     from symbiotic_sim_v2.gui.controller import SimulationController
-    from symbiotic_sim_v2.gui.three_life_window import ThreeDigitalLifeMainWindow
+    from symbiotic_sim_v2.gui.light_simulation_window import LightSimulationMainWindow
 
     app = QApplication.instance() or QApplication(sys.argv[:1])
     available_fonts = set(QFontDatabase.families())
@@ -879,9 +1007,9 @@ def run_gui(
         if family in available_fonts:
             app.setFont(QFont(family))
             break
-    simulation = create_three_digital_life_competition_simulation()
+    simulation = create_light_feedback_simulation()
     controller = SimulationController(simulation.engine)
-    window = ThreeDigitalLifeMainWindow(controller, simulation)
+    window = LightSimulationMainWindow(controller, simulation)
     app.aboutToQuit.connect(controller.shutdown)
     window.show()
 
@@ -922,6 +1050,7 @@ def run_gui(
         def validate_smoke() -> None:
             failures: list[str] = []
             expected_tabs = (
+                "光点滅シミュレーター",
                 "3生命・資格競争",
                 "Garden出力資格層",
                 "Garden入力層",
@@ -937,13 +1066,14 @@ def run_gui(
             active = window.simulation
             if active.engine.clock.state.value != "completed":
                 failures.append(f"state={active.engine.clock.state.value}")
-            if len(active.virtual_user_component.heartbeat_records()) != 280:
+            upstream = active.upstream_simulation
+            if len(upstream.virtual_user_component.heartbeat_records()) != 280:
                 failures.append("heartbeat count")
-            if len(active.polar_h10_component.measurement_records()) != 279:
+            if len(upstream.polar_h10_component.measurement_records()) != 279:
                 failures.append("RRI count")
-            if len(active.garden_input_component.signal_records()) != 241:
+            if len(upstream.garden_input_component.signal_records()) != 241:
                 failures.append("Garden signal count")
-            garden_snapshot = active.garden_output_component.snapshot()
+            garden_snapshot = upstream.garden_output_component.snapshot()
             expected_garden = (
                 garden_snapshot.total_touch_count == 540
                 and garden_snapshot.feedback_count == 723
@@ -956,7 +1086,7 @@ def run_gui(
             )
             if not expected_garden:
                 failures.append(f"Garden output={garden_snapshot!r}")
-            for life_id, component in active.digital_life_components.items():
+            for life_id, component in upstream.digital_life_components.items():
                 snapshot = component.snapshot()
                 if (
                     snapshot.first_round_count != 241
@@ -966,7 +1096,7 @@ def run_gui(
                     or snapshot.k_update_count != 0
                 ):
                     failures.append(f"life={life_id}:{snapshot!r}")
-            green = active.green_life_component.snapshot()
+            green = upstream.green_life_component.snapshot()
             if green.e <= 0.14 or green.q_update_count != 3:
                 failures.append("green E/q")
             multi_panel = window.multi_life_panel
@@ -1009,12 +1139,54 @@ def run_gui(
                 failures.append("H10 chart")
             if window.garden_input_panel.chart.signal_count != 241:
                 failures.append("Garden input chart")
+            mapper = active.garden_light_mapper_component
+            device = active.virtual_light_device_component
+            commands = mapper.command_records()
+            states = device.stimulus_state_records()
+            segments = device.stimulus_segments()
+            active_commands = tuple(record for record in commands if record.active)
+            final_light = device.snapshot()
+            first_command = active_commands[0] if active_commands else None
+            light_panel = window.light_output_panel
+            if (
+                len(commands) != 241
+                or len(states) != 241
+                or len(segments) != 240
+                or len(active_commands) != 180
+                or sum(not record.active for record in commands) != 61
+            ):
+                failures.append("Stage 6 command/state/segment counts")
+            if (
+                first_command is None
+                or first_command.qualification_holder_id != "life-green"
+                or first_command.source_b != (125.0 / 360.0, 0.5, 0.5, 0.5)
+                or first_command.hue_degree != 125.0
+                or first_command.blink_bpm != 87.5
+            ):
+                failures.append("Stage 6 first active mapping")
+            if (
+                final_light.active
+                or final_light.current_value != 0.0
+                or final_light.phase_cycles is not None
+                or final_light.phase_reset_count != 1
+                or final_light.phase_continuation_count != 179
+            ):
+                failures.append("Stage 6 phase/final inactive state")
+            if (
+                light_panel.command_model.rowCount() != 241
+                or light_panel.segment_model.rowCount() != 240
+                or light_panel.parameter_chart.command_count != 241
+                or light_panel.preview_checkbox.isChecked()
+            ):
+                failures.append("Stage 6 GUI chart/table/preview")
             event_types = {event.event_type for event in active.engine.executed_events()}
             required_types = {
                 "digital_life_touch",
                 "garden_qualified_b",
                 "garden_interoceptive_feedback",
                 "garden_holder_release",
+                "light_command",
+                "light_stimulus_state",
             }
             if not required_types <= event_types:
                 failures.append("Stage 5B event types")
@@ -1033,6 +1205,31 @@ def run_gui(
         screenshot.parent.mkdir(parents=True, exist_ok=True)
 
         def save_screenshot() -> None:
+            light_panel = window.light_output_panel
+            if screenshot_target == "light-output-overview":
+                controller.reset()
+                window.speed_combo.setCurrentIndex(0)
+                engine = window.simulation.engine
+                for _ in range(10_000):
+                    event = engine.step_one_event()
+                    if event is None:
+                        raise RuntimeError("first active light state was not reached")
+                    if (
+                        event.event_type == "light_stimulus_state"
+                        and event.payload["active"] is True
+                    ):
+                        break
+                else:  # pragma: no cover - bounded production fixture guard
+                    raise RuntimeError("first active light state search exceeded limit")
+                controller.snapshot_changed.emit(controller.current_snapshot())
+                light_panel.preview_checkbox.setChecked(True)
+            elif screenshot_target == "continuous-phase-waveform":
+                controller.reset()
+                window.speed_combo.setCurrentIndex(0)
+                engine = window.simulation.engine
+                for _ in range(75):
+                    engine.step_one_second()
+                controller.snapshot_changed.emit(controller.current_snapshot())
             targets = {
                 "window": window,
                 "three-life-overview": window,
@@ -1042,6 +1239,9 @@ def run_gui(
                 "garden-output-qualified-b": (
                     window.garden_output_panel.diagnostics_content
                 ),
+                "light-output-overview": window,
+                "continuous-phase-waveform": light_panel.waveform_chart,
+                "light-command-segments": light_panel.chart_table_splitter,
             }
             if screenshot_target == "garden-output-qualified-b":
                 window.tabs.setCurrentWidget(window.garden_output_panel)
@@ -1050,6 +1250,25 @@ def run_gui(
                 "touch-holder-second-round",
             }:
                 window.tabs.setCurrentWidget(window.multi_life_panel)
+            elif screenshot_target in {
+                "light-output-overview",
+                "continuous-phase-waveform",
+                "light-command-segments",
+            }:
+                window.tabs.setCurrentWidget(light_panel)
+                if screenshot_target == "light-output-overview":
+                    light_panel.diagnostics_scroll.verticalScrollBar().setValue(0)
+                elif screenshot_target == "continuous-phase-waveform":
+                    light_panel.diagnostics_scroll.ensureWidgetVisible(
+                        light_panel.waveform_chart
+                    )
+                else:
+                    light_panel.table_tabs.setCurrentIndex(1)
+                    light_panel.chart_table_splitter.setSizes([480, 520, 480])
+                    light_panel.diagnostics_scroll.ensureWidgetVisible(
+                        light_panel.chart_table_splitter
+                    )
+            app.processEvents()
             target = targets.get(screenshot_target, window)
             if not target.grab().save(str(screenshot)):
                 raise RuntimeError(f"failed to save screenshot: {screenshot}")
@@ -1081,6 +1300,10 @@ def main(argv: list[str] | None = None) -> int:
             "--export-three-life-competition-csv requires "
             "--headless-three-life-competition-demo"
         )
+    if args.export_light_device_csv is not None and not args.headless_light_device_demo:
+        raise ValueError(
+            "--export-light-device-csv requires --headless-light-device-demo"
+        )
     if args.headless_demo or args.headless_time_demo:
         return run_headless_demo()
     if args.headless_virtual_user_demo:
@@ -1098,6 +1321,8 @@ def main(argv: list[str] | None = None) -> int:
         return run_headless_three_life_competition_demo(
             args.export_three_life_competition_csv
         )
+    if args.headless_light_device_demo:
+        return run_headless_light_device_demo(args.export_light_device_csv)
     if args.life_role is not None or args.screenshot_target == "digital-life-graphs":
         return run_single_life_gui(
             smoke_test=args.smoke_test,

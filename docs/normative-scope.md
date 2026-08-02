@@ -82,4 +82,14 @@ v2.0のCoreから維持する正式境界は、Digital LifeがGardenへ個体ID�
 
 Stage 5B.1のround finalizeは全touch、発行済みqualified B、holder Bの整合を検証し、feedbackと第2周を同期する。qualified Bの早期発行はholder、G、E、q、k、feedback時刻、第2周時刻、240秒closing帰属とreleaseを変更しない。
 
-`garden_qualified_b_event_v2`はStage 6へのformal interfaceであり、active時はholder touch時刻、inactive時はsignal時刻をeffective timeとして明示する。Stage 6のlight mapper、Hue、BPM、光波形I、VirtualUserの光応答は未実装である。関係記憶探索とk更新もStage 5Cまで実装しない。
+`garden_qualified_b_event_v2`はStage 6へのformal interfaceであり、active時はholder touch時刻、inactive時はsignal時刻をeffective timeとして明示する。関係記憶探索とk更新はStage 5Cまで実装しない。
+
+## Stage 6のB→Iと仮想光deviceとの境界
+
+v2.0が定めるRelax with Lightの規範範囲は、Garden出力層が資格holderの `B=[F,A,T,D]` から `I=M_garden(B)` を作り、`Hue_degree=360F`、`blink_BPM=10+155T`、Saturation 100%、HSV Value 35〜50%、sine波をfeedback deviceが提示することである。PC出力でA/Dを使用しないことも参照仕様として維持する。
+
+Stage 6はこの範囲を `GardenQualifiedBEvent v2 -> LightCommandEvent -> LightStimulusStateEvent` のGUI非依存境界として実装する。MapperはDigital LifeやP/V/tau/W/E/q/k/Gを参照せず、DeviceはLightCommand以外の上流componentを参照しない。
+
+v2.0が明示しないformal Hue 360のGUI描画用modulo、位相開始点、same-commandのphase reset、BPM/Hue変更時のphase継続、command保持、inactive黒、priority 66/67、event/schemaの具体形、GUI fps、20ms固定grid samplingは、それぞれversion管理した **simulation implementation assumption** である。QColor/sRGB preview、CSV、`LightStimulusSegment`、fixed-grid waveform sample、canonical digestは開発・監査用診断であり、校正済み物理光量またはStage 7へ配送するformal signalではない。
+
+Stage 6はcommand境界ごとに `light_stimulus_state_event_v1` を1件出力し、このeventだけを将来Stage 7の正式光入力境界とする。Stage 6自身はVirtualUserのHeartbeat/RRI、RMSSD、N/Nd/Wを光で変化させない。Stage 5Cの関係記憶探索も未実装である。
