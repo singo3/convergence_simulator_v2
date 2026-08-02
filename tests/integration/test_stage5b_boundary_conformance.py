@@ -24,18 +24,26 @@ from symbiotic_sim_v2.domain.event_types import (
 )
 from symbiotic_sim_v2.domain.events import SimulationEvent
 from symbiotic_sim_v2.garden.output_layer.component import GardenOutputComponent
+from symbiotic_sim_v2.garden.output_layer.config import GardenOutputConfig
 from symbiotic_sim_v2.garden.output_layer.diagnostics import (
     export_qualification_records_csv,
     export_qualified_b_records_csv,
     export_touch_records_csv,
 )
 from symbiotic_sim_v2.garden.output_layer.events import (
+    DIGITAL_LIFE_TOUCH_EVENT_PRIORITY,
+    DIGITAL_LIFE_TOUCH_EVENT_SOURCE,
+    DIGITAL_LIFE_TOUCH_EVENT_TYPE,
     GARDEN_INTEROCEPTIVE_FEEDBACK_EVENT_PRIORITY,
     GARDEN_INTEROCEPTIVE_FEEDBACK_EVENT_TYPE,
     GARDEN_OUTPUT_EVENT_SOURCE,
     GARDEN_OUTPUT_NO_TOUCH_FINALIZE_EVENT_PRIORITY,
     GARDEN_OUTPUT_NO_TOUCH_FINALIZE_EVENT_TYPE,
+    GARDEN_OUTPUT_ROUND_FINALIZE_EVENT_PRIORITY,
+    GARDEN_OUTPUT_ROUND_FINALIZE_EVENT_TYPE,
     GARDEN_OUTPUT_RUNTIME_EVENT_SOURCE,
+    GARDEN_QUALIFIED_B_EVENT_PRIORITY,
+    GARDEN_QUALIFIED_B_EVENT_TYPE,
 )
 from symbiotic_sim_v2.runtime.multi_life.scenario import (
     create_three_digital_life_competition_simulation,
@@ -397,7 +405,11 @@ def test_e_and_q_updates_never_recompute_the_same_signal_first_round() -> None:
 
 def test_pre_session_s_zero_emits_inactive_output_and_three_null_feedbacks() -> None:
     engine = SimulationEngine(EmptyScenario())
-    component = GardenOutputComponent()
+    component = GardenOutputComponent(
+        GardenOutputConfig(
+            expected_digital_life_ids=("life-blue", "life-green", "life-red")
+        )
+    )
     component.begin_round(
         signal_index=0,
         signal_time_us=0,
@@ -437,6 +449,172 @@ def test_pre_session_s_zero_emits_inactive_output_and_three_null_feedbacks() -> 
     assert all(not record.closing_evaluation_attribution for record in feedback)
 
 
+ARBITRARY_IDS = ("participant-a", "participant-b", "participant-c")
+ARBITRARY_B = {
+    "participant-a": (0.1, 0.2, 0.3, 0.4),
+    "participant-b": (0.2, 0.3, 0.4, 0.5),
+    "participant-c": (0.3, 0.4, 0.5, 0.6),
+}
+
+
+def _formal_touch(
+    life_id: str,
+    signal_index: int,
+    signal_time_us: int,
+    arrival_time_us: int,
+    sequence: int,
+) -> SimulationEvent:
+    b = ARBITRARY_B[life_id]
+    return SimulationEvent(
+        event_id=f"touch-{signal_index}-{life_id}",
+        event_type=DIGITAL_LIFE_TOUCH_EVENT_TYPE,
+        source=DIGITAL_LIFE_TOUCH_EVENT_SOURCE,
+        scheduled_time_us=arrival_time_us,
+        priority=DIGITAL_LIFE_TOUCH_EVENT_PRIORITY,
+        sequence=sequence,
+        payload={
+            "digital_life_id": life_id,
+            "signal_index": signal_index,
+            "signal_time_us": signal_time_us,
+            "b_f": b[0],
+            "b_a": b[1],
+            "b_t": b[2],
+            "b_d": b[3],
+            "schema_version": "digital_life_touch_event_v2",
+        },
+    )
+
+
+def _active_finalize(signal_index: int, signal_time_us: int) -> SimulationEvent:
+    return SimulationEvent(
+        event_id=f"finalize-{signal_index}",
+        event_type=GARDEN_OUTPUT_ROUND_FINALIZE_EVENT_TYPE,
+        source=GARDEN_OUTPUT_RUNTIME_EVENT_SOURCE,
+        scheduled_time_us=signal_time_us + 999_999,
+        priority=GARDEN_OUTPUT_ROUND_FINALIZE_EVENT_PRIORITY,
+        sequence=100 + signal_index,
+        payload={"signal_index": signal_index, "signal_time_us": signal_time_us},
+    )
+
+
+def _begin_active(component: GardenOutputComponent, signal_index: int) -> int:
+    signal_time_us = signal_index * 1_000_000
+    component.begin_round(
+        signal_index=signal_index,
+        signal_time_us=signal_time_us,
+        s=1,
+        session_status="active",
+        closing_signal=False,
+        round_finalize_time_us=signal_time_us + 999_999,
+    )
+    return signal_time_us
+
+
+def _establish_arbitrary_holder(
+    component: GardenOutputComponent,
+    engine: SimulationEngine,
+) -> None:
+    signal_time_us = _begin_active(component, 60)
+    for sequence, (life_id, offset) in enumerate(
+        (("participant-b", 100_000), ("participant-a", 200_000), ("participant-c", 300_000))
+    ):
+        component.handle_touch(
+            _formal_touch(
+                life_id,
+                60,
+                signal_time_us,
+                signal_time_us + offset,
+                sequence,
+            ),
+            engine,
+        )
+    component.handle_round_finalize(_active_finalize(60, signal_time_us), engine)
+
+
+@pytest.mark.parametrize(
+    ("arrival_order", "holder_position"),
+    (
+        (("participant-b", "participant-a", "participant-c"), 1),
+        (("participant-a", "participant-b", "participant-c"), 2),
+        (("participant-a", "participant-c", "participant-b"), 3),
+    ),
+)
+def test_arbitrary_roster_emits_once_only_when_holder_touch_actually_arrives(
+    arrival_order: tuple[str, str, str],
+    holder_position: int,
+) -> None:
+    engine = SimulationEngine(EmptyScenario())
+    component = GardenOutputComponent(
+        GardenOutputConfig(
+            expected_digital_life_ids=(
+                "participant-c",
+                "participant-a",
+                "participant-b",
+            )
+        )
+    )
+    assert component.config.expected_digital_life_ids == ARBITRARY_IDS
+    _establish_arbitrary_holder(component, engine)
+    initial_output_count = len(component.qualified_b_records())
+    signal_time_us = _begin_active(component, 61)
+
+    for position, life_id in enumerate(arrival_order, start=1):
+        component.handle_touch(
+            _formal_touch(
+                life_id,
+                61,
+                signal_time_us,
+                signal_time_us + position * 100_000,
+                position,
+            ),
+            engine,
+        )
+        expected_count = initial_output_count + int(position >= holder_position)
+        assert len(component.qualified_b_records()) == expected_count
+
+    output = component.qualified_b_records()[-1]
+    assert output.signal_index == 61
+    assert output.qualification_holder_id == "participant-b"
+    assert output.b == ARBITRARY_B["participant-b"]
+    assert output.effective_time_us == signal_time_us + holder_position * 100_000
+    component.handle_round_finalize(_active_finalize(61, signal_time_us), engine)
+    assert len(component.qualified_b_records()) == initial_output_count + 1
+
+    scheduled = [
+        event
+        for event in engine.scheduler.pending_events()
+        if event.event_type == GARDEN_QUALIFIED_B_EVENT_TYPE
+        and event.payload["signal_index"] == 61
+    ]
+    assert len(scheduled) == 1
+    assert scheduled[0].priority == GARDEN_QUALIFIED_B_EVENT_PRIORITY
+    assert scheduled[0].scheduled_time_us == output.effective_time_us
+    assert scheduled[0].payload["effective_time_us"] == output.effective_time_us
+    assert "role" not in scheduled[0].payload
+
+
+def test_exact_tie_assigns_lexical_id_and_emits_its_b_at_tie_time() -> None:
+    engine = SimulationEngine(EmptyScenario())
+    component = GardenOutputComponent(
+        GardenOutputConfig(expected_digital_life_ids=tuple(reversed(ARBITRARY_IDS)))
+    )
+    signal_time_us = _begin_active(component, 60)
+    tie_time_us = signal_time_us + 500_000
+    for sequence, life_id in enumerate(ARBITRARY_IDS):
+        component.handle_touch(
+            _formal_touch(life_id, 60, signal_time_us, tie_time_us, sequence),
+            engine,
+        )
+    component.handle_round_finalize(_active_finalize(60, signal_time_us), engine)
+
+    output = component.qualified_b_records()[0]
+    assert output.qualification_holder_id == "participant-a"
+    assert output.b == ARBITRARY_B["participant-a"]
+    assert output.effective_time_us == tie_time_us
+    assert len(component.qualified_b_records()) == 1
+    assert all(record.exact_time_tie for record in component.touch_records())
+
+
 def _read_csv(path: Path) -> list[dict[str, str]]:
     with path.open(encoding="utf-8", newline="") as csv_file:
         return list(csv.DictReader(csv_file))
@@ -465,7 +643,7 @@ def test_garden_csv_rows_match_every_immutable_source_record(tmp_path: Path) -> 
         assert int(row["arrival_order"]) == record.arrival_order
         assert int(row["arrival_time_us"]) == record.arrival_time_us
         assert row["digital_life_id"] == record.digital_life_id
-        assert row["role"] == record.role
+        assert "role" not in row
         assert tuple(float(row[name]) for name in ("b_f", "b_a", "b_t", "b_d")) == (
             record.b
         )
@@ -474,6 +652,7 @@ def test_garden_csv_rows_match_every_immutable_source_record(tmp_path: Path) -> 
         assert (row["assigned"] == "True") is record.assigned_holder_on_this_touch
         assert (row["exact_time_tie"] == "True") is record.exact_time_tie
         assert row["tie_break_policy"] == record.tie_break_policy
+        assert row["touch_schema_version"] == record.schema_version
 
     qualification_rows = _read_csv(
         export_qualification_records_csv(
@@ -527,9 +706,12 @@ def test_garden_csv_rows_match_every_immutable_source_record(tmp_path: Path) -> 
     for row, record in zip(output_rows, component.qualified_b_records(), strict=True):
         assert int(row["signal_index"]) == record.signal_index
         assert int(row["signal_time_us"]) == record.signal_time_us
+        assert int(row["effective_time_us"]) == record.effective_time_us
         assert int(row["s"]) == record.s
         assert (row["active"] == "True") is record.active
         assert _optional_text(row["holder_id"]) == record.qualification_holder_id
         assert tuple(
             _optional_float(row[name]) for name in ("b_f", "b_a", "b_t", "b_d")
         ) == ((None, None, None, None) if record.b is None else record.b)
+        assert row["emission_policy_version"] == record.emission_policy_version
+        assert row["schema_version"] == record.schema_version

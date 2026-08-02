@@ -27,7 +27,6 @@ class TouchIntentLike(Protocol):
     signal_index: int
     signal_time_us: int
     digital_life_id: str
-    role: str
     b: tuple[float, float, float, float]
     tau: float | None
     touch_enabled: bool
@@ -80,8 +79,6 @@ def schedule_touch_intent(
         raise ValueError("signal_index must be non-negative")
     if not isinstance(intent.digital_life_id, str) or not intent.digital_life_id.strip():
         raise ValueError("digital_life_id must be a non-empty string")
-    if not isinstance(intent.role, str) or not intent.role.strip():
-        raise ValueError("role must be a non-empty string")
     if not isinstance(intent.b, tuple) or len(intent.b) != 4:
         raise ValueError("b must be an immutable four-element tuple")
     b_values = tuple(_unit(f"b[{index}]", value) for index, value in enumerate(intent.b))
@@ -93,7 +90,6 @@ def schedule_touch_intent(
         priority=DIGITAL_LIFE_TOUCH_EVENT_PRIORITY,
         payload={
             "digital_life_id": intent.digital_life_id,
-            "role": intent.role,
             "signal_index": intent.signal_index,
             "signal_time_us": intent.signal_time_us,
             "b_f": b_values[0],

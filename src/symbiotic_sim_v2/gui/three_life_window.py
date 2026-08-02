@@ -18,7 +18,8 @@ from symbiotic_sim_v2.simulation.clock import ClockState
 from symbiotic_sim_v2.virtual_user.config import VirtualUserConfig
 
 WINDOW_TITLE = (
-    "環境共生型デジタル生命シミュレーター v2 — 3生命・資格競争・第2周"
+    "環境共生型デジタル生命シミュレーター v2 — 3生命・資格競争・第2周 "
+    "— Stage 5B.1 出力境界補正"
 )
 
 
@@ -71,7 +72,9 @@ class ThreeDigitalLifeMainWindow(GardenInputMainWindow):
     def _apply_stage_5b_copy(self) -> None:
         page_title = self.findChild(QLabel, "pageTitle")
         if page_title is not None:
-            page_title.setText("3生命・資格競争・第2周  ·  Stage 05B")
+            page_title.setText(
+                "3生命・資格競争・第2周・出力境界補正  ·  Stage 05B.1"
+            )
 
         garden_assumption = self.garden_input_panel.findChild(
             QLabel,

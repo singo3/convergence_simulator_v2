@@ -15,7 +15,6 @@ class GardenTouchRecord:
     arrival_order: int
     arrival_time_us: int
     digital_life_id: str
-    role: str
     b: BVector
     holder_before: str | None
     holder_after: str | None
@@ -33,10 +32,12 @@ class GardenQualifiedBRecord:
     garden_id: str
     signal_index: int
     signal_time_us: int
+    effective_time_us: int
     s: int
     active: bool
     qualification_holder_id: str | None
     b: BVector | None
+    emission_policy_version: str
     schema_version: str
 
     def to_dict(self) -> dict[str, Any]:
@@ -104,4 +105,9 @@ class GardenOutputSnapshot:
     incomplete_round_count: int
     qualification_record_count: int
     latest_qualified_b: BVector | None
+    latest_qualified_b_effective_time_us: int | None
+    latest_active_qualified_b_effective_time_us: int | None
+    latest_active_holder_touch_time_us: int | None
+    latest_active_qualified_b_delay_us: int | None
+    qualified_b_emission_policy_version: str
     latest_touch_order: tuple[str, ...]

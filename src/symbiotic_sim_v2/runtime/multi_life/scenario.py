@@ -44,12 +44,6 @@ from symbiotic_sim_v2.simulation.scheduler import EventScheduler
 from symbiotic_sim_v2.virtual_user.component import VirtualUserComponent
 from symbiotic_sim_v2.virtual_user.config import VirtualUserConfig
 
-_ROLE_BY_ID = {
-    "life-blue": "blue",
-    "life-green": "green",
-    "life-red": "red",
-}
-
 
 @dataclass(slots=True)
 class ThreeDigitalLifeCompetitionScenario:
@@ -160,19 +154,6 @@ def create_three_digital_life_competition_simulation(
 ) -> ThreeDigitalLifeCompetitionSimulation:
     """Wire three independent first/second rounds without central tau comparison."""
 
-    selected_runtime_config = runtime_config or MultiLifeRuntimeConfig()
-    selected_garden_output_config = garden_output_config or GardenOutputConfig()
-    if (
-        selected_garden_output_config.expected_digital_life_ids
-        != selected_runtime_config.expected_digital_life_ids
-    ):
-        raise ValueError("Garden output and runtime expected Digital Life IDs differ")
-    if (
-        selected_garden_output_config.round_finalize_offset_us
-        != selected_runtime_config.round_finalize_offset_us
-    ):
-        raise ValueError("Garden output and runtime finalize offsets differ")
-
     supplied_configs = (
         tuple(digital_life_configs)
         if digital_life_configs is not None
@@ -185,11 +166,26 @@ def create_three_digital_life_competition_simulation(
     configs_by_id = {config.digital_life_id: config for config in supplied_configs}
     if len(configs_by_id) != 3:
         raise ValueError("Digital Life config IDs must be unique")
+    selected_runtime_config = runtime_config or MultiLifeRuntimeConfig(
+        expected_digital_life_ids=tuple(configs_by_id)
+    )
     if set(configs_by_id) != set(selected_runtime_config.expected_digital_life_ids):
-        raise ValueError("Digital Life config IDs must be life-red, life-green, and life-blue")
-    for life_id, expected_role in _ROLE_BY_ID.items():
-        if configs_by_id[life_id].role != expected_role:
-            raise ValueError("Digital Life ID and role must use the authoritative pairing")
+        raise ValueError("Digital Life config IDs must match the runtime roster")
+    selected_garden_output_config = garden_output_config or GardenOutputConfig(
+        expected_digital_life_ids=(
+            selected_runtime_config.expected_digital_life_ids
+        )
+    )
+    if (
+        selected_garden_output_config.expected_digital_life_ids
+        != selected_runtime_config.expected_digital_life_ids
+    ):
+        raise ValueError("Garden output and runtime expected Digital Life IDs differ")
+    if (
+        selected_garden_output_config.round_finalize_offset_us
+        != selected_runtime_config.round_finalize_offset_us
+    ):
+        raise ValueError("Garden output and runtime finalize offsets differ")
     selected_life_configs = tuple(
         configs_by_id[life_id] for life_id in selected_runtime_config.expected_digital_life_ids
     )

@@ -16,6 +16,8 @@ from symbiotic_sim_v2.garden.output_layer.events import (
     GARDEN_HOLDER_RELEASE_EVENT_TYPE,
     GARDEN_INTEROCEPTIVE_FEEDBACK_EVENT_TYPE,
     GARDEN_OUTPUT_NO_TOUCH_FINALIZE_EVENT_TYPE,
+    GARDEN_OUTPUT_ROUND_FINALIZE_EVENT_TYPE,
+    GARDEN_QUALIFIED_B_EVENT_PRIORITY,
     GARDEN_QUALIFIED_B_EVENT_TYPE,
 )
 from symbiotic_sim_v2.runtime.multi_life.config import MultiLifeRuntimeConfig
@@ -75,6 +77,16 @@ def test_standard_three_life_scenario_uses_actual_first_arrival_and_completes() 
     assert first_round_touches[0].assigned_holder_on_this_touch
     assert all(not record.exact_time_tie for record in first_round_touches)
 
+    first_active_output = next(
+        record
+        for record in simulation.garden_output_component.qualified_b_records()
+        if record.active
+    )
+    assert first_active_output.signal_index == 60
+    assert first_active_output.qualification_holder_id == "life-green"
+    assert first_active_output.effective_time_us == first_round_touches[0].arrival_time_us
+    assert first_active_output.effective_time_us < 60_999_999
+
 
 def test_all_life_states_are_independent_and_only_holder_updates_q() -> None:
     simulation = create_three_digital_life_competition_simulation()
@@ -132,7 +144,7 @@ def test_closing_event_order_attributes_bundle_before_holder_release() -> None:
         (25, GARDEN_EVALUATION_FINALIZED_EVENT_TYPE),
         (30, GARDEN_INPUT_SIGNAL_EVENT_TYPE),
         (31, GARDEN_OUTPUT_NO_TOUCH_FINALIZE_EVENT_TYPE),
-        (75, GARDEN_QUALIFIED_B_EVENT_TYPE),
+        (GARDEN_QUALIFIED_B_EVENT_PRIORITY, GARDEN_QUALIFIED_B_EVENT_TYPE),
         (80, GARDEN_INTEROCEPTIVE_FEEDBACK_EVENT_TYPE),
         (80, GARDEN_INTEROCEPTIVE_FEEDBACK_EVENT_TYPE),
         (80, GARDEN_INTEROCEPTIVE_FEEDBACK_EVENT_TYPE),
@@ -145,6 +157,61 @@ def test_closing_event_order_attributes_bundle_before_holder_release() -> None:
     assert closing_qualification.holder_after is None
     assert closing_qualification.released_after_second_round
     assert not closing_qualification.active_output
+
+
+def test_feedback_and_second_round_stay_at_finalize_after_early_qualified_b() -> None:
+    simulation = create_three_digital_life_competition_simulation()
+    simulation.engine.run_until_end()
+    events = simulation.engine.executed_events()
+    active_outputs = tuple(
+        record
+        for record in simulation.garden_output_component.qualified_b_records()
+        if record.active
+    )
+    feedback_events = tuple(
+        event
+        for event in events
+        if event.event_type == GARDEN_INTEROCEPTIVE_FEEDBACK_EVENT_TYPE
+    )
+
+    assert all(
+        record.effective_time_us < record.signal_time_us + 999_999
+        for record in active_outputs
+    )
+    assert all(
+        event.scheduled_time_us
+        == event.payload["signal_time_us"] + (999_999 if event.payload["s"] else 0)
+        for event in feedback_events
+    )
+    assert not any(
+        event.event_type == GARDEN_QUALIFIED_B_EVENT_TYPE
+        and event.scheduled_time_us == event.payload["signal_time_us"] + 999_999
+        and event.payload["active"]
+        for event in events
+    )
+
+    first_active_order = [
+        event.event_type
+        for event in events
+        if event.scheduled_time_us == 60_999_999
+        and event.event_type
+        in {
+            GARDEN_OUTPUT_ROUND_FINALIZE_EVENT_TYPE,
+            GARDEN_INTEROCEPTIVE_FEEDBACK_EVENT_TYPE,
+            GARDEN_QUALIFIED_B_EVENT_TYPE,
+        }
+    ]
+    assert first_active_order == [
+        GARDEN_OUTPUT_ROUND_FINALIZE_EVENT_TYPE,
+        GARDEN_INTEROCEPTIVE_FEEDBACK_EVENT_TYPE,
+        GARDEN_INTEROCEPTIVE_FEEDBACK_EVENT_TYPE,
+        GARDEN_INTEROCEPTIVE_FEEDBACK_EVENT_TYPE,
+    ]
+
+    for component in simulation.digital_life_components.values():
+        records = component.second_round_records()
+        assert tuple(record.signal_index for record in records) == tuple(range(241))
+        assert all(record.signal_time_us == record.signal_index * 1_000_000 for record in records)
 
 
 def test_config_input_order_does_not_change_normal_arrival_or_digests() -> None:

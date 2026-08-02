@@ -52,8 +52,10 @@ def test_window_has_exact_tabs_copy_three_cards_flow_tables_and_output_rules(
     output_panel = window.garden_output_panel
 
     assert window.windowTitle() == (
-        "環境共生型デジタル生命シミュレーター v2 — 3生命・資格競争・第2周"
+        "環境共生型デジタル生命シミュレーター v2 — 3生命・資格競争・第2周 "
+        "— Stage 5B.1 出力境界補正"
     )
+    assert "Stage 05B.1" in window.findChild(QLabel, "pageTitle").text()
     assert [window.tabs.tabText(index) for index in range(window.tabs.count())] == [
         "3生命・資格競争",
         "Garden出力資格層",
@@ -99,24 +101,39 @@ def test_window_has_exact_tabs_copy_three_cards_flow_tables_and_output_rules(
         "E/q第2周",
         "次signal",
     }
-    assert life_panel.touch_model.columnCount() == 13
+    assert life_panel.touch_model.columnCount() == 12
     assert life_panel.second_round_model.columnCount() == 15
     assert "P" not in life_panel.touch_model.HEADERS
     assert "V" not in life_panel.touch_model.HEADERS
     assert "tau" not in life_panel.touch_model.HEADERS
+    assert "role" not in life_panel.touch_model.HEADERS
 
     rules = output_panel.findChild(QLabel, "gardenOutputRulesNotice")
     boundary = output_panel.findChild(QLabel, "gardenOutputBoundaryNotice")
     no_light = output_panel.findChild(QLabel, "gardenOutputNoLightNotice")
+    timing = output_panel.findChild(QLabel, "gardenOutputTimingNotice")
     assert rules is not None and "first touch when empty" in rules.text()
     assert rules is not None and "release after closing second round when S=0" in rules.text()
     assert boundary is not None and "ID/B only" in boundary.text()
     assert boundary is not None and "P、V、tau" in boundary.text()
+    assert boundary is not None and "role" in boundary.text()
+    assert timing is not None and "holder touchの実到着時刻" in timing.text()
+    assert timing is not None and "光開始時刻ではありません" in timing.text()
+    assert timing is not None and "再出力しません" in timing.text()
     assert no_light is not None and "まだHue、BPM、光波形Iを生成しません" in no_light.text()
     assert output_panel.qualification_model.columnCount() == 16
     assert output_panel.current_holder_label.text() == "null"
     assert output_panel.assignment_signal_label.text() == "—"
     assert output_panel.total_touch_count_label.text() == "0"
+    assert output_panel.emission_policy_label.text() == (
+        "qualified_b_on_holder_touch_v0_1"
+    )
+    assert output_panel.touch_schema_version_label.text() == (
+        "digital_life_touch_event_v2"
+    )
+    assert output_panel.qualified_b_schema_version_label.text() == (
+        "garden_qualified_b_event_v2"
+    )
 
 
 @pytest.mark.parametrize(("width", "height"), ((1560, 980), (1280, 800)))
@@ -203,6 +220,9 @@ def test_event_and_second_steps_update_all_new_views(stage_5b_gui, qtbot) -> Non
     assert output_panel.chart.qualified_b_count == 2
     assert output_panel.inactive_output_count_label.text() == "2"
     assert output_panel.current_holder_label.text() == "null"
+    assert output_panel.qualified_effective_time_label.text() == "00:00:01.000"
+    assert output_panel.active_qualified_effective_time_label.text() == "—"
+    assert output_panel.active_emission_status_label.text() == "未発行"
     for life_id, component in window.simulation.digital_life_components.items():
         assert plot_point_count(life_panel.chart.p_items[life_id]) == 2
         assert life_panel.life_value_labels[life_id]["role"].text() == (
@@ -266,7 +286,22 @@ def test_run_to_end_populates_three_life_and_garden_output_then_reset_clears(
     assert output_panel.chart.qualified_b_count == 241
     assert output_panel.chart.assignment_count == 1
     assert output_panel.chart.release_count == 1
+    assert output_panel.chart.active_effective_count == 180
+    assert output_panel.chart.holder_touch_count == 180
+    assert output_panel.chart.round_finalize_count == 180
     assert plot_point_count(output_panel.chart.qualified_holder_item) == 241
+    assert plot_point_count(output_panel.chart.active_effective_item) == 180
+    assert plot_point_count(output_panel.chart.holder_touch_item) == 180
+    assert plot_point_count(output_panel.chart.round_finalize_item) == 180
+    assert output_panel.chart.active_effective_item.xData[0] == pytest.approx(
+        60.551540
+    )
+    assert output_panel.chart.holder_touch_item.xData[0] == pytest.approx(
+        60.551540
+    )
+    assert output_panel.chart.round_finalize_item.xData[0] == pytest.approx(
+        60.999999
+    )
     assert output_panel.current_holder_label.text() == "null"
     assert output_panel.assignment_signal_label.text() == "60"
     assert output_panel.total_touch_count_label.text() == "540"
@@ -276,6 +311,15 @@ def test_run_to_end_populates_three_life_and_garden_output_then_reset_clears(
     assert output_panel.assignment_count_label.text() == "1"
     assert output_panel.release_count_label.text() == "1"
     assert output_panel.latest_qualified_b_label.text() == "—"
+    assert output_panel.qualified_effective_time_label.text() == "00:04:00.000"
+    assert output_panel.active_qualified_effective_time_label.text() == (
+        "00:03:59.589"
+    )
+    assert output_panel.holder_touch_time_label.text() == "00:03:59.589"
+    assert output_panel.qualified_b_delay_label.text() == "0 us"
+    assert output_panel.active_emission_status_label.text() == (
+        "yes — holder touchと同じmicrosecond"
+    )
 
     green = simulation.digital_life_components["life-green"].snapshot()
     assert green.q_update_count == 3
@@ -297,6 +341,10 @@ def test_run_to_end_populates_three_life_and_garden_output_then_reset_clears(
     assert output_panel.chart.qualification_count == 0
     assert output_panel.current_holder_label.text() == "null"
     assert output_panel.total_touch_count_label.text() == "0"
+    assert output_panel.qualified_effective_time_label.text() == "—"
+    assert output_panel.active_qualified_effective_time_label.text() == "—"
+    assert output_panel.holder_touch_time_label.text() == "—"
+    assert output_panel.qualified_b_delay_label.text() == "—"
 
 
 def test_four_csv_buttons_write_exact_schemas_and_preserve_digests(
@@ -349,6 +397,17 @@ def test_four_csv_buttons_write_exact_schemas_and_preserve_digests(
             rows = list(reader)
         assert tuple(reader.fieldnames or ()) == fields
         assert len(rows) == row_count
+        if path == destinations[1]:
+            assert "role" not in (reader.fieldnames or ())
+            assert {row["touch_schema_version"] for row in rows} == {
+                "digital_life_touch_event_v2"
+            }
+        if path == destinations[3]:
+            assert int(rows[60]["effective_time_us"]) == 60_551_540
+            assert rows[60]["emission_policy_version"] == (
+                "qualified_b_on_holder_touch_v0_1"
+            )
+            assert rows[60]["schema_version"] == "garden_qualified_b_event_v2"
 
     assert (
         garden.touch_digest(),

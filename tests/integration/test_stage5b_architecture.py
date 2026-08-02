@@ -72,6 +72,35 @@ def test_garden_output_has_no_digital_life_or_private_decision_inputs() -> None:
     )
 
 
+def test_garden_output_core_has_no_role_or_fixed_fixture_identity() -> None:
+    root = package_root() / "garden" / "output_layer"
+    core_paths = tuple(
+        root / filename
+        for filename in ("component.py", "config.py", "events.py", "records.py")
+    )
+    trees = tuple(ast.parse(path.read_text(encoding="utf-8")) for path in core_paths)
+    identifiers = {
+        value
+        for tree in trees
+        for node in ast.walk(tree)
+        for value in (
+            (node.id if isinstance(node, ast.Name) else None),
+            (node.attr if isinstance(node, ast.Attribute) else None),
+        )
+        if value is not None
+    }
+    string_literals = {
+        node.value
+        for tree in trees
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Constant) and isinstance(node.value, str)
+    }
+
+    assert "_ROLE_BY_ID" not in identifiers
+    assert "role" not in identifiers
+    assert {"life-red", "life-green", "life-blue"}.isdisjoint(string_literals)
+
+
 def test_connected_life_has_no_other_life_collection_or_runtime_dependency() -> None:
     path = package_root() / "digital_life" / "connected_component.py"
     imports = imported_modules(path)
@@ -105,5 +134,17 @@ def test_stage5b_core_has_no_exploration_light_mapping_or_old_simulator() -> Non
         "hue_degree",
         "blink_bpm",
         "light_waveform",
+        "light_mapper",
+        "virtual_user_light_response",
     ):
         assert forbidden not in source
+
+
+def test_stage6_device_and_light_response_modules_do_not_exist_yet() -> None:
+    root = package_root()
+    forbidden_paths = (
+        root / "devices" / "light",
+        root / "garden" / "light_mapper.py",
+        root / "virtual_user" / "light_response.py",
+    )
+    assert all(not path.exists() for path in forbidden_paths)

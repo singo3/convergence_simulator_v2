@@ -25,8 +25,13 @@ EVENT_STYLES: dict[str, tuple[int, str, str, str]] = {
     "garden_input_signal": (11, "d", "#C084FC", "garden_input_signal"),
     "garden_output_no_touch_finalize": (12, "t", "#94A3B8", "no_touch_finalize"),
     "digital_life_touch": (13, "o", "#FB7185", "digital_life_touch"),
-    "garden_output_round_finalize": (14, "t", "#F97316", "output_finalize"),
-    "garden_qualified_b": (15, "d", "#2DD4BF", "qualified_B"),
+    "garden_output_round_finalize": (
+        14,
+        "t",
+        "#F97316",
+        "round_finalize_feedback_sync",
+    ),
+    "garden_qualified_b": (15, "d", "#2DD4BF", "qualified_B_effective"),
     "garden_interoceptive_feedback": (16, "s", "#60A5FA", "feedback"),
     "garden_holder_release": (17, "star", "#FACC15", "holder_release"),
 }

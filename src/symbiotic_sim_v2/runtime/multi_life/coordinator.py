@@ -63,6 +63,8 @@ class ConnectedLife(Protocol):
 
 
 class GardenOutput(Protocol):
+    config: object
+
     def reset(self) -> None: ...
 
     def begin_round(
@@ -162,6 +164,12 @@ class MultiLifeRuntimeCoordinator:
         ):
             if not callable(getattr(garden_output_component, method_name, None)):
                 raise TypeError(f"Garden output component must provide {method_name}()")
+        garden_config = getattr(garden_output_component, "config", None)
+        if (
+            getattr(garden_config, "expected_digital_life_ids", None)
+            != expected_ids
+        ):
+            raise ValueError("Garden output roster must match the runtime config")
 
         self.config = config
         self._life_ids = expected_ids

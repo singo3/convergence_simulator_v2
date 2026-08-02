@@ -40,7 +40,9 @@ RUNTIME_NOTICE = (
     "配送するだけです。"
 )
 GARDEN_NOTICE = (
-    "Gardenは実際に到着したID、Bだけから資格生命を決めます。"
+    "Gardenは実際に到着したID、Bだけから資格生命を決めます。formal touch "
+    "payloadにrole、P、V、tauは含まれません。role表示はDigital Life config由来の"
+    "Runtime / GUI診断です。"
 )
 K_NOTICE = "Stage 5Bでk_anchor / k_currentは全3生命とも固定です。"
 
@@ -269,7 +271,8 @@ class MultiLifePanel(QWidget):
         layout = QVBoxLayout(page)
         layout.setContentsMargins(4, 4, 4, 4)
         notice = QLabel(
-            "Gardenのタッチ表は実到着のID/Bだけを表示し、P、V、tauを表示しません。",
+            "Garden formal touch表は実到着のID/Bだけを生命由来情報として表示します。"
+            "role、P、V、tauはGardenへ届きません。",
             page,
         )
         notice.setObjectName("touchBoundaryNotice")

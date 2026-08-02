@@ -113,13 +113,14 @@ def test_qualified_b_boundary_is_active_only_with_holder_and_complete_b() -> Non
         event_id="qualified",
         event_type=GARDEN_QUALIFIED_B_EVENT_TYPE,
         source=GARDEN_OUTPUT_EVENT_SOURCE,
-        scheduled_time_us=60_999_999,
+        scheduled_time_us=60_250_000,
         priority=GARDEN_QUALIFIED_B_EVENT_PRIORITY,
         sequence=0,
         payload={
             "garden_id": "relax-with-light",
             "signal_index": 60,
             "signal_time_us": 60_000_000,
+            "effective_time_us": 60_250_000,
             "s": 1,
             "active": True,
             "qualification_holder_id": "life-green",
@@ -127,14 +128,47 @@ def test_qualified_b_boundary_is_active_only_with_holder_and_complete_b() -> Non
             "b_a": 0.5,
             "b_t": 0.5,
             "b_d": 0.5,
-            "schema_version": "garden_qualified_b_event_v1",
+            "emission_policy_version": "qualified_b_on_holder_touch_v0_1",
+            "schema_version": "garden_qualified_b_event_v2",
         },
     )
 
     parsed = parse_garden_qualified_b_event(event)
     assert parsed.active
+    assert parsed.effective_time_us == 60_250_000
     assert parsed.qualification_holder_id == "life-green"
     assert parsed.b == (0.3, 0.5, 0.5, 0.5)
+    assert parsed.emission_policy_version == "qualified_b_on_holder_touch_v0_1"
     assert not hasattr(parsed, "hue")
     assert not hasattr(parsed, "bpm")
     assert not hasattr(parsed, "i")
+
+
+def test_inactive_qualified_b_is_effective_at_signal_time() -> None:
+    event = SimulationEvent(
+        event_id="qualified-inactive",
+        event_type=GARDEN_QUALIFIED_B_EVENT_TYPE,
+        source=GARDEN_OUTPUT_EVENT_SOURCE,
+        scheduled_time_us=60_000_000,
+        priority=GARDEN_QUALIFIED_B_EVENT_PRIORITY,
+        sequence=0,
+        payload={
+            "garden_id": "relax-with-light",
+            "signal_index": 60,
+            "signal_time_us": 60_000_000,
+            "effective_time_us": 60_000_000,
+            "s": 0,
+            "active": False,
+            "qualification_holder_id": None,
+            "b_f": None,
+            "b_a": None,
+            "b_t": None,
+            "b_d": None,
+            "emission_policy_version": "qualified_b_on_holder_touch_v0_1",
+            "schema_version": "garden_qualified_b_event_v2",
+        },
+    )
+
+    parsed = parse_garden_qualified_b_event(event)
+    assert parsed.effective_time_us == parsed.signal_time_us
+    assert not parsed.active

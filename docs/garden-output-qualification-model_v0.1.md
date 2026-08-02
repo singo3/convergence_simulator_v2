@@ -1,5 +1,7 @@
 # Garden出力資格model v0.1
 
+> この文書はStage 5Bのv0.1 model記録です。active実行経路は[Garden output qualification model v0.2](garden-output-qualification-model_v0.2.md)へ移行しています。
+
 ## 境界
 
 `relax_with_light_garden_output_qualification_v0_1` はStage 5BのGUI非依存Garden出力資格層です。生命由来の正式入力は `digital_life_touch_event_v1` のID、role、signal識別子、Bだけです。GardenはP、V、tau、touch offset、N、Nd、W、E、q、k、G、順位、評価値を受け取りません。

@@ -27,18 +27,18 @@ from symbiotic_sim_v2.runtime.multi_life.scenario import (
     create_three_digital_life_competition_simulation,
 )
 
-TOUCH_DIGEST = "d2ed8461f5121e52a2e5bf3f482a625de129eaf0e70dcdc81148195102b58db0"
+TOUCH_DIGEST = "0d5f8671fd3859f74be7c758954952c8976eb02dcea62b7074ec459063a76c75"
 QUALIFICATION_DIGEST = (
     "1dd880f811bf1dd6e56e2842a65d565aa82c7e4fb61cbb4a5b2f123946102eed"
 )
 QUALIFIED_B_DIGEST = (
-    "c918db83d56ce108bc3e714afa12e63c8e5872599832351472d37ffa36c32141"
+    "6157d8251af0e0ceb784b664d90d01368b8506efeb37665962244f991b6a57b7"
 )
 FEEDBACK_DIGEST = (
     "121c9bfdee73a3411864829f146958afc134fc2b08d96c70a71f20d11fc0ff62"
 )
 FULL_EVENT_DIGEST = (
-    "3707317810b37824b2fc9aa830fb42747592b1b526ef855ca62c0f245a09e57e"
+    "fa68733a98a962fcad7aeb58d7ec12439e860d8d02c43beaae42e345d5a0884f"
 )
 SECOND_ROUND_DIGESTS = {
     "life-blue": "d299790089141d8285c1de9fcf8e7ce2756f91e2ed3535ab3340d544412866b6",
@@ -70,17 +70,32 @@ def run_cli(export_directory: Path | None = None) -> dict[str, object]:
 
 def test_headless_stage5b_contract_counts_state_versions_and_digests() -> None:
     output = run_cli()
-    assert output["project_version"] == "0.6.0"
+    assert output["project_version"] == "0.6.1"
     assert output["document_version"] == "v2.0"
     assert output["profile_version"] == "symbiotic_signal_loop_reference_v1_0"
     assert output["algorithm_version"] == "adaptive_random_search_confirmed_v1"
     assert output["state_schema_version"] == "relation_memory_state_v2"
-    assert output["runtime_model_version"] == "three_digital_life_runtime_v0_1"
+    assert output["runtime_model_version"] == "three_digital_life_runtime_v0_2"
     assert output["garden_output_model_version"] == (
-        "relax_with_light_garden_output_qualification_v0_1"
+        "relax_with_light_garden_output_qualification_v0_2"
     )
     assert output["tau_delivery_policy_version"] == (
         "tau_to_microsecond_touch_delivery_v0_1"
+    )
+    assert output["qualified_b_emission_policy_version"] == (
+        "qualified_b_on_holder_touch_v0_1"
+    )
+    assert output["digital_life_touch_schema_version"] == (
+        "digital_life_touch_event_v2"
+    )
+    assert output["garden_qualified_b_schema_version"] == (
+        "garden_qualified_b_event_v2"
+    )
+    assert output["event_schema_versions"]["touch"] == (
+        "digital_life_touch_event_v2"
+    )
+    assert output["event_schema_versions"]["qualified_b"] == (
+        "garden_qualified_b_event_v2"
     )
     assert output["final_virtual_time_us"] == 240_000_000
     assert output["final_state"] == "completed"
@@ -96,6 +111,13 @@ def test_headless_stage5b_contract_counts_state_versions_and_digests() -> None:
     assert output["qualification_holder_id_during_session"] == "life-green"
     assert output["final_qualification_holder_id"] is None
     assert output["holder_assignment_signal_index"] == 60
+    assert output["holder_assignment_time_us"] == 60_551_540
+    assert output["first_active_qualified_b_effective_time_us"] == 60_551_540
+    assert output["last_active_qualified_b_effective_time_us"] == 239_589_850
+    assert output["closing_inactive_effective_time_us"] == 240_000_000
+    assert output["holder_touch_to_qualified_b_delay_us_max"] == 0
+    assert output["active_qualified_b_at_holder_touch_count"] == 180
+    assert output["active_qualified_b_at_round_finalize_count"] == 0
     assert output["touch_count_by_life"] == {
         "life-blue": 180,
         "life-green": 180,
@@ -116,6 +138,21 @@ def test_headless_stage5b_contract_counts_state_versions_and_digests() -> None:
         "life-blue": 0,
         "life-green": 0,
         "life-red": 0,
+    }
+    assert output["per_life_final_E"] == {
+        "life-blue": 0.0,
+        "life-green": 0.14991222526166195,
+        "life-red": 0.0,
+    }
+    assert output["per_life_final_q"] == {
+        "life-blue": 0.5,
+        "life-green": 0.5041270950772643,
+        "life-red": 0.5,
+    }
+    assert output["per_life_final_k"] == {
+        "life-blue": [0.5, 0.5, 0.5, 0.5],
+        "life-green": [0.5, 0.5, 0.5, 0.5],
+        "life-red": [0.5, 0.5, 0.5, 0.5],
     }
     assert output["per_life_q_update_count"] == {
         "life-blue": 0,
@@ -169,6 +206,33 @@ def test_headless_stage5b_csvs_have_exact_columns_rows_and_do_not_change_digests
             rows = list(reader)
             assert tuple(reader.fieldnames or ()) == fields
         assert len(rows) == row_count
+
+        if filename == TOUCH_CSV_FILENAME:
+            assert "role" not in (reader.fieldnames or ())
+            assert {row["touch_schema_version"] for row in rows} == {
+                "digital_life_touch_event_v2"
+            }
+        if filename == QUALIFIED_B_CSV_FILENAME:
+            active_rows = [row for row in rows if row["active"] == "True"]
+            inactive_rows = [row for row in rows if row["active"] == "False"]
+            assert len(active_rows) == 180
+            assert len(inactive_rows) == 61
+            assert all(
+                int(row["signal_time_us"])
+                < int(row["effective_time_us"])
+                < int(row["signal_time_us"]) + 1_000_000
+                for row in active_rows
+            )
+            assert all(
+                int(row["effective_time_us"]) == int(row["signal_time_us"])
+                for row in inactive_rows
+            )
+            assert {row["emission_policy_version"] for row in rows} == {
+                "qualified_b_on_holder_touch_v0_1"
+            }
+            assert {row["schema_version"] for row in rows} == {
+                "garden_qualified_b_event_v2"
+            }
 
     paths = output["diagnostic_csvs"]
     assert isinstance(paths, dict)

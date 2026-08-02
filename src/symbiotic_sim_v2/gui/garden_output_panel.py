@@ -45,7 +45,13 @@ GARDEN_OUTPUT_RULES = (
     "second round when S=0 / equal arrival tie-break"
 )
 GARDEN_OUTPUT_BOUNDARY_NOTICE = (
-    "Garden receives ID/B only。P、V、tauを入力せず、資格判定にも使用しません。"
+    "Garden formal boundary receives ID/B only。touch payloadにrole、P、V、tauは"
+    "含まれず、roleはRuntime / GUI診断だけに使用します。"
+)
+GARDEN_OUTPUT_TIMING_NOTICE = (
+    "active qualified Bはholder touchの実到着時刻に正式出力します。round finalizeは"
+    "全touch確認、feedback確定、第2周同期の時刻であり、光開始時刻ではありません。"
+    "round finalizeでactive Bを再出力しません。"
 )
 NO_LIGHT_NOTICE = (
     "Garden出力資格層はまだHue、BPM、光波形Iを生成しません。"
@@ -99,6 +105,11 @@ class GardenOutputPanel(QWidget):
         boundary.setWordWrap(True)
         root.addWidget(boundary)
 
+        timing = QLabel(GARDEN_OUTPUT_TIMING_NOTICE, self)
+        timing.setObjectName("gardenOutputTimingNotice")
+        timing.setWordWrap(True)
+        root.addWidget(timing)
+
         no_light = QLabel(NO_LIGHT_NOTICE, self)
         no_light.setObjectName("gardenOutputNoLightNotice")
         no_light.setWordWrap(True)
@@ -134,6 +145,7 @@ class GardenOutputPanel(QWidget):
         self.chart_table_splitter.setObjectName("gardenOutputChartTableSplitter")
         self.chart_table_splitter.setMinimumHeight(GARDEN_OUTPUT_SPLITTER_MIN_HEIGHT)
         self.chart = GardenOutputChart(self.chart_table_splitter)
+        self._apply_chart_config()
         self.chart_table_splitter.addWidget(self.chart)
         self._build_qualification_table()
         self.chart_table_splitter.addWidget(self.table_frame)
@@ -156,7 +168,8 @@ class GardenOutputPanel(QWidget):
                     background: #E8F1FF; border: 1px solid #B9D2F5;
                     border-radius: 6px; color: #234A75; padding: 6px 10px;
                 }
-                QLabel#gardenOutputRulesNotice, QLabel#gardenOutputBoundaryNotice {
+                QLabel#gardenOutputRulesNotice, QLabel#gardenOutputBoundaryNotice,
+                QLabel#gardenOutputTimingNotice {
                     background: #F5F3FF; border: 1px solid #C4B5FD;
                     border-radius: 6px; color: #4C1D95; padding: 6px 10px;
                 }
@@ -194,6 +207,17 @@ class GardenOutputPanel(QWidget):
             ("assignments", "assignment count"),
             ("releases", "release count"),
             ("latest_qualified_b", "latest qualified B"),
+            ("qualified_effective_time", "latest command effective time"),
+            (
+                "active_qualified_effective_time",
+                "latest active qualified B effective time",
+            ),
+            ("holder_touch_time", "latest active holder touch arrival time"),
+            ("holder_touch_delay", "holder touch → qualified B delay"),
+            ("emission_policy", "qualified B emission policy"),
+            ("touch_schema", "touch schema version"),
+            ("qualified_b_schema", "qualified B schema version"),
+            ("active_emission_status", "active B emitted at holder touch"),
         )
         self.state_labels: dict[str, QLabel] = {}
         for key, caption in fields:
@@ -220,6 +244,24 @@ class GardenOutputPanel(QWidget):
         self.assignment_count_label = self.state_labels["assignments"]
         self.release_count_label = self.state_labels["releases"]
         self.latest_qualified_b_label = self.state_labels["latest_qualified_b"]
+        self.qualified_effective_time_label = self.state_labels[
+            "qualified_effective_time"
+        ]
+        self.effective_time_label = self.qualified_effective_time_label
+        self.active_qualified_effective_time_label = self.state_labels[
+            "active_qualified_effective_time"
+        ]
+        self.holder_touch_time_label = self.state_labels["holder_touch_time"]
+        self.qualified_b_delay_label = self.state_labels["holder_touch_delay"]
+        self.holder_touch_delay_label = self.qualified_b_delay_label
+        self.emission_policy_label = self.state_labels["emission_policy"]
+        self.touch_schema_version_label = self.state_labels["touch_schema"]
+        self.qualified_b_schema_version_label = self.state_labels[
+            "qualified_b_schema"
+        ]
+        self.active_emission_status_label = self.state_labels[
+            "active_emission_status"
+        ]
         return frame
 
     def _build_qualification_table(self) -> None:
@@ -299,6 +341,7 @@ class GardenOutputPanel(QWidget):
 
     def set_config(self, config: Any) -> None:
         self._config = config
+        self._apply_chart_config()
 
     def set_duration_seconds(self, duration_seconds: int) -> None:
         self.chart.set_duration_seconds(duration_seconds)
@@ -315,6 +358,7 @@ class GardenOutputPanel(QWidget):
             qualification_records,
             qualified_b_records,
             engine_snapshot.current_time_us,
+            self._component.touch_records(),
         )
         if self.qualification_model.rowCount() > previous_rows:
             self.qualification_table.scrollToBottom()
@@ -353,6 +397,61 @@ class GardenOutputPanel(QWidget):
         labels["latest_qualified_b"].setText(
             self._format_b(snapshot.latest_qualified_b)
         )
+        effective_time_us = getattr(
+            snapshot,
+            "latest_qualified_b_effective_time_us",
+            None,
+        )
+        active_effective_time_us = getattr(
+            snapshot,
+            "latest_active_qualified_b_effective_time_us",
+            None,
+        )
+        holder_touch_time_us = getattr(
+            snapshot,
+            "latest_active_holder_touch_time_us",
+            None,
+        )
+        delay_us = getattr(snapshot, "latest_active_qualified_b_delay_us", None)
+        labels["qualified_effective_time"].setText(
+            self._format_time(effective_time_us)
+        )
+        labels["active_qualified_effective_time"].setText(
+            self._format_time(active_effective_time_us)
+        )
+        labels["holder_touch_time"].setText(
+            self._format_time(holder_touch_time_us)
+        )
+        labels["holder_touch_delay"].setText(
+            "—" if delay_us is None else f"{delay_us} us"
+        )
+        policy = getattr(
+            snapshot,
+            "qualified_b_emission_policy_version",
+            getattr(self._config, "qualified_b_emission_policy_version", "—"),
+        )
+        labels["emission_policy"].setText(str(policy))
+        labels["touch_schema"].setText(
+            str(getattr(self._config, "touch_schema_version", "—"))
+        )
+        labels["qualified_b_schema"].setText(
+            str(getattr(self._config, "qualified_b_schema_version", "—"))
+        )
+        if snapshot.active_output_count == 0:
+            emission_status = "未発行"
+        elif delay_us == 0:
+            emission_status = "yes — holder touchと同じmicrosecond"
+        else:
+            emission_status = "no"
+        labels["active_emission_status"].setText(emission_status)
+
+    def _apply_chart_config(self) -> None:
+        if not hasattr(self, "chart") or self._config is None:
+            return
+        self.chart.set_round_finalize_offset_us(
+            self._config.round_finalize_offset_us
+        )
+        self.chart.set_roster(self._config.expected_digital_life_ids)
 
     def _export_touch_clicked(self) -> None:
         self._export_records(
@@ -406,6 +505,10 @@ class GardenOutputPanel(QWidget):
         if value is None:
             return "—"
         return "[" + ", ".join(f"{item:.6f}" for item in value) + "]"
+
+    @staticmethod
+    def _format_time(value: int | None) -> str:
+        return "—" if value is None else format_time_us(value)
 
 
 GardenOutputQualificationPanel = GardenOutputPanel

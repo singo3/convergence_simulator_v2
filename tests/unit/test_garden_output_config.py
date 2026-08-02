@@ -12,13 +12,15 @@ from symbiotic_sim_v2.garden.output_layer.config import (
     GARDEN_OUTPUT_MODEL_VERSION,
     GARDEN_QUALIFICATION_STATE_SCHEMA_VERSION,
     GARDEN_QUALIFIED_B_SCHEMA_VERSION,
-    STANDARD_DIGITAL_LIFE_IDS,
+    QUALIFIED_B_EMISSION_POLICY_VERSION,
     GardenOutputConfig,
 )
 
+ROSTER = ("alpha", "middle", "zeta")
 
-def test_default_config_pins_all_stage_5b_versions_and_three_ids() -> None:
-    config = GardenOutputConfig()
+
+def test_injected_config_pins_all_stage_5b1_versions_and_lexical_roster() -> None:
+    config = GardenOutputConfig(expected_digital_life_ids=("zeta", "alpha", "middle"))
 
     assert config.model_version == GARDEN_OUTPUT_MODEL_VERSION
     assert config.qualification_state_schema_version == (
@@ -29,12 +31,15 @@ def test_default_config_pins_all_stage_5b_versions_and_three_ids() -> None:
         GARDEN_INTEROCEPTIVE_FEEDBACK_SCHEMA_VERSION
     )
     assert config.qualified_b_schema_version == GARDEN_QUALIFIED_B_SCHEMA_VERSION
-    assert config.expected_digital_life_ids == STANDARD_DIGITAL_LIFE_IDS
+    assert config.qualified_b_emission_policy_version == (
+        QUALIFIED_B_EMISSION_POLICY_VERSION
+    )
+    assert config.expected_digital_life_ids == ROSTER
     assert config.round_finalize_offset_us == 999_999
 
 
 def test_json_round_trip_is_exact_and_rejects_missing_or_unknown_fields() -> None:
-    config = GardenOutputConfig()
+    config = GardenOutputConfig(expected_digital_life_ids=ROSTER)
     assert GardenOutputConfig.from_json(config.to_json()) == config
 
     values = config.to_dict()
@@ -53,6 +58,7 @@ def test_json_round_trip_is_exact_and_rejects_missing_or_unknown_fields() -> Non
     (
         ("model_version", "other"),
         ("touch_schema_version", "other"),
+        ("qualified_b_emission_policy_version", "other"),
         ("assignment_rule", "central_winner"),
         ("tie_break_rule", "role_order"),
         ("round_finalize_offset_us", True),
@@ -62,15 +68,29 @@ def test_json_round_trip_is_exact_and_rejects_missing_or_unknown_fields() -> Non
             "expected_digital_life_ids",
             ("life-blue", "life-green", "life-green"),
         ),
-        (
-            "expected_digital_life_ids",
-            ("life-red", "life-green", "life-blue"),
-        ),
+        ("expected_digital_life_ids", ("alpha", " ", "zeta")),
     ),
 )
-def test_invalid_config_values_are_rejected_without_silent_normalization(
+def test_invalid_config_values_are_rejected(
     field: str,
     value: object,
 ) -> None:
     with pytest.raises((TypeError, ValueError)):
-        replace(GardenOutputConfig(), **{field: value})
+        replace(
+            GardenOutputConfig(expected_digital_life_ids=ROSTER),
+            **{field: value},
+        )
+
+
+def test_roster_is_required_and_arbitrary_ids_are_supported() -> None:
+    with pytest.raises(TypeError):
+        GardenOutputConfig()  # type: ignore[call-arg]
+
+    config = GardenOutputConfig(
+        expected_digital_life_ids=("life-omega", "life-beta", "life-kappa")
+    )
+    assert config.expected_digital_life_ids == (
+        "life-beta",
+        "life-kappa",
+        "life-omega",
+    )

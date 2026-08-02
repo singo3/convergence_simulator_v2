@@ -73,3 +73,13 @@ v2.0はtauを0〜1の論理到達値として定義するが、integer microseco
 Gardenの `first_touch_when_empty`、`while_s_is_1`、closing第2周完了後のrelease、各recipientへその生命自身のBだけを返す方式も、Stage 5Bでversion管理するGarden出力資格modelの実装仕様である。240秒closingではBundle 2の新しい有効revisionを第1周で適用し、release前holderを含むfeedbackで第2周を完了した後だけholderを解放する。
 
 Stage 5Bではkを初期値のまま固定し、3 bundle関係記憶探索、trial/adoption、k更新はStage 5Cの責務とする。Hue、blink BPM、saturation、brightness、光波形Iの生成はStage 6の責務であり、Stage 5Bは実装しない。
+
+## Stage 5B.1の出力境界・時刻補正との境界
+
+v2.0のCoreから維持する正式境界は、Digital LifeがGardenへ個体IDとBをtouchし、Gardenがactual arrivalによって資格を扱い、qualified Bを後続componentへ渡すことである。`digital_life_touch_event_v2`からroleを除き、GardenがID/Bとsignal識別metadataだけを受ける構造は、この責務分離を明確化する。roleは標準3生命fixtureをGUIで識別するRuntime側の診断情報であり、Garden coreのformal inputまたは個体対応表ではない。
+
+参加IDをRuntime/session rosterからGarden configへ注入する構成、3 IDのlexical正規化、priority 60/65/70、holder touchと同じ`effective_time_us`でactive qualified Bを発行する`qualified_b_on_holder_touch_v0_1`は **simulation implementation assumption** である。v2.0はqualified Bを発行する正確なmicrosecondを規定していない。
+
+Stage 5B.1のround finalizeは全touch、発行済みqualified B、holder Bの整合を検証し、feedbackと第2周を同期する。qualified Bの早期発行はholder、G、E、q、k、feedback時刻、第2周時刻、240秒closing帰属とreleaseを変更しない。
+
+`garden_qualified_b_event_v2`はStage 6へのformal interfaceであり、active時はholder touch時刻、inactive時はsignal時刻をeffective timeとして明示する。Stage 6のlight mapper、Hue、BPM、光波形I、VirtualUserの光応答は未実装である。関係記憶探索とk更新もStage 5Cまで実装しない。

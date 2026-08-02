@@ -63,6 +63,7 @@ from symbiotic_sim_v2.garden.output_layer.config import (
     GARDEN_OUTPUT_MODEL_VERSION,
     GARDEN_QUALIFICATION_STATE_SCHEMA_VERSION,
     GARDEN_QUALIFIED_B_SCHEMA_VERSION,
+    QUALIFIED_B_EMISSION_POLICY_VERSION,
 )
 from symbiotic_sim_v2.garden.output_layer.diagnostics import (
     export_garden_output_diagnostics,
@@ -91,7 +92,7 @@ STAGE_5A_HEADLESS_PROJECT_VERSION = "0.5.0"
 
 
 def _build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Symbiotic simulator Stage 5B")
+    parser = argparse.ArgumentParser(description="Symbiotic simulator Stage 5B.1")
     headless_group = parser.add_mutually_exclusive_group()
     headless_group.add_argument(
         "--headless-demo",
@@ -126,7 +127,10 @@ def _build_parser() -> argparse.ArgumentParser:
     headless_group.add_argument(
         "--headless-three-life-competition-demo",
         action="store_true",
-        help="run the 240-second Stage 5B three-life competition and second round",
+        help=(
+            "run the 240-second Stage 5B.1 three-life competition with corrected "
+            "Garden output timing"
+        ),
     )
     parser.add_argument(
         "--life-role",
@@ -473,6 +477,24 @@ def run_headless_three_life_competition_demo(
     qualification_records = garden.qualification_records()
     qualified_b_records = garden.qualified_b_records()
     feedback_records = garden.feedback_records()
+    active_qualified_b_records = tuple(
+        record for record in qualified_b_records if record.active
+    )
+    inactive_qualified_b_records = tuple(
+        record for record in qualified_b_records if not record.active
+    )
+    touch_by_signal_and_id = {
+        (record.signal_index, record.digital_life_id): record
+        for record in touch_records
+    }
+    holder_touch_delays_us = tuple(
+        record.effective_time_us
+        - touch_by_signal_and_id[
+            (record.signal_index, record.qualification_holder_id)
+        ].arrival_time_us
+        for record in active_qualified_b_records
+    )
+    round_finalize_offset_us = simulation.garden_output_config.round_finalize_offset_us
     life_ids = tuple(sorted(simulation.digital_life_components))
     life_snapshots = {
         life_id: simulation.digital_life_components[life_id].snapshot()
@@ -516,6 +538,11 @@ def run_headless_three_life_competition_demo(
             GARDEN_QUALIFICATION_STATE_SCHEMA_VERSION
         ),
         "tau_delivery_policy_version": TAU_TOUCH_DELIVERY_POLICY_VERSION,
+        "qualified_b_emission_policy_version": (
+            QUALIFIED_B_EMISSION_POLICY_VERSION
+        ),
+        "digital_life_touch_schema_version": DIGITAL_LIFE_TOUCH_SCHEMA_VERSION,
+        "garden_qualified_b_schema_version": GARDEN_QUALIFIED_B_SCHEMA_VERSION,
         "event_schema_versions": {
             "touch": DIGITAL_LIFE_TOUCH_SCHEMA_VERSION,
             "interoceptive_feedback": (
@@ -539,6 +566,26 @@ def run_headless_three_life_competition_demo(
         "inactive_output_count": garden_snapshot.inactive_output_count,
         "assignment_count": garden_snapshot.assignment_count,
         "release_count": garden_snapshot.release_count,
+        "first_active_qualified_b_effective_time_us": (
+            active_qualified_b_records[0].effective_time_us
+        ),
+        "last_active_qualified_b_effective_time_us": (
+            active_qualified_b_records[-1].effective_time_us
+        ),
+        "closing_inactive_effective_time_us": (
+            inactive_qualified_b_records[-1].effective_time_us
+        ),
+        "holder_touch_to_qualified_b_delay_us_max": max(
+            holder_touch_delays_us
+        ),
+        "active_qualified_b_at_holder_touch_count": sum(
+            delay_us == 0 for delay_us in holder_touch_delays_us
+        ),
+        "active_qualified_b_at_round_finalize_count": sum(
+            record.effective_time_us
+            == record.signal_time_us + round_finalize_offset_us
+            for record in active_qualified_b_records
+        ),
         "qualification_holder_id_during_session": (
             garden_snapshot.last_assigned_holder_id
         ),
@@ -935,9 +982,27 @@ def run_gui(
             if (
                 output_panel.chart.qualification_count != 241
                 or output_panel.chart.qualified_b_count != 241
+                or output_panel.chart.active_effective_count != 180
+                or output_panel.chart.holder_touch_count != 180
+                or output_panel.chart.round_finalize_count != 180
                 or output_panel.qualification_model.rowCount() != 241
             ):
                 failures.append("Garden output chart/table data")
+            effective_times = output_panel.chart.active_effective_item.xData
+            holder_touch_times = output_panel.chart.holder_touch_item.xData
+            finalize_times = output_panel.chart.round_finalize_item.xData
+            if (
+                effective_times is None
+                or holder_touch_times is None
+                or finalize_times is None
+                or effective_times[0] != holder_touch_times[0]
+                or effective_times[0] >= finalize_times[0]
+                or output_panel.qualified_b_delay_label.text() != "0 us"
+                or output_panel.active_emission_status_label.text()
+                != "yes — holder touchと同じmicrosecond"
+                or "role" in multi_panel.touch_model.HEADERS
+            ):
+                failures.append("qualified B effective timing/boundary")
             if window.virtual_user_panel.chart.record_count != 280:
                 failures.append("Virtual User chart")
             if window.polar_h10_panel.chart.record_count != 279:

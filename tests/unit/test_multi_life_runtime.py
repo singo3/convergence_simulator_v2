@@ -77,7 +77,9 @@ class FakeLife:
 
 
 class FakeGarden:
-    config = SimpleNamespace()
+    config = SimpleNamespace(
+        expected_digital_life_ids=("life-blue", "life-green", "life-red")
+    )
 
     def reset(self) -> None:
         return None
@@ -205,3 +207,17 @@ def test_feedback_router_rejects_an_unknown_recipient_without_broadcasting() -> 
     with pytest.raises(ValueError, match="not a configured"):
         router.route(feedback_event("life-unknown"), engine)
     assert all(not life.received_feedback for life in lives.values())
+
+
+def test_coordinator_rejects_a_garden_with_a_different_session_roster() -> None:
+    garden = FakeGarden()
+    garden.config = SimpleNamespace(
+        expected_digital_life_ids=("alpha", "middle", "zeta")
+    )
+
+    with pytest.raises(ValueError, match="Garden output roster"):
+        MultiLifeRuntimeCoordinator(
+            MultiLifeRuntimeConfig(),
+            fake_lives_reversed(),
+            garden,
+        )

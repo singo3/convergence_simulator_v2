@@ -30,7 +30,11 @@
 - Stage 5AでGを0などの代替値として捏造せず `not_connected` とする。touch eventを配送せず、E、q、kをlive更新しない。
 - Stage 5AにGarden出力層、第2周、3生命資格競争、holder・勝者・順位決定、関係記憶探索を先回り実装しない。
 - Stage 5B RuntimeはP/Vを比較せず、各生命のtauをversion管理したpolicyで個別のtouch時刻へ写像してscheduleするだけとする。
-- Digital Lifeの正式touch payloadはID、role、signal識別子、Bだけとし、P、V、tau、offset、N/Nd/W/E/q/k/GをGardenへ渡さない。
+- Digital Lifeの正式touch payloadはID、signal識別metadata、Bだけとし、role、P、V、tau、offset、N/Nd/W/E/q/k/GをGardenへ渡さない。
+- Garden output coreでroleを参照せず、参加Digital Life IDはRuntime/session rosterから注入する。
+- active qualified Bはholder touchの実到着時刻に1回だけ出力し、formal eventへeffective timeを明示する。round finalizeで再出力しない。
+- qualified Bの早期出力によってfeedbackと第2周の時刻を早めず、round finalizeを全touch確認とfeedback・第2周同期の境界として維持する。
+- Stage 5B.1でStage 6、Hue、BPM、光波形I、VirtualUserの光応答を先回り実装しない。
 - Garden出力資格層は実際の `scheduled_time_us` とscheduler配送順だけでtouch到着順を決め、通常時にID順、role順、P/Vでholderを決めない。
 - Gは各生命が自己IDとfeedbackのholder IDを照合して計算し、GardenはGをpayloadへ含めない。
 - Eは毎signalの第2周で更新する。qは新しい有効なintervention bundle評価がありG=1の生命だけ更新し、baseline評価では更新しない。

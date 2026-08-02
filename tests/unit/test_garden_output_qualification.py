@@ -8,6 +8,7 @@ import pytest
 
 from symbiotic_sim_v2.domain.events import SimulationEvent
 from symbiotic_sim_v2.garden.output_layer.component import GardenOutputComponent
+from symbiotic_sim_v2.garden.output_layer.config import GardenOutputConfig
 from symbiotic_sim_v2.garden.output_layer.events import (
     DIGITAL_LIFE_TOUCH_EVENT_PRIORITY,
     DIGITAL_LIFE_TOUCH_EVENT_SOURCE,
@@ -19,6 +20,8 @@ from symbiotic_sim_v2.garden.output_layer.events import (
     GARDEN_OUTPUT_ROUND_FINALIZE_EVENT_PRIORITY,
     GARDEN_OUTPUT_ROUND_FINALIZE_EVENT_TYPE,
     GARDEN_OUTPUT_RUNTIME_EVENT_SOURCE,
+    GARDEN_QUALIFIED_B_EVENT_PRIORITY,
+    GARDEN_QUALIFIED_B_EVENT_TYPE,
 )
 from symbiotic_sim_v2.simulation.engine import SimulationEngine
 from symbiotic_sim_v2.simulation.scheduler import EventScheduler
@@ -26,8 +29,8 @@ from symbiotic_sim_v2.simulation.scheduler import EventScheduler
 GREEN_B = (125 / 360, 0.5, 0.5, 0.5)
 BLUE_B = (250 / 360, 0.5, 0.5, 0.5)
 RED_B = (5 / 360, 0.5, 0.5, 0.5)
-ROLE_BY_ID = {"life-blue": "blue", "life-green": "green", "life-red": "red"}
 B_BY_ID = {"life-blue": BLUE_B, "life-green": GREEN_B, "life-red": RED_B}
+ROSTER = ("life-blue", "life-green", "life-red")
 
 
 @dataclass(frozen=True, slots=True)
@@ -43,6 +46,10 @@ def engine() -> SimulationEngine:
     return SimulationEngine(Scenario())
 
 
+def garden_output() -> GardenOutputComponent:
+    return GardenOutputComponent(GardenOutputConfig(expected_digital_life_ids=ROSTER))
+
+
 def touch_event(
     life_id: str,
     signal_index: int,
@@ -55,14 +62,13 @@ def touch_event(
     b = B_BY_ID[life_id]
     payload: dict[str, object] = {
         "digital_life_id": life_id,
-        "role": ROLE_BY_ID[life_id],
         "signal_index": signal_index,
         "signal_time_us": signal_time_us,
         "b_f": b[0],
         "b_a": b[1],
         "b_t": b[2],
         "b_d": b[3],
-        "schema_version": "digital_life_touch_event_v1",
+        "schema_version": "digital_life_touch_event_v2",
     }
     payload.update(payload_updates or {})
     return SimulationEvent(
@@ -149,7 +155,7 @@ def deliver_active_round(
 
 
 def test_first_actual_touch_assigns_holder_and_later_signals_hold_it() -> None:
-    component = GardenOutputComponent()
+    component = garden_output()
     runtime = engine()
 
     deliver_active_round(component, runtime, 60)
@@ -159,6 +165,10 @@ def test_first_actual_touch_assigns_holder_and_later_signals_hold_it() -> None:
     assert first.assigned_this_signal
     assert first.touch_order == ("life-green", "life-blue", "life-red")
     assert first.qualified_b == GREEN_B
+    first_output = component.qualified_b_records()[0]
+    assert first_output.effective_time_us == 60_100_000
+    assert first_output.qualification_holder_id == "life-green"
+    assert first_output.b == GREEN_B
 
     deliver_active_round(
         component,
@@ -172,16 +182,22 @@ def test_first_actual_touch_assigns_holder_and_later_signals_hold_it() -> None:
     assert not second.assigned_this_signal
     assert second.touch_order == ("life-red", "life-blue", "life-green")
     assert second.qualified_b == GREEN_B
+    second_output = component.qualified_b_records()[1]
+    assert second_output.effective_time_us == 61_100_002
+    assert second_output.qualification_holder_id == "life-green"
 
     snapshot = component.snapshot()
     assert snapshot.assignment_count == 1
     assert snapshot.total_touch_count == 6
     assert snapshot.active_output_count == 2
     assert snapshot.feedback_count == 6
+    assert snapshot.latest_active_holder_touch_time_us == 61_100_002
+    assert snapshot.latest_active_qualified_b_effective_time_us == 61_100_002
+    assert snapshot.latest_active_qualified_b_delay_us == 0
 
 
 def test_equal_time_tie_uses_actual_lexical_scheduler_order_and_flags_every_tie() -> None:
-    component = GardenOutputComponent()
+    component = garden_output()
     runtime = engine()
     time_us = begin(component, 60, s=1)
 
@@ -206,10 +222,20 @@ def test_equal_time_tie_uses_actual_lexical_scheduler_order_and_flags_every_tie(
     ]
     assert {record.exact_time_tie for record in records} == {True}
     assert component.snapshot().qualification_holder_id == "life-blue"
+    output = component.qualified_b_records()[0]
+    assert output.effective_time_us == time_us + 500_000
+    assert output.qualification_holder_id == "life-blue"
+    queued_outputs = [
+        event
+        for event in runtime.scheduler.pending_events()
+        if event.event_type == GARDEN_QUALIFIED_B_EVENT_TYPE
+    ]
+    assert len(queued_outputs) == 1
+    assert queued_outputs[0].priority == GARDEN_QUALIFIED_B_EVENT_PRIORITY == 65
 
 
 def test_incomplete_round_errors_without_fallback_and_can_be_completed() -> None:
-    component = GardenOutputComponent()
+    component = garden_output()
     runtime = engine()
     time_us = begin(component, 60, s=1)
     for offset, life_id in enumerate(("life-green", "life-blue"), start=100_000):
@@ -222,7 +248,7 @@ def test_incomplete_round_errors_without_fallback_and_can_be_completed() -> None
         component.handle_round_finalize(finalize_event(60, time_us, active=True), runtime)
     assert component.snapshot().round_open
     assert component.snapshot().incomplete_round_count == 1
-    assert component.qualified_b_records() == ()
+    assert len(component.qualified_b_records()) == 1
 
     component.handle_touch(
         touch_event("life-red", 60, time_us, time_us + 300_000, sequence=3),
@@ -233,7 +259,7 @@ def test_incomplete_round_errors_without_fallback_and_can_be_completed() -> None
 
 
 def test_closing_feedback_is_attributed_before_holder_release() -> None:
-    component = GardenOutputComponent()
+    component = garden_output()
     runtime = engine()
     deliver_active_round(component, runtime, 239)
     time_us = begin(component, 240, s=0, closing=True)
@@ -244,6 +270,7 @@ def test_closing_feedback_is_attributed_before_holder_release() -> None:
     assert before_release.closing_release_pending
     output = component.qualified_b_records()[-1]
     assert not output.active
+    assert output.effective_time_us == time_us
     assert output.qualification_holder_id is None
     assert output.b is None
     closing_feedback = component.feedback_records()[-3:]
@@ -267,10 +294,10 @@ def test_closing_feedback_is_attributed_before_holder_release() -> None:
 
 @pytest.mark.parametrize(
     "failure",
-    ("s-zero", "duplicate", "unknown", "mixed-signal", "extra", "wrong-role"),
+    ("s-zero", "duplicate", "unknown", "mixed-signal", "extra", "legacy-role"),
 )
 def test_invalid_touch_is_rejected(failure: str) -> None:
-    component = GardenOutputComponent()
+    component = garden_output()
     runtime = engine()
     time_us = begin(component, 0 if failure == "s-zero" else 60, s=0 if failure == "s-zero" else 1)
     event = touch_event("life-green", 60, 60_000_000, 60_100_000)
@@ -295,13 +322,13 @@ def test_invalid_touch_is_rejected(failure: str) -> None:
             60_100_000,
             payload_updates={"tau": 0.1},
         )
-    elif failure == "wrong-role":
+    elif failure == "legacy-role":
         event = touch_event(
             "life-green",
             60,
             60_000_000,
             60_100_000,
-            payload_updates={"role": "red"},
+            payload_updates={"role": "green"},
         )
 
     with pytest.raises((RuntimeError, ValueError)):

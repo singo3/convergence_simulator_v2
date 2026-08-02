@@ -6,9 +6,9 @@ import json
 from dataclasses import asdict, dataclass
 from typing import Any
 
-THREE_DIGITAL_LIFE_RUNTIME_MODEL_VERSION = "three_digital_life_runtime_v0_1"
+THREE_DIGITAL_LIFE_RUNTIME_MODEL_VERSION = "three_digital_life_runtime_v0_2"
 TAU_TOUCH_DELIVERY_POLICY_VERSION = "tau_to_microsecond_touch_delivery_v0_1"
-TOUCH_EVENT_SCHEMA_VERSION = "digital_life_touch_event_v1"
+TOUCH_EVENT_SCHEMA_VERSION = "digital_life_touch_event_v2"
 TOUCH_EQUAL_TIME_TIE_BREAK_RULE = "lexicographic_digital_life_id_on_equal_arrival_us"
 
 EXPECTED_DIGITAL_LIFE_IDS = ("life-blue", "life-green", "life-red")
@@ -55,10 +55,7 @@ class MultiLifeRuntimeConfig:
             raise ValueError("every expected Digital Life ID must be a non-empty string")
         if len(set(life_ids)) != len(life_ids):
             raise ValueError("expected Digital Life IDs must be unique")
-        if life_ids != EXPECTED_DIGITAL_LIFE_IDS:
-            raise ValueError(
-                "expected_digital_life_ids must be the canonical lexicographic ID order"
-            )
+        life_ids = tuple(sorted(life_ids))
         _non_negative_int("round_finalize_offset_us", self.round_finalize_offset_us)
         object.__setattr__(self, "expected_digital_life_ids", life_ids)
 

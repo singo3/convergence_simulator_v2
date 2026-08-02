@@ -63,3 +63,11 @@ def test_coordinator_schedules_each_intent_in_canonical_id_loop() -> None:
     call = schedule_calls[0]
     assert isinstance(call.args[1], ast.Name)
     assert call.args[1].id == "intent"
+
+
+def test_runtime_never_constructs_or_emits_qualified_b() -> None:
+    path = runtime_root() / "coordinator.py"
+    source = path.read_text(encoding="utf-8").lower()
+
+    assert "garden_qualified_b" not in source
+    assert "qualified_b_emission" not in source

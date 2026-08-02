@@ -63,7 +63,7 @@ def test_tau_policy_clips_only_the_logical_tau_boundary() -> None:
     assert tau_to_touch_offset_us(2.0) == 999_998
 
 
-def test_formal_touch_event_contains_only_id_role_signal_and_b() -> None:
+def test_formal_touch_event_contains_only_id_signal_b_and_v2_schema() -> None:
     engine = SimulationEngine(EmptyScenario())
     event = schedule_touch_intent(engine, touch_intent())
 
@@ -74,7 +74,6 @@ def test_formal_touch_event_contains_only_id_role_signal_and_b() -> None:
     payload = thaw_json(event.payload)
     assert set(payload) == {
         "digital_life_id",
-        "role",
         "signal_index",
         "signal_time_us",
         "b_f",
@@ -83,7 +82,7 @@ def test_formal_touch_event_contains_only_id_role_signal_and_b() -> None:
         "b_d",
         "schema_version",
     }
-    assert payload["schema_version"] == "digital_life_touch_event_v1"
+    assert payload["schema_version"] == "digital_life_touch_event_v2"
     assert {
         "p",
         "v",
@@ -117,10 +116,15 @@ def test_disabled_intent_is_never_scheduled() -> None:
 
 def test_runtime_config_is_strict_and_round_trips_json() -> None:
     config = MultiLifeRuntimeConfig()
+    assert config.runtime_model_version == "three_digital_life_runtime_v0_2"
+    assert config.touch_event_schema_version == "digital_life_touch_event_v2"
     assert MultiLifeRuntimeConfig.from_json(config.to_json()) == config
     with pytest.raises(ValueError, match="unknown"):
         MultiLifeRuntimeConfig.from_dict(config.to_dict() | {"winner_rule": "minimum_tau"})
-    with pytest.raises(ValueError, match="canonical"):
-        MultiLifeRuntimeConfig(
-            expected_digital_life_ids=("life-red", "life-green", "life-blue")
-        )
+    arbitrary = MultiLifeRuntimeConfig(
+        expected_digital_life_ids=("zeta", "alpha", "middle")
+    )
+    assert arbitrary.expected_digital_life_ids == ("alpha", "middle", "zeta")
+
+    with pytest.raises(ValueError, match="unique"):
+        MultiLifeRuntimeConfig(expected_digital_life_ids=("alpha", "alpha", "zeta"))

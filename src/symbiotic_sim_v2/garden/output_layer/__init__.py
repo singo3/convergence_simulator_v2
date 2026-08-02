@@ -10,9 +10,9 @@ from symbiotic_sim_v2.garden.output_layer.config import (
     GARDEN_QUALIFIED_B_SCHEMA_VERSION,
     HOLD_WHILE_ACTIVE_RULE,
     LEXICOGRAPHIC_EQUAL_TIME_TIE_BREAK,
+    QUALIFIED_B_EMISSION_POLICY_VERSION,
     RELEASE_AFTER_CLOSING_RULE,
     ROUND_FINALIZE_OFFSET_US,
-    STANDARD_DIGITAL_LIFE_IDS,
     GardenOutputConfig,
 )
 from symbiotic_sim_v2.garden.output_layer.diagnostics import (
@@ -94,9 +94,9 @@ __all__ = [
     "LEXICOGRAPHIC_EQUAL_TIME_TIE_BREAK",
     "QUALIFICATION_CSV_FILENAME",
     "QUALIFIED_B_CSV_FILENAME",
+    "QUALIFIED_B_EMISSION_POLICY_VERSION",
     "RELEASE_AFTER_CLOSING_RULE",
     "ROUND_FINALIZE_OFFSET_US",
-    "STANDARD_DIGITAL_LIFE_IDS",
     "TOUCH_CSV_FILENAME",
     "DigitalLifeTouchInput",
     "GardenFeedbackRecord",

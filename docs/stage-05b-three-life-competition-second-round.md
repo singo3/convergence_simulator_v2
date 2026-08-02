@@ -1,5 +1,7 @@
 # Stage 05B — 3生命・資格競争・第2周
 
+> この文書はStage 5B（project 0.6.0）の実装記録です。formal touchからのrole除去とqualified Bのholder-touch時刻発行は、後続の[Stage 5B.1補正文書](stage-05b1-output-boundary-timing-correction.md)を参照してください。
+
 ## 目的とCore対応
 
 Stage 5BはStage 5Aの第1周を `life-red`、`life-green`、`life-blue` の3体へ独立に適用し、tauによる自律touch、Garden資格処理、ID照合によるG、E/q第2周までを接続します。規範仕様はv2.0、profileは `symbiotic_signal_loop_reference_v1_0`、algorithmは `adaptive_random_search_confirmed_v1`、state schemaは `relation_memory_state_v2` のままです。

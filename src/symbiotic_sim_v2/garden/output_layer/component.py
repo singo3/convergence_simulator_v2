@@ -35,11 +35,6 @@ from symbiotic_sim_v2.garden.output_layer.records import (
 )
 from symbiotic_sim_v2.simulation.engine import SimulationEngine
 
-_ROLE_BY_ID = {
-    "life-blue": "blue",
-    "life-green": "green",
-    "life-red": "red",
-}
 _KNOWN_SESSION_STATUSES = {"baseline", "active", "baseline_invalid", "completed"}
 _FINALIZE_PAYLOAD_FIELDS = {"signal_index", "signal_time_us"}
 
@@ -78,6 +73,7 @@ class _RoundContext:
     round_finalize_time_us: int
     holder_before: str | None
     touches: list[_PendingTouch]
+    active_qualified_b_outputs: list[GardenQualifiedBRecord]
 
 
 @dataclass(frozen=True, slots=True)
@@ -91,10 +87,10 @@ class _PendingClosingQualification:
 class GardenOutputComponent:
     """Qualify solely from actual ID/B touch arrivals and emit formal feedback."""
 
-    def __init__(self, config: GardenOutputConfig | None = None) -> None:
-        self.config = config or GardenOutputConfig()
-        if not isinstance(self.config, GardenOutputConfig):
+    def __init__(self, config: GardenOutputConfig) -> None:
+        if not isinstance(config, GardenOutputConfig):
             raise TypeError("config must be a GardenOutputConfig")
+        self.config = config
         self.reset()
 
     def reset(self) -> None:
@@ -117,6 +113,10 @@ class GardenOutputComponent:
         self._last_started_signal_index: int | None = None
         self._last_started_signal_time_us: int | None = None
         self._latest_qualified_b: BVector | None = None
+        self._latest_qualified_b_effective_time_us: int | None = None
+        self._latest_active_qualified_b_effective_time_us: int | None = None
+        self._latest_active_holder_touch_time_us: int | None = None
+        self._latest_active_qualified_b_delay_us: int | None = None
         self._latest_touch_order: tuple[str, ...] = ()
         self._active_output_count = 0
         self._inactive_output_count = 0
@@ -181,6 +181,7 @@ class GardenOutputComponent:
             round_finalize_time_us=finalize_time_us,
             holder_before=self._qualification_holder_id,
             touches=[],
+            active_qualified_b_outputs=[],
         )
         self._current_signal_index = index
         self._current_signal_time_us = time_us
@@ -191,7 +192,7 @@ class GardenOutputComponent:
     def handle_touch(
         self,
         event: SimulationEvent,
-        _engine: SimulationEngine,
+        engine: SimulationEngine,
     ) -> None:
         """Accept one actual active-round arrival without seeing hidden life values."""
 
@@ -205,8 +206,6 @@ class GardenOutputComponent:
             raise ValueError("touch signal_time_us does not match the open round")
         if touch.digital_life_id not in self.config.expected_digital_life_ids:
             raise ValueError("touch has an unexpected Digital Life ID")
-        if touch.role != _ROLE_BY_ID[touch.digital_life_id]:
-            raise ValueError("touch role does not match its Digital Life ID")
         if any(
             item.input.digital_life_id == touch.digital_life_id
             for item in context.touches
@@ -240,6 +239,8 @@ class GardenOutputComponent:
                 assigned=assigned,
             )
         )
+        if touch.digital_life_id == self._qualification_holder_id:
+            self._emit_active_qualified_b(context, touch, engine)
 
     def handle_round_finalize(
         self,
@@ -267,21 +268,28 @@ class GardenOutputComponent:
             if holder not in touch_by_id:
                 self._incomplete_round_count += 1
                 raise RuntimeError("the holder did not touch in the current round")
-            qualified_b = touch_by_id[holder].b
+            try:
+                output_record = self._validate_active_qualified_b_output(
+                    context,
+                    holder,
+                    touch_by_id[holder],
+                )
+            except RuntimeError:
+                self._incomplete_round_count += 1
+                raise
+            qualified_b = output_record.b
             returned_by_id = {
                 life_id: touch_by_id[life_id].b
                 for life_id in self.config.expected_digital_life_ids
             }
-            output_holder = holder
-            active = True
             attribution_source = "current_signal_touch"
             closing_attribution = False
         else:
             if context.touches:
                 raise RuntimeError("inactive Garden output round unexpectedly contains touches")
+            if context.active_qualified_b_outputs:
+                raise RuntimeError("inactive Garden output round contains an active output")
             qualified_b = None
-            output_holder = None
-            active = False
             if context.closing_signal:
                 holder = self._qualification_holder_id
                 assert holder is not None
@@ -298,24 +306,21 @@ class GardenOutputComponent:
                 }
                 attribution_source = "none"
                 closing_attribution = False
-
-        output_record = GardenQualifiedBRecord(
-            garden_id=self.config.garden_id,
-            signal_index=context.signal_index,
-            signal_time_us=context.signal_time_us,
-            s=context.s,
-            active=active,
-            qualification_holder_id=output_holder,
-            b=qualified_b,
-            schema_version=self.config.qualified_b_schema_version,
-        )
-        engine.schedule_at(
-            event.scheduled_time_us,
-            GARDEN_QUALIFIED_B_EVENT_TYPE,
-            source=GARDEN_OUTPUT_EVENT_SOURCE,
-            priority=GARDEN_QUALIFIED_B_EVENT_PRIORITY,
-            payload=self._qualified_b_payload(output_record),
-        )
+            output_record = GardenQualifiedBRecord(
+                garden_id=self.config.garden_id,
+                signal_index=context.signal_index,
+                signal_time_us=context.signal_time_us,
+                effective_time_us=context.signal_time_us,
+                s=0,
+                active=False,
+                qualification_holder_id=None,
+                b=None,
+                emission_policy_version=(
+                    self.config.qualified_b_emission_policy_version
+                ),
+                schema_version=self.config.qualified_b_schema_version,
+            )
+            self._emit_qualified_b_output(output_record, engine)
 
         feedback_batch: list[GardenFeedbackRecord] = []
         for life_id in self.config.expected_digital_life_ids:
@@ -349,14 +354,8 @@ class GardenOutputComponent:
                 item.input.digital_life_id: item.input.b for item in context.touches
             }
         self._touch_records.extend(touch_records)
-        self._qualified_b_records.append(output_record)
         self._feedback_records.extend(feedback_batch)
-        self._latest_qualified_b = qualified_b
         self._latest_touch_order = touch_order
-        if active:
-            self._active_output_count += 1
-        else:
-            self._inactive_output_count += 1
 
         assigned = any(item.assigned for item in context.touches)
         assignment_touch = next(
@@ -389,7 +388,7 @@ class GardenOutputComponent:
                     released_after_second_round=False,
                     touch_order=touch_order,
                     qualified_b=qualified_b,
-                    active_output=active,
+                    active_output=context.s == 1,
                 )
             )
         self._current_round = None
@@ -468,6 +467,21 @@ class GardenOutputComponent:
             incomplete_round_count=self._incomplete_round_count,
             qualification_record_count=len(self._qualification_records),
             latest_qualified_b=self._latest_qualified_b,
+            latest_qualified_b_effective_time_us=(
+                self._latest_qualified_b_effective_time_us
+            ),
+            latest_active_qualified_b_effective_time_us=(
+                self._latest_active_qualified_b_effective_time_us
+            ),
+            latest_active_holder_touch_time_us=(
+                self._latest_active_holder_touch_time_us
+            ),
+            latest_active_qualified_b_delay_us=(
+                self._latest_active_qualified_b_delay_us
+            ),
+            qualified_b_emission_policy_version=(
+                self.config.qualified_b_emission_policy_version
+            ),
             latest_touch_order=self._latest_touch_order,
         )
 
@@ -496,6 +510,7 @@ class GardenOutputComponent:
                     "holder_after": record.holder_after,
                     "assigned": record.assigned_holder_on_this_touch,
                     "exact_time_tie": record.exact_time_tie,
+                    "schema_version": record.schema_version,
                 }
                 for record in self._touch_records
             ]
@@ -523,10 +538,14 @@ class GardenOutputComponent:
             [
                 {
                     "signal_index": record.signal_index,
+                    "signal_time_us": record.signal_time_us,
+                    "effective_time_us": record.effective_time_us,
                     "s": record.s,
                     "active": record.active,
                     "holder": record.qualification_holder_id,
                     "b": record.b,
+                    "emission_policy_version": record.emission_policy_version,
+                    "schema_version": record.schema_version,
                 }
                 for record in self._qualified_b_records
             ]
@@ -603,6 +622,95 @@ class GardenOutputComponent:
         if event.payload["signal_time_us"] != signal_time_us:
             raise ValueError("Garden Runtime control signal_time_us is incorrect")
 
+    def _emit_active_qualified_b(
+        self,
+        context: _RoundContext,
+        touch: DigitalLifeTouchInput,
+        engine: SimulationEngine,
+    ) -> None:
+        if context.s != 1:
+            raise RuntimeError("only an active round can emit an active qualified B")
+        if touch.digital_life_id != self._qualification_holder_id:
+            raise RuntimeError("active qualified B requires the current holder touch")
+        if context.active_qualified_b_outputs:
+            raise RuntimeError("active qualified B was emitted more than once")
+        record = GardenQualifiedBRecord(
+            garden_id=self.config.garden_id,
+            signal_index=context.signal_index,
+            signal_time_us=context.signal_time_us,
+            effective_time_us=touch.arrival_time_us,
+            s=1,
+            active=True,
+            qualification_holder_id=touch.digital_life_id,
+            b=touch.b,
+            emission_policy_version=self.config.qualified_b_emission_policy_version,
+            schema_version=self.config.qualified_b_schema_version,
+        )
+        self._emit_qualified_b_output(record, engine)
+        context.active_qualified_b_outputs.append(record)
+
+    def _validate_active_qualified_b_output(
+        self,
+        context: _RoundContext,
+        holder: str,
+        holder_touch: DigitalLifeTouchInput,
+    ) -> GardenQualifiedBRecord:
+        if len(context.active_qualified_b_outputs) != 1:
+            raise RuntimeError("active round must already have exactly one qualified B")
+        output = context.active_qualified_b_outputs[0]
+        expected = GardenQualifiedBRecord(
+            garden_id=self.config.garden_id,
+            signal_index=context.signal_index,
+            signal_time_us=context.signal_time_us,
+            effective_time_us=holder_touch.arrival_time_us,
+            s=1,
+            active=True,
+            qualification_holder_id=holder,
+            b=holder_touch.b,
+            emission_policy_version=self.config.qualified_b_emission_policy_version,
+            schema_version=self.config.qualified_b_schema_version,
+        )
+        if output != expected:
+            raise RuntimeError("active qualified B does not match the holder touch")
+        matching_outputs = [
+            record
+            for record in self._qualified_b_records
+            if record.signal_index == context.signal_index
+        ]
+        if matching_outputs != [output]:
+            raise RuntimeError("active round output count or record is inconsistent")
+        return output
+
+    def _emit_qualified_b_output(
+        self,
+        record: GardenQualifiedBRecord,
+        engine: SimulationEngine,
+    ) -> None:
+        if any(
+            existing.signal_index == record.signal_index
+            for existing in self._qualified_b_records
+        ):
+            raise RuntimeError("qualified B was emitted more than once for one signal")
+        engine.schedule_at(
+            record.effective_time_us,
+            GARDEN_QUALIFIED_B_EVENT_TYPE,
+            source=GARDEN_OUTPUT_EVENT_SOURCE,
+            priority=GARDEN_QUALIFIED_B_EVENT_PRIORITY,
+            payload=self._qualified_b_payload(record),
+        )
+        self._qualified_b_records.append(record)
+        self._latest_qualified_b = record.b
+        self._latest_qualified_b_effective_time_us = record.effective_time_us
+        if record.active:
+            self._active_output_count += 1
+            self._latest_active_qualified_b_effective_time_us = (
+                record.effective_time_us
+            )
+            self._latest_active_holder_touch_time_us = record.effective_time_us
+            self._latest_active_qualified_b_delay_us = 0
+        else:
+            self._inactive_output_count += 1
+
     def _materialize_touch_records(
         self,
         context: _RoundContext,
@@ -615,7 +723,6 @@ class GardenOutputComponent:
                 arrival_order=index,
                 arrival_time_us=item.input.arrival_time_us,
                 digital_life_id=item.input.digital_life_id,
-                role=item.input.role,
                 b=item.input.b,
                 holder_before=item.holder_before,
                 holder_after=item.holder_after,
@@ -634,6 +741,7 @@ class GardenOutputComponent:
             "garden_id": record.garden_id,
             "signal_index": record.signal_index,
             "signal_time_us": record.signal_time_us,
+            "effective_time_us": record.effective_time_us,
             "s": record.s,
             "active": record.active,
             "qualification_holder_id": record.qualification_holder_id,
@@ -641,6 +749,7 @@ class GardenOutputComponent:
             "b_a": None if b is None else b[1],
             "b_t": None if b is None else b[2],
             "b_d": None if b is None else b[3],
+            "emission_policy_version": record.emission_policy_version,
             "schema_version": record.schema_version,
         }
 

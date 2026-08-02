@@ -20,7 +20,6 @@ class TouchTableModel(QAbstractTableModel):
         "arrival order",
         "arrival time",
         "life ID",
-        "role",
         "B_F",
         "B_A",
         "B_T",
@@ -45,7 +44,7 @@ class TouchTableModel(QAbstractTableModel):
         if not index.isValid() or not (0 <= index.row() < len(self._records)):
             return None
         if role == Qt.ItemDataRole.TextAlignmentRole:
-            if index.column() in {0, 1, 2, 5, 6, 7, 8, 11, 12}:
+            if index.column() in {0, 1, 2, 4, 5, 6, 7, 10, 11}:
                 return int(Qt.AlignmentFlag.AlignCenter)
             return int(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft)
         if role != Qt.ItemDataRole.DisplayRole:
@@ -57,7 +56,6 @@ class TouchTableModel(QAbstractTableModel):
             record.arrival_order,
             format_time_us(record.arrival_time_us),
             record.digital_life_id,
-            record.role,
             self._b_value(record, 0),
             self._b_value(record, 1),
             self._b_value(record, 2),

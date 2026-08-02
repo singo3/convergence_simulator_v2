@@ -24,7 +24,6 @@ TOUCH_CSV_FIELDS = (
     "arrival_order",
     "arrival_time_us",
     "digital_life_id",
-    "role",
     "b_f",
     "b_a",
     "b_t",
@@ -34,6 +33,7 @@ TOUCH_CSV_FIELDS = (
     "assigned",
     "exact_time_tie",
     "tie_break_policy",
+    "touch_schema_version",
 )
 QUALIFICATION_CSV_FIELDS = (
     "signal_index",
@@ -56,6 +56,7 @@ QUALIFICATION_CSV_FIELDS = (
 QUALIFIED_B_CSV_FIELDS = (
     "signal_index",
     "signal_time_us",
+    "effective_time_us",
     "s",
     "active",
     "holder_id",
@@ -63,6 +64,8 @@ QUALIFIED_B_CSV_FIELDS = (
     "b_a",
     "b_t",
     "b_d",
+    "emission_policy_version",
+    "schema_version",
 )
 
 
@@ -88,7 +91,6 @@ def export_touch_records_csv(
                 "arrival_order": record.arrival_order,
                 "arrival_time_us": record.arrival_time_us,
                 "digital_life_id": record.digital_life_id,
-                "role": record.role,
                 "b_f": b_f,
                 "b_a": b_a,
                 "b_t": b_t,
@@ -98,6 +100,7 @@ def export_touch_records_csv(
                 "assigned": record.assigned_holder_on_this_touch,
                 "exact_time_tie": record.exact_time_tie,
                 "tie_break_policy": record.tie_break_policy,
+                "touch_schema_version": record.schema_version,
             }
         )
     _write_rows(path, TOUCH_CSV_FIELDS, rows)
@@ -152,6 +155,7 @@ def export_qualified_b_records_csv(
             {
                 "signal_index": record.signal_index,
                 "signal_time_us": record.signal_time_us,
+                "effective_time_us": record.effective_time_us,
                 "s": record.s,
                 "active": record.active,
                 "holder_id": record.qualification_holder_id,
@@ -159,6 +163,8 @@ def export_qualified_b_records_csv(
                 "b_a": None if b is None else b[1],
                 "b_t": None if b is None else b[2],
                 "b_d": None if b is None else b[3],
+                "emission_policy_version": record.emission_policy_version,
+                "schema_version": record.schema_version,
             }
         )
     _write_rows(path, QUALIFIED_B_CSV_FIELDS, rows)
