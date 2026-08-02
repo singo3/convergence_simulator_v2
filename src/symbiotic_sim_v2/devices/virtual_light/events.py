@@ -188,7 +188,7 @@ def light_stimulus_state_payload(
 def parse_light_stimulus_state_event(
     event: SimulationEvent,
 ) -> LightStimulusStateInput:
-    """Validate the exact GUI-independent boundary intended for future Stage 7."""
+    """Validate the exact GUI-independent light boundary consumed by Stage 7."""
 
     if event.event_type != LIGHT_STIMULUS_STATE_EVENT_TYPE:
         raise ValueError("state handler received the wrong event type")

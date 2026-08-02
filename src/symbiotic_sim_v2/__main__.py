@@ -1,4 +1,4 @@
-"""Command entry point for Stage 1-6 headless demos and the Stage 6 GUI."""
+"""Command entry point for Stage 1-7 headless demos and the Stage 7 GUI."""
 
 from __future__ import annotations
 
@@ -85,6 +85,9 @@ from symbiotic_sim_v2.garden.output_layer.config import (
 from symbiotic_sim_v2.garden.output_layer.diagnostics import (
     export_garden_output_diagnostics,
 )
+from symbiotic_sim_v2.runtime.closed_loop import (
+    create_light_responsive_closed_loop_simulation,
+)
 from symbiotic_sim_v2.runtime.light_simulation.scenario import (
     create_light_feedback_simulation,
 )
@@ -102,6 +105,25 @@ from symbiotic_sim_v2.virtual_user.diagnostics import (
     full_run_rmssd_ms,
     rolling_rmssd_ms,
 )
+from symbiotic_sim_v2.virtual_user.light_response.config import (
+    HEARTBEAT_CAUSALITY_POLICY_VERSION,
+    LIGHT_RESPONSE_MODEL_VERSION,
+    PHYSICAL_PROJECTION_VERSION,
+    PHYSIOLOGY_COUPLING_VERSION,
+    PREFERENCE_MODEL_VERSION,
+    RESPONSE_DYNAMICS_VERSION,
+)
+from symbiotic_sim_v2.virtual_user.light_response.diagnostics import (
+    export_light_response_diagnostics,
+)
+from symbiotic_sim_v2.virtual_user.light_response.physiology import (
+    effective_physiology,
+)
+from symbiotic_sim_v2.virtual_user.light_response.presets import (
+    DEFAULT_LIGHT_RESPONSE_PRESET,
+    light_response_config_for_preset,
+    light_response_preset_names,
+)
 from symbiotic_sim_v2.virtual_user.scenario import create_virtual_user_simulation
 
 DOCUMENT_VERSION = "v2.0"
@@ -110,10 +132,11 @@ STAGE_3_HEADLESS_PROJECT_VERSION = "0.3.0"
 STAGE_4_HEADLESS_PROJECT_VERSION = "0.4.0"
 STAGE_5A_HEADLESS_PROJECT_VERSION = "0.5.0"
 STAGE_5B1_HEADLESS_PROJECT_VERSION = "0.6.1"
+STAGE_6_HEADLESS_PROJECT_VERSION = "0.7.0"
 
 
 def _build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Symbiotic simulator Stage 6")
+    parser = argparse.ArgumentParser(description="Symbiotic simulator Stage 7")
     headless_group = parser.add_mutually_exclusive_group()
     headless_group.add_argument(
         "--headless-demo",
@@ -158,6 +181,11 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="run the 240-second Stage 6 Garden-to-virtual-light simulation",
     )
+    headless_group.add_argument(
+        "--headless-light-responsive-user-demo",
+        action="store_true",
+        help="run the 240-second Stage 7 light-responsive closed loop",
+    )
     parser.add_argument(
         "--life-role",
         choices=("red", "green", "blue"),
@@ -172,7 +200,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--auto-close-ms",
         type=int,
-        default=5500,
+        default=6500,
         help="GUI smoke-test auto-close delay in milliseconds",
     )
     parser.add_argument(
@@ -191,9 +219,12 @@ def _build_parser() -> argparse.ArgumentParser:
             "light-output-overview",
             "continuous-phase-waveform",
             "light-command-segments",
+            "stage-07-light-response-overview",
+            "stage-07-preference-response-physiology",
+            "stage-07-heartbeat-rmssd-closed-loop",
         ),
         default="window",
-        help="capture the selected Stage 5A/5B/6 diagnostic view",
+        help="capture the selected Stage 5A/5B/6/7 diagnostic view",
     )
     parser.add_argument(
         "--export-virtual-user-csv",
@@ -224,6 +255,17 @@ def _build_parser() -> argparse.ArgumentParser:
         "--export-light-device-csv",
         type=Path,
         help="write the four Stage 6 light diagnostic CSV files to a directory",
+    )
+    parser.add_argument(
+        "--light-response-preset",
+        choices=light_response_preset_names(),
+        default=DEFAULT_LIGHT_RESPONSE_PRESET,
+        help="select the fixed Stage 7 light-response characteristic",
+    )
+    parser.add_argument(
+        "--export-light-responsive-user-csv",
+        type=Path,
+        help="write the four Stage 7 response diagnostic CSV files to a directory",
     )
     return parser
 
@@ -723,7 +765,7 @@ def run_headless_light_device_demo(export_csv: Path | None = None) -> int:
     final_snapshot = device.snapshot()
 
     result = {
-        "project_version": __version__,
+        "project_version": STAGE_6_HEADLESS_PROJECT_VERSION,
         "document_version": DOCUMENT_VERSION,
         "profile_version": PROFILE_VERSION,
         "algorithm_version": ALGORITHM_VERSION,
@@ -790,6 +832,157 @@ def run_headless_light_device_demo(export_csv: Path | None = None) -> int:
             "stimulus_states": str(paths.stimulus_states),
             "stimulus_segments": str(paths.stimulus_segments),
             "waveform_samples": str(paths.waveform_samples),
+        }
+    print(json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True))
+    return 0
+
+
+def run_headless_light_responsive_user_demo(
+    *,
+    preset_name: str = DEFAULT_LIGHT_RESPONSE_PRESET,
+    export_csv: Path | None = None,
+) -> int:
+    """Run the Stage 7 closed loop and emit separated causal diagnostics."""
+
+    light_response_config = light_response_config_for_preset(preset_name)
+    simulation = create_light_responsive_closed_loop_simulation(
+        light_response_config=light_response_config,
+    )
+    simulation.engine.run_until_end()
+    component = simulation.light_responsive_virtual_user_component
+    receipts = component.light_receipt_records()
+    segments = component.response_segments()
+    samples = component.response_samples()
+    heartbeats = component.heartbeat_records()
+    responsive_heartbeats = component.responsive_heartbeat_records()
+    first_active = next(record for record in receipts if record.active)
+    first_heartbeat_at_or_after_active = next(
+        record
+        for record in heartbeats
+        if record.heartbeat_time_us >= first_active.event_time_us
+    )
+    first_affected_interval = next(
+        record
+        for record in responsive_heartbeats
+        if record.true_rri_us is not None
+        and record.response_sample_time_us >= first_active.event_time_us
+        and record.response_level > 0.0
+    )
+    garden = simulation.garden_input_component
+    garden_snapshot = garden.snapshot()
+    evaluations = garden.evaluation_records()
+    baseline_evaluation = next(
+        record for record in evaluations if record.evaluation_kind == "baseline"
+    )
+    bundle_evaluations = {
+        record.bundle_index: record
+        for record in evaluations
+        if record.evaluation_kind == "bundle"
+    }
+    life_snapshots = {
+        life_id: component.snapshot()
+        for life_id, component in sorted(simulation.digital_life_components.items())
+    }
+    garden_output_snapshot = simulation.garden_output_component.snapshot()
+    response_at_90s = component.response_at(90_000_000)
+    response_at_120s = component.response_at(120_000_000)
+    response_at_180s = component.response_at(180_000_000)
+    response_at_240s = component.response_at(240_000_000)
+    physiology_at_90s = effective_physiology(
+        simulation.virtual_user_config,
+        light_response_config,
+        response_at_90s,
+    )
+    written_csvs: tuple[Path, Path, Path, Path] | None = None
+    if export_csv is not None:
+        written_csvs = export_light_response_diagnostics(export_csv, component)
+
+    result = {
+        "project_version": __version__,
+        "document_version": DOCUMENT_VERSION,
+        "profile_version": PROFILE_VERSION,
+        "algorithm_version": ALGORITHM_VERSION,
+        "state_schema_version": STATE_SCHEMA_VERSION,
+        "light_responsive_user_model_version": LIGHT_RESPONSE_MODEL_VERSION,
+        "physical_projection_version": PHYSICAL_PROJECTION_VERSION,
+        "preference_model_version": PREFERENCE_MODEL_VERSION,
+        "response_dynamics_version": RESPONSE_DYNAMICS_VERSION,
+        "physiology_coupling_version": PHYSIOLOGY_COUPLING_VERSION,
+        "heartbeat_causality_policy_version": (
+            HEARTBEAT_CAUSALITY_POLICY_VERSION
+        ),
+        "virtual_user_config": simulation.virtual_user_config.to_dict(),
+        "light_response_config": light_response_config.to_dict(),
+        "preset": preset_name,
+        "final_virtual_time_us": simulation.engine.clock.current_time_us,
+        "final_state": simulation.engine.clock.state.value,
+        "executed_event_count": len(simulation.engine.executed_events()),
+        "light_stimulus_input_count": len(receipts),
+        "active_light_input_count": sum(record.active for record in receipts),
+        "inactive_light_input_count": sum(not record.active for record in receipts),
+        "response_target_change_count": (
+            component.snapshot().response_target_change_count
+        ),
+        "response_segment_count": len(segments),
+        "response_sample_count": len(samples),
+        "first_active_effective_time_us": first_active.event_time_us,
+        "first_active_hue_degree": (
+            first_active.physical_stimulus.render_hue_degree
+        ),
+        "first_active_blink_bpm": first_active.physical_stimulus.blink_bpm,
+        "first_active_hue_match": first_active.hue_match,
+        "first_active_bpm_match": first_active.bpm_match,
+        "first_active_preference_match": first_active.preference_match,
+        "first_heartbeat_at_or_after_active_time_us": (
+            first_heartbeat_at_or_after_active.heartbeat_time_us
+        ),
+        "first_light_affected_interval_start_us": (
+            first_affected_interval.response_sample_time_us
+        ),
+        "first_light_affected_interval_end_us": (
+            first_affected_interval.heartbeat_time_us
+        ),
+        "response_at_90s": response_at_90s,
+        "response_at_120s": response_at_120s,
+        "response_at_180s": response_at_180s,
+        "response_at_240s": response_at_240s,
+        "effective_respiratory_amplitude_at_90s": physiology_at_90s[4],
+        "effective_mean_rri_at_90s": physiology_at_90s[1],
+        "heartbeat_count": len(heartbeats),
+        "rri_measurement_count": len(
+            simulation.polar_h10_component.measurement_records()
+        ),
+        "artifact_count": garden_snapshot.artifact_rri_count,
+        "evaluation_count": len(evaluations),
+        "baseline_evaluation": baseline_evaluation.to_dict(),
+        "bundle_0_evaluation": bundle_evaluations[0].to_dict(),
+        "bundle_1_evaluation": bundle_evaluations[1].to_dict(),
+        "bundle_2_evaluation": bundle_evaluations[2].to_dict(),
+        "per_life_final_E": {
+            life_id: snapshot.e for life_id, snapshot in life_snapshots.items()
+        },
+        "per_life_final_q": {
+            life_id: snapshot.q for life_id, snapshot in life_snapshots.items()
+        },
+        "per_life_final_k": {
+            life_id: snapshot.k_current
+            for life_id, snapshot in life_snapshots.items()
+        },
+        "holder_id": garden_output_snapshot.last_assigned_holder_id,
+        "final_holder_id": garden_output_snapshot.qualification_holder_id,
+        "heartbeat_digest": component.heartbeat_digest(),
+        "responsive_diagnostic_digest": component.responsive_diagnostic_digest(),
+        "light_receipt_digest": component.light_receipt_digest(),
+        "response_segment_digest": component.response_segment_digest(),
+        "response_sample_digest": component.response_sample_digest(),
+        "full_event_digest": simulation.engine.deterministic_digest(),
+    }
+    if written_csvs is not None:
+        result["diagnostic_csvs"] = {
+            "light_stimulus_receipts": str(written_csvs[0]),
+            "light_response_segments": str(written_csvs[1]),
+            "light_responsive_heartbeats": str(written_csvs[2]),
+            "light_response_samples": str(written_csvs[3]),
         }
     print(json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True))
     return 0
@@ -978,14 +1171,14 @@ def run_single_life_gui(
     return app.exec()
 
 
-def run_gui(
+def run_stage6_gui(
     *,
     smoke_test: bool,
     auto_close_ms: int,
     screenshot: Path | None,
     screenshot_target: str = "window",
 ) -> int:
-    """Start the Stage 6 seven-tab GUI over the shared production factory."""
+    """Retain the Stage 6 seven-tab GUI as a backward-compatible helper."""
 
     if auto_close_ms <= 0:
         raise ValueError("--auto-close-ms must be positive")
@@ -1280,6 +1473,264 @@ def run_gui(
     return 1 if smoke_failures else exit_code
 
 
+def run_gui(
+    *,
+    smoke_test: bool,
+    auto_close_ms: int,
+    screenshot: Path | None,
+    screenshot_target: str = "window",
+    preset_name: str = DEFAULT_LIGHT_RESPONSE_PRESET,
+) -> int:
+    """Start the Stage 7 eight-tab fixed-preference closed-loop GUI."""
+
+    if auto_close_ms <= 0:
+        raise ValueError("--auto-close-ms must be positive")
+    light_response_config = light_response_config_for_preset(preset_name)
+    if os.environ.get("LC_ALL", "") in {"", "C", "C.UTF-8", "POSIX"}:
+        os.environ["LC_ALL"] = "en_US.UTF-8"
+    if os.environ.get("LANG", "") in {"", "C", "C.UTF-8", "POSIX"}:
+        os.environ["LANG"] = "en_US.UTF-8"
+
+    from PySide6.QtCore import QTimer
+    from PySide6.QtGui import QFont, QFontDatabase
+    from PySide6.QtWidgets import QApplication
+
+    from symbiotic_sim_v2.gui.controller import SimulationController
+    from symbiotic_sim_v2.gui.light_responsive_window import (
+        LightResponsiveMainWindow,
+    )
+
+    app = QApplication.instance() or QApplication(sys.argv[:1])
+    available_fonts = set(QFontDatabase.families())
+    for family in (".AppleSystemUIFont", "Noto Sans", "DejaVu Sans", "Arial"):
+        if family in available_fonts:
+            app.setFont(QFont(family))
+            break
+    simulation = create_light_responsive_closed_loop_simulation(
+        light_response_config=light_response_config,
+    )
+    controller = SimulationController(simulation.engine)
+    window = LightResponsiveMainWindow(
+        controller,
+        simulation,
+        preset_name=preset_name,
+    )
+    app.aboutToQuit.connect(controller.shutdown)
+    window.show()
+
+    smoke_failures: list[str] = []
+    if smoke_test:
+
+        def select_preset(name: str) -> None:
+            combo = window.light_response_user_panel.preset_combo
+            index = combo.findData(name)
+            if index < 0:
+                raise RuntimeError(f"missing Stage 7 preset: {name}")
+            combo.setCurrentIndex(index)
+            combo.activated.emit(index)
+
+        def finish_smoke_run() -> None:
+            if window.simulation.engine.clock.state.value != "completed":
+                window.simulation.engine.run_until_end()
+            controller.set_speed(controller.speed_mode)
+
+        actions = (
+            (50, window.start_button.click),
+            (100, window.pause_button.click),
+            (150, window.resume_button.click),
+            (200, window.pause_button.click),
+            (250, window.step_second_button.click),
+            (300, window.step_event_button.click),
+            (350, lambda: window.speed_combo.setCurrentIndex(1)),
+            (400, lambda: window.speed_combo.setCurrentIndex(2)),
+            (450, lambda: window.speed_combo.setCurrentIndex(3)),
+            (500, window.reset_button.click),
+            (650, lambda: select_preset("light_insensitive_control")),
+            (850, lambda: select_preset("aligned_green_center")),
+            (1_050, window.run_to_end_button.click),
+            (1_250, finish_smoke_run),
+            (1_500, lambda: window.tabs.setCurrentIndex(0)),
+            (1_600, lambda: window.tabs.setCurrentIndex(1)),
+            (1_700, lambda: window.tabs.setCurrentIndex(2)),
+            (1_800, lambda: window.tabs.setCurrentIndex(3)),
+            (1_900, lambda: window.tabs.setCurrentIndex(4)),
+            (2_000, lambda: window.tabs.setCurrentIndex(5)),
+            (2_100, lambda: window.tabs.setCurrentIndex(6)),
+            (2_200, lambda: window.tabs.setCurrentIndex(7)),
+            (2_300, lambda: window.tabs.setCurrentIndex(0)),
+        )
+        for delay_ms, action in actions:
+            QTimer.singleShot(delay_ms, action)
+
+        def validate_smoke() -> None:
+            failures: list[str] = []
+            expected_tabs = (
+                "光応答仮想ユーザー",
+                "光点滅シミュレーター",
+                "3生命・資格競争",
+                "Garden出力資格層",
+                "Garden入力層",
+                "仮想ユーザー心拍",
+                "Polar H10",
+                "時間・イベント診断",
+            )
+            actual_tabs = tuple(
+                window.tabs.tabText(index) for index in range(window.tabs.count())
+            )
+            if actual_tabs != expected_tabs:
+                failures.append(f"tabs={actual_tabs!r}")
+            active = window.simulation
+            component = active.light_responsive_virtual_user_component
+            response_panel = window.light_response_user_panel
+            if active.engine.clock.state.value != "completed":
+                failures.append(f"state={active.engine.clock.state.value}")
+            if response_panel.preset_name != "aligned_green_center":
+                failures.append(f"preset={response_panel.preset_name}")
+            receipts = component.light_receipt_records()
+            responsive_heartbeats = component.responsive_heartbeat_records()
+            segments = component.response_segments()
+            samples = component.response_samples() if component.snapshot().completed else ()
+            first_active = next((record for record in receipts if record.active), None)
+            if (
+                len(receipts) != 241
+                or len(responsive_heartbeats) != 277
+                or len(segments) != 2
+                or len(samples) != 2_401
+            ):
+                failures.append("Stage 7 record counts")
+            if (
+                first_active is None
+                or first_active.event_time_us != 60_551_540
+                or first_active.preference_match != 1.0
+                or first_active.response_before != 0.0
+                or component.response_at(90_000_000) <= 0.95
+            ):
+                failures.append("first active/preference/response onset")
+            snapshot = component.snapshot()
+            if (
+                snapshot.current_light_active
+                or snapshot.current_response_target != 0.0
+                or snapshot.current_response_level <= 0.99
+                or snapshot.effective_respiratory_amplitude_ms <= 64.9
+                or not snapshot.completed
+            ):
+                failures.append(f"closing response={snapshot!r}")
+            evaluations = active.garden_input_component.evaluation_records()
+            if (
+                len(evaluations) != 4
+                or any(record.rmssd_ms is None for record in evaluations)
+                or any(record.n is None for record in evaluations)
+                or any(
+                    record.rmssd_ms <= evaluations[0].rmssd_ms
+                    for record in evaluations[1:]
+                )
+            ):
+                failures.append("Garden RMSSD/N evaluations")
+            if len(active.polar_h10_component.measurement_records()) != 276:
+                failures.append("H10 changed RRI count")
+            if (
+                response_panel.receipt_model.rowCount() != 241
+                or response_panel.heartbeat_model.rowCount() != 277
+                or response_panel.light_response_chart.sample_count != 2_401
+                or response_panel.physiology_chart.record_count != 277
+                or response_panel.garden_evaluation_chart.evaluation_count != 4
+            ):
+                failures.append("Stage 7 charts/tables")
+            if (
+                window.light_output_panel.command_model.rowCount() != 241
+                or window.multi_life_panel.touch_model.rowCount() != 540
+                or window.garden_output_panel.qualification_model.rowCount() != 241
+                or window.garden_input_panel.chart.evaluation_count != 4
+                or window.virtual_user_panel.chart.record_count != 277
+                or window.polar_h10_panel.chart.record_count != 276
+            ):
+                failures.append("retained Stage 2-6 tabs")
+            if window.light_output_panel.preview_checkbox.isChecked():
+                failures.append("real-light preview unexpectedly enabled")
+            if response_panel.settings_frame.isEnabled():
+                failures.append("fixed preference settings enabled after completion")
+            life_snapshots = {
+                life_id: life.snapshot()
+                for life_id, life in active.digital_life_components.items()
+            }
+            if any(snapshot.k_update_count != 0 for snapshot in life_snapshots.values()):
+                failures.append("Stage 5C k update unexpectedly present")
+            if failures:
+                smoke_failures.extend(failures)
+                print("GUI smoke failed: " + "; ".join(failures), file=sys.stderr)
+                app.quit()
+
+        QTimer.singleShot(max(2_500, auto_close_ms - 350), validate_smoke)
+        QTimer.singleShot(auto_close_ms, app.quit)
+
+    if screenshot is not None:
+        screenshot.parent.mkdir(parents=True, exist_ok=True)
+
+        def save_screenshot() -> None:
+            panel = window.light_response_user_panel
+            targets = {
+                "window": window,
+                "stage-07-light-response-overview": window,
+                "stage-07-preference-response-physiology": (
+                    panel.chart_table_splitter
+                ),
+                "stage-07-heartbeat-rmssd-closed-loop": (
+                    panel.chart_table_splitter
+                ),
+                "three-life-overview": window,
+                "touch-holder-second-round": window.multi_life_panel.chart_table_splitter,
+                "garden-output-qualified-b": (
+                    window.garden_output_panel.diagnostics_content
+                ),
+                "light-output-overview": window,
+                "continuous-phase-waveform": window.light_output_panel.waveform_chart,
+                "light-command-segments": (
+                    window.light_output_panel.chart_table_splitter
+                ),
+            }
+            if screenshot_target in {
+                "stage-07-light-response-overview",
+                "stage-07-preference-response-physiology",
+                "stage-07-heartbeat-rmssd-closed-loop",
+            }:
+                window.tabs.setCurrentWidget(panel)
+                if screenshot_target == "stage-07-light-response-overview":
+                    panel.diagnostics_scroll.verticalScrollBar().setValue(0)
+                elif screenshot_target == "stage-07-preference-response-physiology":
+                    panel.table_tabs.setCurrentIndex(0)
+                    panel.diagnostics_scroll.ensureWidgetVisible(
+                        panel.light_response_chart
+                    )
+                else:
+                    panel.table_tabs.setCurrentIndex(1)
+                    panel.diagnostics_scroll.ensureWidgetVisible(
+                        panel.garden_evaluation_chart
+                    )
+            elif screenshot_target in {
+                "three-life-overview",
+                "touch-holder-second-round",
+            }:
+                window.tabs.setCurrentWidget(window.multi_life_panel)
+            elif screenshot_target == "garden-output-qualified-b":
+                window.tabs.setCurrentWidget(window.garden_output_panel)
+            elif screenshot_target in {
+                "light-output-overview",
+                "continuous-phase-waveform",
+                "light-command-segments",
+            }:
+                window.tabs.setCurrentWidget(window.light_output_panel)
+            app.processEvents()
+            target = targets.get(screenshot_target, window)
+            if not target.grab().save(str(screenshot)):
+                raise RuntimeError(f"failed to save screenshot: {screenshot}")
+
+        screenshot_delay_ms = max(2_000, auto_close_ms - 150) if smoke_test else 250
+        QTimer.singleShot(screenshot_delay_ms, save_screenshot)
+
+    exit_code = app.exec()
+    return 1 if smoke_failures else exit_code
+
+
 def main(argv: list[str] | None = None) -> int:
     """Parse CLI options without importing Qt on the headless path."""
 
@@ -1304,6 +1755,14 @@ def main(argv: list[str] | None = None) -> int:
         raise ValueError(
             "--export-light-device-csv requires --headless-light-device-demo"
         )
+    if (
+        args.export_light_responsive_user_csv is not None
+        and not args.headless_light_responsive_user_demo
+    ):
+        raise ValueError(
+            "--export-light-responsive-user-csv requires "
+            "--headless-light-responsive-user-demo"
+        )
     if args.headless_demo or args.headless_time_demo:
         return run_headless_demo()
     if args.headless_virtual_user_demo:
@@ -1323,6 +1782,11 @@ def main(argv: list[str] | None = None) -> int:
         )
     if args.headless_light_device_demo:
         return run_headless_light_device_demo(args.export_light_device_csv)
+    if args.headless_light_responsive_user_demo:
+        return run_headless_light_responsive_user_demo(
+            preset_name=args.light_response_preset,
+            export_csv=args.export_light_responsive_user_csv,
+        )
     if args.life_role is not None or args.screenshot_target == "digital-life-graphs":
         return run_single_life_gui(
             smoke_test=args.smoke_test,
@@ -1336,6 +1800,7 @@ def main(argv: list[str] | None = None) -> int:
         auto_close_ms=args.auto_close_ms,
         screenshot=args.screenshot,
         screenshot_target=args.screenshot_target,
+        preset_name=args.light_response_preset,
     )
 
 

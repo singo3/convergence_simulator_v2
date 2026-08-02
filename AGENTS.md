@@ -43,6 +43,14 @@
 - `Hue_degree=360F` のformal値を保持し、F=1の360 degreeをGUI描画のmoduloでformal 0 degreeに書き換えない。
 - 高頻度のlight frame eventをSimulationEngineへscheduleせず、waveform sampleはsimulation完了後に `state_at()` から固定virtual gridで導出する。
 - Stage 6は `LightStimulusStateEvent` だけをStage 7の正式光入力境界とし、segment、fixed-grid waveform、GUI preview、CSVをformal signalと混同しない。VirtualUserのHeartbeat/RRI・生理やStage 5Cの関係記憶探索を先回り実装しない。
+- Stage 7の正式な光入力は `LightStimulusStateEvent` だけ、正式なユーザー出力は既存schemaの `HeartbeatEvent` だけとする。Virtual Light Deviceのcomponent/内部record、segment、waveform sample、GUI previewを仮想ユーザーから参照しない。
+- physical light projection、preference関数、physiology関数へholder ID、source B、source signal IDを渡さず、provenanceは監査receiptだけへ分離する。
+- Stage 7のHue/BPM preferenceは1 run中固定し、moving preference、履歴依存、負反応を実装しない。
+- 光からRMSSD、N、Nd、Wを直接変更せず、responseは将来のheartbeat intervalを生成する平均RRIと呼吸性RRI変動幅だけへ作用させる。
+- LightStimulusStateEvent受信時に予約済みheartbeatをcancel/rescheduleせず、heartbeat開始時のresponseを次intervalへ使用する。
+- Stage 2と同じroot seed、named random stream、stream名、beat index key、clamp、microsecond丸めを維持し、新しい乱数streamやlight config hashを追加しない。
+- `light_insensitive_control` はlight receiptを記録しつつ、Stage 6のheartbeat、H10、Garden、Digital Life、Light formal streamを完全再現する。
+- Stage 7でcandidate、k_trial、adoption、convergence、関係記憶探索を先回りせず、kはStage 5Cまで固定する。
 - Garden出力資格層は実際の `scheduled_time_us` とscheduler配送順だけでtouch到着順を決め、通常時にID順、role順、P/Vでholderを決めない。
 - Gは各生命が自己IDとfeedbackのholder IDを照合して計算し、GardenはGをpayloadへ含めない。
 - Eは毎signalの第2周で更新する。qは新しい有効なintervention bundle評価がありG=1の生命だけ更新し、baseline評価では更新しない。

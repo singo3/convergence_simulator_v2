@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, replace
+from typing import Protocol
 
 from symbiotic_sim_v2.devices.polar_h10.component import PolarH10Component
 from symbiotic_sim_v2.devices.polar_h10.config import PolarH10Config
@@ -21,6 +23,7 @@ from symbiotic_sim_v2.domain.event_types import (
     RRI_MEASUREMENT_EVENT_TYPE,
     SIMULATION_COMPLETE_EVENT_TYPE,
 )
+from symbiotic_sim_v2.domain.events import SimulationEvent
 from symbiotic_sim_v2.garden.input_layer.component import (
     GARDEN_INPUT_SCENARIO_SOURCE,
     GardenInputComponent,
@@ -38,6 +41,25 @@ from symbiotic_sim_v2.virtual_user.component import VirtualUserComponent
 from symbiotic_sim_v2.virtual_user.config import VirtualUserConfig
 
 
+class HeartbeatSourceComponent(Protocol):
+    """Internal injection seam for a formal-heartbeat-only virtual user."""
+
+    config: VirtualUserConfig
+
+    def reset(self) -> None: ...
+
+    def schedule_initial(self, scheduler: EventScheduler) -> SimulationEvent: ...
+
+    def handle_heartbeat(
+        self,
+        event: SimulationEvent,
+        engine: SimulationEngine,
+    ) -> None: ...
+
+
+HeartbeatSourceFactory = Callable[[VirtualUserConfig], HeartbeatSourceComponent]
+
+
 @dataclass(slots=True)
 class GardenInputScenario:
     """Reset and schedule exactly one deterministic 240-second Stage 4 session."""
@@ -45,7 +67,7 @@ class GardenInputScenario:
     virtual_user_config: VirtualUserConfig
     polar_h10_config: PolarH10Config
     garden_input_config: GardenInputConfig
-    virtual_user_component: VirtualUserComponent
+    virtual_user_component: HeartbeatSourceComponent
     polar_h10_component: PolarH10Component
     garden_input_component: GardenInputComponent
 
@@ -131,7 +153,7 @@ class GardenInputSimulation:
 
     engine: SimulationEngine
     scenario: GardenInputScenario
-    virtual_user_component: VirtualUserComponent
+    virtual_user_component: HeartbeatSourceComponent
     polar_h10_component: PolarH10Component
     garden_input_component: GardenInputComponent
     virtual_user_config: VirtualUserConfig
@@ -139,7 +161,7 @@ class GardenInputSimulation:
     garden_input_config: GardenInputConfig
 
     @property
-    def component(self) -> VirtualUserComponent:
+    def component(self) -> HeartbeatSourceComponent:
         """Stage 2-compatible alias used by the retained virtual-user panel."""
 
         return self.virtual_user_component
@@ -158,6 +180,31 @@ def create_garden_input_simulation(
 ) -> GardenInputSimulation:
     """Create one engine with exactly one handler at each formal boundary."""
 
+    return _create_garden_input_simulation(
+        virtual_user_config=virtual_user_config,
+        polar_h10_config=polar_h10_config,
+        garden_input_config=garden_input_config,
+        heartbeat_source_factory=VirtualUserComponent,
+    )
+
+
+def _create_garden_input_simulation(
+    *,
+    virtual_user_config: VirtualUserConfig | None = None,
+    polar_h10_config: PolarH10Config | None = None,
+    garden_input_config: GardenInputConfig | None = None,
+    heartbeat_source_factory: HeartbeatSourceFactory,
+) -> GardenInputSimulation:
+    """Build Stage 4 with an injected formal-heartbeat source.
+
+    The public Stage 4 factory always supplies :class:`VirtualUserComponent`.
+    Later stages may use this private seam to replace only that component while
+    preserving every formal handler and scheduled boundary.
+    """
+
+    if not callable(heartbeat_source_factory):
+        raise TypeError("heartbeat_source_factory must be callable")
+
     selected_garden_config = garden_input_config or GardenInputConfig()
     selected_user_config = virtual_user_config or replace(
         VirtualUserConfig(),
@@ -171,7 +218,12 @@ def create_garden_input_simulation(
     if selected_h10_config.expected_user_id != selected_user_config.user_id:
         raise ValueError("H10 expected_user_id must match virtual-user user_id")
 
-    virtual_user = VirtualUserComponent(selected_user_config)
+    virtual_user = heartbeat_source_factory(selected_user_config)
+    if getattr(virtual_user, "config", None) != selected_user_config:
+        raise ValueError("injected heartbeat source config differs from selected config")
+    for method_name in ("reset", "schedule_initial", "handle_heartbeat"):
+        if not callable(getattr(virtual_user, method_name, None)):
+            raise TypeError(f"injected heartbeat source must provide {method_name}()")
     polar_h10 = PolarH10Component(selected_h10_config)
     garden_input = GardenInputComponent(selected_garden_config)
     scenario = GardenInputScenario(

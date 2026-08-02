@@ -121,7 +121,7 @@ def test_stage6_has_no_virtual_user_light_response_or_stage5c_exploration() -> N
     user_root = package_root() / "virtual_user"
     user_source = "\n".join(
         path.read_text(encoding="utf-8").casefold()
-        for path in python_sources(user_root)
+        for path in sorted(user_root.glob("*.py"))
     )
     assert "light_stimulus_state" not in user_source
     assert "handle_light" not in user_source

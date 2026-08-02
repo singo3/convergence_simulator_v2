@@ -8,9 +8,9 @@
 - 5B. 3生命・資格競争・第2周: 完了
 - 5B.1. Garden出力境界・qualified B実効時刻補正: 完了
 - 6. 光点滅シミュレーター: 完了
-- 7. 光に反応する仮想ユーザー: 次工程
-- 5C. 3 bundle関係記憶探索: 光応答接続後
-- 8. 全閉ループ統合
+- 7. 固定反応特性の光応答仮想ユーザー: 完了
+- 5C. 3 bundle関係記憶探索: 次工程
+- 8. 全閉ループ適応・複数セッション
 - 9. Webアプリ
 
-Stage 6は論理光刺激の `LightStimulusStateEvent` 出力境界までで完了とする。Stage 7ではこの正式eventからVirtualUserの光応答を接続する。GUI preview、segment、20ms waveform sampleを生理入力にしない。Stage 5Cの関係記憶探索は引き続き未実装である。
+Stage 7はStage 6の `LightStimulusStateEvent` だけをformal inputとし、固定Hue/BPM嗜好、一次遅れresponse、平均RRI・呼吸性RRI変動幅を介して既存 `HeartbeatEvent` へ閉ループ接続した。GUI preview、segment、20ms waveform sample、holder/source Bを生理入力にしない。次工程のStage 5Cでは3 bundle関係記憶探索を実装するが、Stage 7のformal user boundaryと固定preference modelを変更しない。

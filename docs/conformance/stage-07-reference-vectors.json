@@ -1,0 +1,167 @@
+{
+  "causality_vectors": {
+    "first_active_effective_time_us": 60551540,
+    "first_light_affected_interval_rule": "first heartbeat after active is the interval start",
+    "heartbeat_priority": 40,
+    "light_stimulus_state_priority": 67,
+    "pending_heartbeat_rescheduled": false,
+    "policy": "sample_light_response_at_heartbeat_start_v0_1",
+    "same_time_order": [
+      "heartbeat",
+      "light_stimulus_state"
+    ]
+  },
+  "control": {
+    "formal_event_stream_equals_stage_6": true,
+    "light_receipts_recorded": true,
+    "maximum_mean_rri_increase_ms": 0.0,
+    "maximum_respiratory_amplitude_gain_ms": 0.0,
+    "stage_6_heartbeat_digest": "dfc32d05a372482a81a40ffbb9dc721aed8edcada4709a4dcb86e76719ddf17b"
+  },
+  "normative_source": {
+    "algorithm_version": "adaptive_random_search_confirmed_v1",
+    "document_version": "v2.0",
+    "profile_version": "symbiotic_signal_loop_reference_v1_0",
+    "sha256": "9707de5c07cbcb20603436b374f6a563b5d908206096f2a2204384ae91b22c73",
+    "size_bytes": 65759,
+    "state_schema_version": "relation_memory_state_v2"
+  },
+  "physiology_vectors": {
+    "base_mean_rri_ms": 857.1428571428571,
+    "base_respiratory_amplitude_ms": 35.0,
+    "response_at_90s": {
+      "effective_mean_rri_ms": 871.764912408289,
+      "effective_respiratory_amplitude_ms": 64.24411053086378,
+      "response_level": 0.974803684362126
+    },
+    "response_one": {
+      "effective_mean_rri_ms": 872.1428571428571,
+      "effective_respiratory_amplitude_ms": 65.0
+    },
+    "response_zero": {
+      "effective_mean_rri_ms": 857.1428571428571,
+      "effective_respiratory_amplitude_ms": 35.0,
+      "stage_2_formula_exact": true
+    },
+    "responsive_rri_manual_fixture": {
+      "components": {
+        "beat_jitter_component_ms": 1.25,
+        "correlated_component_ms": -3.0,
+        "mean_rri_ms": 864.6428571428571,
+        "respiratory_component_ms": 50.0,
+        "slow_wave_component_ms": 8.0
+      },
+      "final_rri_ms": 920.8928571428571,
+      "response_level": 0.5,
+      "rri_us_half_up": 920893,
+      "unclamped_rri_ms": 920.8928571428571
+    }
+  },
+  "preference_vectors": {
+    "aligned": {
+      "blink_bpm": 87.5,
+      "bpm_match": 1.0,
+      "hue_match": 1.0,
+      "preference_match": 1.0,
+      "preferred_blink_bpm": 87.5,
+      "preferred_hue_degree": 125.0,
+      "render_hue_degree": 125.0,
+      "response_target": 1.0
+    },
+    "circular_hue_distance": [
+      {
+        "distance": 0.0,
+        "first_degree": 0.0,
+        "second_degree": 360.0
+      },
+      {
+        "distance": 2.0,
+        "first_degree": 359.0,
+        "second_degree": 1.0
+      },
+      {
+        "distance": 0.0,
+        "first_degree": 125.0,
+        "second_degree": 125.0
+      }
+    ],
+    "inactive": {
+      "bpm_match": null,
+      "hue_match": null,
+      "preference_match": 0.0,
+      "response_target": 0.0
+    },
+    "off_center": {
+      "blink_sigma_bpm": 30.0,
+      "bpm_difference": 37.5,
+      "bpm_match": 0.45783336177161427,
+      "hue_difference_degree": 4.0,
+      "hue_match": 0.7261490370736908,
+      "hue_sigma_degree": 5.0,
+      "preference_match": 0.33245525479066845
+    }
+  },
+  "projection_boundary": {
+    "allowed_fields": [
+      "active",
+      "blink_bpm",
+      "effective_time_us",
+      "phase_cycles_at_start",
+      "render_hue_degree",
+      "saturation",
+      "value_amplitude",
+      "value_center",
+      "value_max",
+      "value_min",
+      "waveform"
+    ],
+    "excluded_provenance_fields": [
+      "qualification_holder_id",
+      "source_b",
+      "source_signal_index"
+    ],
+    "provenance_used_by_physiology": false
+  },
+  "response_vectors": {
+    "checkpoints": {
+      "response_at_120s": 0.9994074394523207,
+      "response_at_180s": 0.9999996722640228,
+      "response_at_240s_before_closing": 0.9999999998187343,
+      "response_at_90s": 0.974803684362126
+    },
+    "continuity_at_target_change": {
+      "response_after_same_time": 0.6321205588285577,
+      "response_before": 0.6321205588285577
+    },
+    "initial_response": 0.0,
+    "onset_after_one_tau": 0.6321205588285577,
+    "recovery_after_one_tau": 0.23254415793482963,
+    "same_target_continues_without_new_segment": true
+  },
+  "schema_version": "stage_07_reference_vectors_v1",
+  "simulation_assumptions": {
+    "diagnostic_sampling_policy_version": "fixed_virtual_grid_100ms_v0_1",
+    "heartbeat_causality_policy_version": "sample_light_response_at_heartbeat_start_v0_1",
+    "input_schema_version": "light_stimulus_state_event_v1",
+    "light_responsive_user_model_version": "stationary_light_responsive_virtual_user_v0_1",
+    "physical_projection_version": "physical_light_stimulus_projection_v0_1",
+    "physiology_coupling_version": "light_response_rsa_mean_rri_coupling_v0_1",
+    "preference_model_version": "stationary_hue_bpm_gaussian_preference_v0_1",
+    "project_version": "0.8.0",
+    "response_dynamics_version": "first_order_light_response_v0_1",
+    "response_segment_schema_version": "light_response_segment_v1",
+    "responsive_heartbeat_schema_version": "light_responsive_heartbeat_record_v1"
+  },
+  "standard_scenario": {
+    "first_active_blink_bpm": 87.5,
+    "first_active_effective_time_us": 60551540,
+    "first_active_hue_degree": 125.0,
+    "first_active_preference_match": 1.0,
+    "light_stimulus_input_count": 241,
+    "preference_stationary": true,
+    "preset": "aligned_green_center",
+    "response_sample_count": 2401,
+    "response_sample_interval_us": 100000,
+    "simulation_end_time_us": 240000000
+  }
+}

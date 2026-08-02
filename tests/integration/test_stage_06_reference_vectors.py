@@ -9,7 +9,6 @@ from pathlib import Path
 
 import pytest
 
-from symbiotic_sim_v2 import __version__
 from symbiotic_sim_v2.devices.virtual_light.config import (
     LIGHT_STIMULUS_SEGMENT_SCHEMA_VERSION,
     LIGHT_STIMULUS_STATE_SCHEMA_VERSION,
@@ -74,7 +73,7 @@ def test_stage6_versions_and_formal_event_contracts_match_fixed_vectors() -> Non
     data = vectors()
     assumptions = data["simulation_assumptions"]
     boundaries = data["formal_boundaries"]
-    assert __version__ == assumptions["project_version"]
+    assert assumptions["project_version"] == "0.7.0"
     assert (
         assumptions["garden_light_mapper_model_version"]
         == GARDEN_LIGHT_MAPPER_MODEL_VERSION

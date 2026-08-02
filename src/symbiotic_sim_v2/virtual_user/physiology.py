@@ -5,6 +5,7 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 
+from symbiotic_sim_v2.simulation.time_utils import us_to_seconds
 from symbiotic_sim_v2.virtual_user.config import VirtualUserConfig
 from symbiotic_sim_v2.virtual_user.random_source import standard_normal
 
@@ -38,8 +39,29 @@ def mean_rri_ms(mean_heart_rate_bpm: float) -> float:
 def respiratory_component_ms(config: VirtualUserConfig, time_seconds: float) -> float:
     """Return deterministic respiratory sinus arrhythmia component."""
 
+    return respiratory_component_with_amplitude_ms(
+        config,
+        time_seconds,
+        config.respiratory_amplitude_ms,
+    )
+
+
+def respiratory_component_with_amplitude_ms(
+    config: VirtualUserConfig,
+    time_seconds: float,
+    respiratory_amplitude_ms: float,
+) -> float:
+    """Return RSA with an explicit amplitude while retaining the Stage 2 phase."""
+
+    if (
+        isinstance(respiratory_amplitude_ms, bool)
+        or not isinstance(respiratory_amplitude_ms, (int, float))
+        or not math.isfinite(float(respiratory_amplitude_ms))
+        or respiratory_amplitude_ms < 0.0
+    ):
+        raise ValueError("respiratory_amplitude_ms must be finite and non-negative")
     frequency_hz = config.respiratory_rate_bpm / 60.0
-    return config.respiratory_amplitude_ms * math.sin(
+    return respiratory_amplitude_ms * math.sin(
         2.0 * math.pi * frequency_hz * time_seconds
     )
 
@@ -78,6 +100,27 @@ def calculate_next_rri(
 ) -> RriComputation:
     """Calculate the interval following a heartbeat using only causal internal state."""
 
+    return calculate_next_rri_with_effective_physiology(
+        config,
+        current_heartbeat_time_us,
+        beat_index,
+        previous_correlated_state,
+        effective_mean_rri_ms=mean_rri_ms(config.mean_heart_rate_bpm),
+        effective_respiratory_amplitude_ms=config.respiratory_amplitude_ms,
+    )
+
+
+def calculate_next_rri_with_effective_physiology(
+    config: VirtualUserConfig,
+    current_heartbeat_time_us: int,
+    beat_index: int,
+    previous_correlated_state: float,
+    *,
+    effective_mean_rri_ms: float,
+    effective_respiratory_amplitude_ms: float,
+) -> RriComputation:
+    """Reuse Stage 2 variability with explicit mean and respiratory amplitude."""
+
     if (
         isinstance(current_heartbeat_time_us, bool)
         or not isinstance(current_heartbeat_time_us, int)
@@ -88,10 +131,21 @@ def calculate_next_rri(
         raise ValueError("beat_index must be a non-negative integer")
     if not math.isfinite(previous_correlated_state):
         raise ValueError("previous_correlated_state must be finite")
+    if (
+        isinstance(effective_mean_rri_ms, bool)
+        or not isinstance(effective_mean_rri_ms, (int, float))
+        or not math.isfinite(float(effective_mean_rri_ms))
+        or effective_mean_rri_ms <= 0.0
+    ):
+        raise ValueError("effective_mean_rri_ms must be finite and positive")
 
-    time_seconds = current_heartbeat_time_us / 1_000_000
-    mean_component = mean_rri_ms(config.mean_heart_rate_bpm)
-    respiratory = respiratory_component_ms(config, time_seconds)
+    time_seconds = us_to_seconds(current_heartbeat_time_us)
+    mean_component = float(effective_mean_rri_ms)
+    respiratory = respiratory_component_with_amplitude_ms(
+        config,
+        time_seconds,
+        effective_respiratory_amplitude_ms,
+    )
     slow_wave = slow_wave_component_ms(config, time_seconds)
     innovation = standard_normal(config.root_seed, CORRELATED_STREAM, beat_index)
     next_correlated_state = correlated_state_update(

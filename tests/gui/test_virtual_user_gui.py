@@ -27,6 +27,14 @@ def click(qtbot, button) -> None:
     qtbot.mouseClick(button, Qt.MouseButton.LeftButton)
 
 
+def run_to_end(qtbot, window) -> None:
+    click(qtbot, window.run_to_end_button)
+    qtbot.waitUntil(
+        lambda: window.simulation.engine.clock.state is ClockState.COMPLETED,
+        timeout=5000,
+    )
+
+
 def test_stage_2_window_constructs_with_both_tabs_and_standard_settings(stage_2_gui) -> None:
     _controller, window = stage_2_gui
     panel = window.virtual_user_panel
@@ -125,7 +133,7 @@ def test_run_to_end_populates_rmssd_components_table_and_time_diagnostics(
 ) -> None:
     _controller, window = stage_2_gui
     panel = window.virtual_user_panel
-    click(qtbot, window.run_to_end_button)
+    run_to_end(qtbot, window)
     assert window.simulation.engine.clock.state is ClockState.COMPLETED
     assert window.time_label.text() == "00:03:00.000"
     assert panel.heartbeat_model.rowCount() == 211
@@ -143,7 +151,7 @@ def test_run_to_end_populates_rmssd_components_table_and_time_diagnostics(
 
 def test_reset_clears_charts_tables_logs_and_reproduces_series(stage_2_gui, qtbot) -> None:
     _controller, window = stage_2_gui
-    click(qtbot, window.run_to_end_button)
+    run_to_end(qtbot, window)
     first_digest = window.simulation.component.heartbeat_digest()
     click(qtbot, window.reset_button)
     panel = window.virtual_user_panel
@@ -151,13 +159,13 @@ def test_reset_clears_charts_tables_logs_and_reproduces_series(stage_2_gui, qtbo
     assert panel.chart.record_count == 0
     assert window.log_model.rowCount() == 0
     assert window.simulation.component.heartbeat_records() == ()
-    click(qtbot, window.run_to_end_button)
+    run_to_end(qtbot, window)
     assert window.simulation.component.heartbeat_digest() == first_digest
 
 
 def test_time_diagnostic_tab_remains_available_after_execution(stage_2_gui, qtbot) -> None:
     _controller, window = stage_2_gui
-    click(qtbot, window.run_to_end_button)
+    run_to_end(qtbot, window)
     window.tabs.setCurrentIndex(1)
     assert window.tabs.currentWidget() is window.time_diagnostics_tab
     assert window.timeline.current_time_us == 180_000_000

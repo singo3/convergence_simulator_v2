@@ -24,7 +24,9 @@ from symbiotic_sim_v2.garden.input_layer.component import GardenInputComponent
 from symbiotic_sim_v2.garden.input_layer.config import GardenInputConfig
 from symbiotic_sim_v2.garden.input_layer.scenario import (
     GardenInputScenario,
-    create_garden_input_simulation,
+    HeartbeatSourceComponent,
+    HeartbeatSourceFactory,
+    _create_garden_input_simulation,
 )
 from symbiotic_sim_v2.garden.output_layer.component import GardenOutputComponent
 from symbiotic_sim_v2.garden.output_layer.config import GardenOutputConfig
@@ -91,7 +93,7 @@ class ThreeDigitalLifeCompetitionSimulation:
 
     engine: SimulationEngine
     scenario: ThreeDigitalLifeCompetitionScenario
-    virtual_user_component: VirtualUserComponent
+    virtual_user_component: HeartbeatSourceComponent
     polar_h10_component: PolarH10Component
     garden_input_component: GardenInputComponent
     digital_life_components: Mapping[str, ConnectedDigitalLifeComponent]
@@ -105,7 +107,7 @@ class ThreeDigitalLifeCompetitionSimulation:
     garden_output_config: GardenOutputConfig
 
     @property
-    def component(self) -> VirtualUserComponent:
+    def component(self) -> HeartbeatSourceComponent:
         """Stage 2-compatible alias retained by the upstream GUI panel."""
 
         return self.virtual_user_component
@@ -154,6 +156,29 @@ def create_three_digital_life_competition_simulation(
 ) -> ThreeDigitalLifeCompetitionSimulation:
     """Wire three independent first/second rounds without central tau comparison."""
 
+    return _create_three_digital_life_competition_simulation(
+        virtual_user_config=virtual_user_config,
+        polar_h10_config=polar_h10_config,
+        garden_input_config=garden_input_config,
+        digital_life_configs=digital_life_configs,
+        runtime_config=runtime_config,
+        garden_output_config=garden_output_config,
+        heartbeat_source_factory=VirtualUserComponent,
+    )
+
+
+def _create_three_digital_life_competition_simulation(
+    *,
+    virtual_user_config: VirtualUserConfig | None = None,
+    polar_h10_config: PolarH10Config | None = None,
+    garden_input_config: GardenInputConfig | None = None,
+    digital_life_configs: Sequence[DigitalLifeConfig] | None = None,
+    runtime_config: MultiLifeRuntimeConfig | None = None,
+    garden_output_config: GardenOutputConfig | None = None,
+    heartbeat_source_factory: HeartbeatSourceFactory,
+) -> ThreeDigitalLifeCompetitionSimulation:
+    """Build Stage 5B over the injected Stage 4 heartbeat-source seam."""
+
     supplied_configs = (
         tuple(digital_life_configs)
         if digital_life_configs is not None
@@ -190,10 +215,11 @@ def create_three_digital_life_competition_simulation(
         configs_by_id[life_id] for life_id in selected_runtime_config.expected_digital_life_ids
     )
 
-    upstream = create_garden_input_simulation(
+    upstream = _create_garden_input_simulation(
         virtual_user_config=virtual_user_config,
         polar_h10_config=polar_h10_config,
         garden_input_config=garden_input_config,
+        heartbeat_source_factory=heartbeat_source_factory,
     )
     life_components = {
         config.digital_life_id: ConnectedDigitalLifeComponent(config)

@@ -93,3 +93,15 @@ Stage 6はこの範囲を `GardenQualifiedBEvent v2 -> LightCommandEvent -> Ligh
 v2.0が明示しないformal Hue 360のGUI描画用modulo、位相開始点、same-commandのphase reset、BPM/Hue変更時のphase継続、command保持、inactive黒、priority 66/67、event/schemaの具体形、GUI fps、20ms固定grid samplingは、それぞれversion管理した **simulation implementation assumption** である。QColor/sRGB preview、CSV、`LightStimulusSegment`、fixed-grid waveform sample、canonical digestは開発・監査用診断であり、校正済み物理光量またはStage 7へ配送するformal signalではない。
 
 Stage 6はcommand境界ごとに `light_stimulus_state_event_v1` を1件出力し、このeventだけを将来Stage 7の正式光入力境界とする。Stage 6自身はVirtualUserのHeartbeat/RRI、RMSSD、N/Nd/Wを光で変化させない。Stage 5Cの関係記憶探索も未実装である。
+
+## Stage 7の固定光応答仮想ユーザーとの境界
+
+v2.0が定める規範上のuser loopは、feedback deviceが刺激Iをユーザーへ提示し、ユーザーの次の生理入力がH10、Garden、Digital Lifeへ戻る責務境界である。Stage 7はこの境界を `LightStimulusStateEvent -> HeartbeatEvent -> H10 RRI -> Garden RMSSD/N` として接続する。正式な光入力はStage 6 deviceの `light_stimulus_state_event_v1` だけ、正式なユーザー出力は既存 `HeartbeatEvent` だけである。
+
+`stationary_hue_bpm_gaussian_preference_v0_1` の固定Hue/BPM特性、Gaussian幅、積によるmatch、`first_order_light_response_v0_1` の8秒onset/12秒recovery、平均RRI最大15ms増加、呼吸性RRI変動幅最大30ms増加、heartbeat開始時sampling、priority 40/67の因果policyは、v2.0が具体的な生理式として定めていない **simulation assumption** である。実データ未校正であり、医学的効果量を表さない。
+
+holder ID、source B、signal indexは物理projection・preference・physiologyから除外し、監査receiptのprovenanceだけに保持する。preferenceは1 run中固定で、moving preference、履歴依存、負反応を実装しない。Light receipt、response segment、responsive heartbeat record、100ms sample、GUI chart、CSV、digestは開発診断である。
+
+光responseが変更するのは将来のheartbeat intervalを生成する平均RRIと呼吸性成分だけである。H10は引き続きheartbeat正式時刻差からraw RRIを測定し、GardenがRRIからRMSSDとNを計算する。光からRMSSD、N、Nd、Wを直接変更しない。予約済みheartbeatをlight receipt時にrescheduleせず、Stage 2と同じroot seed、named random stream、beat-index keyを使用する。gain 0のcontrolはStage 6 formal streamを再現する。
+
+Stage 7はcandidate、`k_trial`、adoption、convergence、関係記憶探索を持たず、kを固定する。これらは次工程Stage 5Cの責務である。
