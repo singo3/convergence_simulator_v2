@@ -51,3 +51,15 @@ Ndはデジタル生命の状態、Wは情動系の値であり、Stage 4 Garden
 v2.0は、window境界をまたぐRRIをどのwindowへ所属させるかを明示していない。Stage 4の `measurement_end_time`、すなわち `RriMeasurementEvent.scheduled_time_us` を半開区間へ当てはめる方式は **simulation implementation assumption** である。詳細は [RRI window membership policy v0.1](rri-window-membership-policy_v0.1.md) に分離する。
 
 v2.0はbaseline評価が無効だった場合の再試行や後続bundleの扱いを固定していない。Stage 4の `keep_s_zero_and_skip_main_evaluations`、すなわち時間は240秒まで進めるがSを0に保ち、main evaluationをrejectedとしてNを更新しない方式も **simulation implementation assumption** である。これは生理・信号処理の規範値ではなく、別versionで交換可能な失敗時policyである。
+
+## Stage 5Aの単一Digital Life・第1周との境界
+
+Stage 5Aでv2.0から実装したのは、1体のデジタル生命がGardenの正式eventからN/Sを知覚し、第1周のNd、W、P、V、B、tauを計算する範囲だけである。N/S状態は `GardenInputSignalEvent`、評価の由来・quality・revisionは `GardenEvaluationFinalizedEvent` から受ける。Digital LifeはGardenのcomponent/state/record、VirtualUser/H10のcomponent/record、raw RRI、RMSSD、artifact内部値を参照しない。
+
+Stage 5Aは、session baseline相対のNd、Ndと別概念のW、`Phi_P`、N/q/EによるV、`Phi_B(k)`、P/Vによる論理到達値tau、有効評価revisionごとの更新を実装する。MVPではWの数値写像はNdと同じだが、責務、field、function、recordを分ける。baseline初期化時のW=0.5を `W_anchor_session` として保存しない。
+
+`life-red`、`life-green`、`life-blue` とrole別F範囲、240秒の単一生命scenario、標準green選択は再現性のための **simulation fixture** である。これらのIDをv2.0が規定する実在個体IDとみなさない。integer-microseconds schedulerへのhandler登録、GUIのrole selector、first-round/evaluation-update digestも実装上の選択である。
+
+`DigitalLifeFirstRoundRecord`、`DigitalLifeEvaluationUpdateRecord`、snapshot、GUI表示、headless JSON、CSVは **開発用診断** であり、Gardenや後続componentへ配送する規範signalではない。Stage 5AのDigital Lifeは正式外部出力eventを発行しない。tauは0〜1の論理値であり、microsecondsの配送予約ではない。
+
+G、Garden出力層、touch配送、第2周、3生命の資格競争、holder・勝者・順位決定、E/q/kのlive更新、関係記憶探索は未実装である。`G_status=not_connected` は `G=0` の代用値ではない。E/q更新のpure functionは後続Stageの参照用に単体実装されるが、Stage 5Aのlive componentには接続されない。

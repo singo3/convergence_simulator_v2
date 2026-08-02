@@ -24,5 +24,10 @@
 - artifact RRIをclipまたは補間せず、valid historyと評価RMSSDから除外する。discard/outside RRIは分類と履歴更新の対象にしても、評価windowのRMSSDへ使用しない。
 - rejected evaluationではN、session baseline、valid revisionを更新しない。
 - RRIの評価window所属policyをversion管理し、現在はmeasurement end timeによる半開区間 `measurement_end_time` を明示する。
+- Digital Lifeが入力とするのはGardenの正式な `GardenInputSignalEvent` と `GardenEvaluationFinalizedEvent` だけとし、Garden component・record・RMSSD/artifact内部値を参照しない。NとSは `GardenInputSignalEvent` からのみ知覚する。
+- Nからbaseline相対Ndを計算する状態系の責務と、NdからWを評価する情動系の責務を分ける。MVPで値が同じでも別field・別functionとする。
+- baseline初期化時のW=0.5を `W_anchor_session` として保存せず、同じ有効評価revisionを1秒signalごとに重複更新しない。
+- Stage 5AでGを0などの代替値として捏造せず `not_connected` とする。touch eventを配送せず、E、q、kをlive更新しない。
+- Stage 5AにGarden出力層、第2周、3生命資格競争、holder・勝者・順位決定、関係記憶探索を先回り実装しない。
 - Stageごとに独立commitを作り、push前にcompileall、全pytest、Ruff、headless、GUI smoke、digest回帰を検証する。
 - force push、force-with-lease、既存commitのamend/rebaseを行わない。

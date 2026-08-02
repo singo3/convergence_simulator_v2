@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "symbiotic-sim-v2"
-version = "0.4.0"
-description = "Deterministic virtual time, physiology, RRI, and Garden input simulator"
+version = "0.5.0"
+description = "Deterministic Garden N/S and single-Digital-Life first-round simulator"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [

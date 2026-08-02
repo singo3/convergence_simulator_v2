@@ -1,0 +1,712 @@
+{
+  "normative_source": {
+    "algorithm_version": "adaptive_random_search_confirmed_v1",
+    "document_version": "v2.0",
+    "profile_version": "symbiotic_signal_loop_reference_v1_0",
+    "sha256": "9707de5c07cbcb20603436b374f6a563b5d908206096f2a2204384ae91b22c73",
+    "size_bytes": 65759,
+    "state_schema_version": "relation_memory_state_v2"
+  },
+  "normative_vectors": {
+    "birth_phase": [
+      {
+        "digital_life_id": "life-red",
+        "expected": 1.2028150370395393e-07,
+        "expected_binary64_hex": "0x1.024d74ba15e49p-23",
+        "hash01": 0.12028150370395395,
+        "role": "red"
+      },
+      {
+        "digital_life_id": "life-green",
+        "expected": 4.1353168607465e-08,
+        "expected_binary64_hex": "0x1.6338945765bbdp-25",
+        "hash01": 0.041353168607465,
+        "role": "green"
+      },
+      {
+        "digital_life_id": "life-blue",
+        "expected": 7.72104874991789e-07,
+        "expected_binary64_hex": "0x1.9e8549369ba13p-21",
+        "hash01": 0.772104874991789,
+        "role": "blue"
+      }
+    ],
+    "clip01": [
+      {
+        "expected": 0.0,
+        "input": -0.25
+      },
+      {
+        "expected": 0.0,
+        "input": 0.0
+      },
+      {
+        "expected": 0.5,
+        "input": 0.5
+      },
+      {
+        "expected": 1.0,
+        "input": 1.0
+      },
+      {
+        "expected": 1.0,
+        "input": 1.25
+      }
+    ],
+    "e_update": {
+      "eta_e": 0.000902475465494823,
+      "rho_e": 0.0005851649222862187,
+      "vectors": [
+        {
+          "e": 0.0,
+          "expected": 0.000902475465494823,
+          "g": 1,
+          "name": "first_accumulation",
+          "s": 1
+        },
+        {
+          "e": 0.4,
+          "expected": 0.4005414852792969,
+          "g": 1,
+          "name": "accumulation",
+          "s": 1
+        },
+        {
+          "e": 0.4,
+          "expected": 0.3997659340310855,
+          "g": 1,
+          "name": "recovery",
+          "s": 0
+        },
+        {
+          "e": 0.4,
+          "expected": 0.3997659340310855,
+          "g": 0,
+          "name": "g_zero_recovery",
+          "s": 1
+        },
+        {
+          "e": 1.0,
+          "expected": 1.0,
+          "g": 1,
+          "name": "upper_endpoint",
+          "s": 1
+        },
+        {
+          "e": 0.0,
+          "expected": 0.0,
+          "g": 1,
+          "name": "lower_endpoint",
+          "s": 0
+        }
+      ]
+    },
+    "hash01": {
+      "denominator": 281474976710655,
+      "vectors": [
+        {
+          "denominator": 281474976710655,
+          "exact_decimal": "0.81385852943365511385753106898417946102266634575336831384485149018926309186202484",
+          "expected": 0.8138585294336551,
+          "expected_binary64_hex": "0x1.a0b210aef9f5ap-1",
+          "joined_text": "life-red:handle-distance",
+          "name": "red_handle_distance",
+          "numerator": 229080810618106,
+          "parts": [
+            "life-red",
+            "handle-distance"
+          ],
+          "prefix48_hex": "d05908577cfa",
+          "sha256_hex": "d05908577cfa520a098b6d24d35114ec31455585a8be3d160f0b50aa1d614775",
+          "utf8_hex": "6c6966652d7265643a68616e646c652d64697374616e6365"
+        },
+        {
+          "denominator": 281474976710655,
+          "exact_decimal": "0.12028150370395394575063968984077345197537255491742760459514342637847262247215375",
+          "expected": 0.12028150370395395,
+          "expected_binary64_hex": "0x1.ecac4c4b8e11fp-4",
+          "joined_text": "life-red:birth-phase",
+          "name": "red_birth_phase",
+          "numerator": 33856233453793,
+          "parts": [
+            "life-red",
+            "birth-phase"
+          ],
+          "prefix48_hex": "1ecac4c4b8e1",
+          "sha256_hex": "1ecac4c4b8e1434234df5bbb6d46922a7ca2befec8e1f892dd49d9735bd55867",
+          "utf8_hex": "6c6966652d7265643a62697274682d7068617365"
+        },
+        {
+          "denominator": 281474976710655,
+          "exact_decimal": "0.19462472806148836434917392597428555651335803945853979740135549484064867924180519",
+          "expected": 0.19462472806148837,
+          "expected_binary64_hex": "0x1.8e9768d022c99p-3",
+          "joined_text": "life-green:handle-distance",
+          "name": "green_handle_distance",
+          "numerator": 54781990798425,
+          "parts": [
+            "life-green",
+            "handle-distance"
+          ],
+          "prefix48_hex": "31d2ed1a0459",
+          "sha256_hex": "31d2ed1a04597ca98570410a185a1e1a2ceb354c363d876635a9b141d8ceb247",
+          "utf8_hex": "6c6966652d677265656e3a68616e646c652d64697374616e6365"
+        },
+        {
+          "denominator": 281474976710655,
+          "exact_decimal": "0.041353168607464998818445449533238965661928195199570488427536927995079549933620893",
+          "expected": 0.041353168607465,
+          "expected_binary64_hex": "0x1.52c3e15829415p-5",
+          "joined_text": "life-green:birth-phase",
+          "name": "green_birth_phase",
+          "numerator": 11639882170698,
+          "parts": [
+            "life-green",
+            "birth-phase"
+          ],
+          "prefix48_hex": "0a961f0ac14a",
+          "sha256_hex": "0a961f0ac14a63afd2bb8ddcaa04aac1e76de9ea0cef5ba8f93c2cb82db08efa",
+          "utf8_hex": "6c6966652d677265656e3a62697274682d7068617365"
+        },
+        {
+          "denominator": 281474976710655,
+          "exact_decimal": "0.61870645592078552506072213924968061150671605361357132834162660220772644104628387",
+          "expected": 0.6187064559207855,
+          "expected_binary64_hex": "0x1.3cc717b401f74p-1",
+          "joined_text": "life-blue:handle-distance",
+          "name": "blue_handle_distance",
+          "numerator": 174150385271035,
+          "parts": [
+            "life-blue",
+            "handle-distance"
+          ],
+          "prefix48_hex": "9e638bda00fb",
+          "sha256_hex": "9e638bda00fbda5108c5fb393111cb378e7aa1c866e89c54e888f8fd5ea5f2e7",
+          "utf8_hex": "6c6966652d626c75653a68616e646c652d64697374616e6365"
+        },
+        {
+          "denominator": 281474976710655,
+          "exact_decimal": "0.77210487499178900387475363156754282113649725098561708768319173265513087468908060",
+          "expected": 0.772104874991789,
+          "expected_binary64_hex": "0x1.8b51548658039p-1",
+          "joined_text": "life-blue:birth-phase",
+          "name": "blue_birth_phase",
+          "numerator": 217328201706497,
+          "parts": [
+            "life-blue",
+            "birth-phase"
+          ],
+          "prefix48_hex": "c5a8aa432c01",
+          "sha256_hex": "c5a8aa432c01ac27ac3662b3696979cd5640ad13c87ee9185f2e5a1c0e67a576",
+          "utf8_hex": "6c6966652d626c75653a62697274682d7068617365"
+        },
+        {
+          "denominator": 281474976710655,
+          "exact_decimal": "0.88206445873959140891592319488058008375899589943033077686571427851012879882218879",
+          "expected": 0.8820644587395914,
+          "expected_binary64_hex": "0x1.c39df3e6803fcp-1",
+          "joined_text": "生命:赤:距離",
+          "name": "unicode_colon_join",
+          "numerator": 248279072981023,
+          "parts": [
+            "生命",
+            "赤",
+            "距離"
+          ],
+          "prefix48_hex": "e1cef9f3401f",
+          "sha256_hex": "e1cef9f3401f29be96b940ac8b42239b578db3879d39034e1aa47f39b2eddfc9",
+          "utf8_hex": "e7949fe591bd3ae8b5a43ae8b79de99ba2"
+        }
+      ]
+    },
+    "nd": [
+      {
+        "delta_n": 0.1,
+        "expected": 1.0,
+        "n_baseline_session": 0.5,
+        "n_current": 0.6,
+        "name": "plus_0_10"
+      },
+      {
+        "delta_n": 0.1,
+        "expected": 0.75,
+        "n_baseline_session": 0.5,
+        "n_current": 0.55,
+        "name": "plus_0_05"
+      },
+      {
+        "delta_n": 0.1,
+        "expected": 0.5,
+        "n_baseline_session": 0.5,
+        "n_current": 0.5,
+        "name": "same_as_baseline"
+      },
+      {
+        "delta_n": 0.1,
+        "expected": 0.25,
+        "n_baseline_session": 0.5,
+        "n_current": 0.45,
+        "name": "minus_0_05"
+      },
+      {
+        "delta_n": 0.1,
+        "expected": 0.0,
+        "n_baseline_session": 0.5,
+        "n_current": 0.4,
+        "name": "minus_0_10"
+      },
+      {
+        "delta_n": 0.1,
+        "expected": 1.0,
+        "n_baseline_session": 0.5,
+        "n_current": 1.0,
+        "name": "upper_clip"
+      },
+      {
+        "delta_n": 0.1,
+        "expected": 0.0,
+        "n_baseline_session": 0.5,
+        "n_current": 0.0,
+        "name": "lower_clip"
+      }
+    ],
+    "p": [
+      {
+        "expected": 1.0,
+        "p_intrinsic": 0.5941575588300965,
+        "role": "red",
+        "s": 0
+      },
+      {
+        "expected": 0.5941575588300965,
+        "p_intrinsic": 0.5941575588300965,
+        "role": "red",
+        "s": 1
+      },
+      {
+        "expected": 1.0,
+        "p_intrinsic": 0.4083874184184465,
+        "role": "green",
+        "s": 0
+      },
+      {
+        "expected": 0.4083874184184465,
+        "p_intrinsic": 0.4083874184184465,
+        "role": "green",
+        "s": 1
+      },
+      {
+        "expected": 1.0,
+        "p_intrinsic": 0.5356119367762356,
+        "role": "blue",
+        "s": 0
+      },
+      {
+        "expected": 0.5356119367762356,
+        "p_intrinsic": 0.5356119367762356,
+        "role": "blue",
+        "s": 1
+      }
+    ],
+    "p_intrinsic": [
+      {
+        "digital_life_id": "life-red",
+        "expected": 0.5941575588300965,
+        "expected_binary64_hex": "0x1.30356b67b1634p-1",
+        "hash01": 0.8138585294336551,
+        "role": "red"
+      },
+      {
+        "digital_life_id": "life-green",
+        "expected": 0.4083874184184465,
+        "expected_binary64_hex": "0x1.a2304fb8d204ap-2",
+        "hash01": 0.19462472806148837,
+        "role": "green"
+      },
+      {
+        "digital_life_id": "life-blue",
+        "expected": 0.5356119367762356,
+        "expected_binary64_hex": "0x1.123bba4f9a309p-1",
+        "hash01": 0.6187064559207855,
+        "role": "blue"
+      }
+    ],
+    "phi_b": [
+      {
+        "a_fixed": 0.5,
+        "d_fixed": 0.5,
+        "expected": [
+          0.013888888888888888,
+          0.5,
+          0.5,
+          0.5
+        ],
+        "f_max": 0.027777777777777776,
+        "f_min": 0.0,
+        "k": [
+          0.5,
+          0.5,
+          0.5,
+          0.5
+        ],
+        "role": "red",
+        "t_max": 1.0,
+        "t_min": 0.0
+      },
+      {
+        "a_fixed": 0.5,
+        "d_fixed": 0.5,
+        "expected": [
+          0.3472222222222222,
+          0.5,
+          0.5,
+          0.5
+        ],
+        "f_max": 0.3611111111111111,
+        "f_min": 0.3333333333333333,
+        "k": [
+          0.5,
+          0.5,
+          0.5,
+          0.5
+        ],
+        "role": "green",
+        "t_max": 1.0,
+        "t_min": 0.0
+      },
+      {
+        "a_fixed": 0.5,
+        "d_fixed": 0.5,
+        "expected": [
+          0.6944444444444444,
+          0.5,
+          0.5,
+          0.5
+        ],
+        "f_max": 0.7083333333333334,
+        "f_min": 0.6805555555555556,
+        "k": [
+          0.5,
+          0.5,
+          0.5,
+          0.5
+        ],
+        "role": "blue",
+        "t_max": 1.0,
+        "t_min": 0.0
+      },
+      {
+        "a_fixed": 0.5,
+        "d_fixed": 0.5,
+        "expected": [
+          0.3611111111111111,
+          0.5,
+          0.0,
+          0.5
+        ],
+        "f_max": 0.3611111111111111,
+        "f_min": 0.3333333333333333,
+        "k": [
+          1.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "role": "green_custom_k",
+        "t_max": 1.0,
+        "t_min": 0.0
+      }
+    ],
+    "q_update": [
+      {
+        "expected": 0.6,
+        "g": 1,
+        "name": "positive_w",
+        "q": 0.5,
+        "w": 1.0
+      },
+      {
+        "expected": 0.5,
+        "g": 1,
+        "name": "neutral_w",
+        "q": 0.5,
+        "w": 0.5
+      },
+      {
+        "expected": 0.4,
+        "g": 1,
+        "name": "negative_w",
+        "q": 0.5,
+        "w": 0.0
+      },
+      {
+        "expected": 0.5,
+        "g": 0,
+        "name": "g_zero",
+        "q": 0.5,
+        "w": 1.0
+      },
+      {
+        "expected": 1.0,
+        "g": 1,
+        "name": "upper_endpoint",
+        "q": 1.0,
+        "w": 1.0
+      },
+      {
+        "expected": 0.0,
+        "g": 1,
+        "name": "lower_endpoint",
+        "q": 0.0,
+        "w": 0.0
+      }
+    ],
+    "tau": [
+      {
+        "birth_phase": 1e-07,
+        "epsilon_tau": 1e-06,
+        "expected": null,
+        "name": "s_zero",
+        "p": 0.5,
+        "s": 0,
+        "v": 0.25
+      },
+      {
+        "birth_phase": 1e-07,
+        "epsilon_tau": 1e-06,
+        "expected": 0.6666658777789629,
+        "name": "formula",
+        "p": 0.5,
+        "s": 1,
+        "v": 0.25
+      },
+      {
+        "birth_phase": 1e-06,
+        "epsilon_tau": 1e-06,
+        "expected": 1.0,
+        "name": "upper_clip",
+        "p": 1.0,
+        "s": 1,
+        "v": 0.0
+      },
+      {
+        "birth_phase": 0.0,
+        "epsilon_tau": 1e-06,
+        "expected": 0.499999000002,
+        "name": "lower_p",
+        "p": 0.25,
+        "s": 1,
+        "v": 0.25
+      },
+      {
+        "birth_phase": 0.0,
+        "epsilon_tau": 1e-06,
+        "expected": 0.7499992500007501,
+        "name": "higher_p",
+        "p": 0.75,
+        "s": 1,
+        "v": 0.25
+      },
+      {
+        "birth_phase": 0.0,
+        "epsilon_tau": 1e-06,
+        "expected": 0.39999968000025604,
+        "name": "higher_v",
+        "p": 0.5,
+        "s": 1,
+        "v": 0.75
+      }
+    ],
+    "v": [
+      {
+        "e": 0.0,
+        "expected": null,
+        "n_current": null,
+        "name": "unavailable_n",
+        "q": 0.5
+      },
+      {
+        "e": 0.0,
+        "expected": 0.35,
+        "n_current": 0.2,
+        "name": "stage_5a_holding_values",
+        "q": 0.5
+      },
+      {
+        "e": 0.2,
+        "expected": 0.27999999999999997,
+        "n_current": 0.2,
+        "name": "nonzero_e",
+        "q": 0.5
+      },
+      {
+        "e": 0.0,
+        "expected": 1.0,
+        "n_current": 1.0,
+        "name": "upper_endpoint",
+        "q": 1.0
+      }
+    ],
+    "w": [
+      {
+        "expected": 0.0,
+        "nd": 0.0
+      },
+      {
+        "expected": 0.25,
+        "nd": 0.25
+      },
+      {
+        "expected": 0.5,
+        "nd": 0.5
+      },
+      {
+        "expected": 0.75,
+        "nd": 0.75
+      },
+      {
+        "expected": 1.0,
+        "nd": 1.0
+      }
+    ],
+    "w_shape": [
+      {
+        "w": 0.0,
+        "w_minus": 1.0,
+        "w_plus": 0.0
+      },
+      {
+        "w": 0.225,
+        "w_minus": 0.5,
+        "w_plus": 0.0
+      },
+      {
+        "w": 0.45,
+        "w_minus": 0.0,
+        "w_plus": 0.0
+      },
+      {
+        "w": 0.5,
+        "w_minus": 0.0,
+        "w_plus": 0.0
+      },
+      {
+        "w": 0.55,
+        "w_minus": 0.0,
+        "w_plus": 0.0
+      },
+      {
+        "w": 0.775,
+        "w_minus": 0.0,
+        "w_plus": 0.49999999999999994
+      },
+      {
+        "w": 1.0,
+        "w_minus": 0.0,
+        "w_plus": 0.9999999999999999
+      }
+    ]
+  },
+  "schema_version": "stage_05a_reference_vectors_v1",
+  "simulation_fixture_vectors": {
+    "fixture_scope": "life IDs and Stage 4 deterministic N values are simulation fixtures, not v2.0 normative constants",
+    "life_presets": {
+      "blue": {
+        "digital_life_id": "life-blue",
+        "f_max": 0.7083333333333334,
+        "f_min": 0.6805555555555556,
+        "role": "blue"
+      },
+      "green": {
+        "digital_life_id": "life-green",
+        "f_max": 0.3611111111111111,
+        "f_min": 0.3333333333333333,
+        "role": "green"
+      },
+      "red": {
+        "digital_life_id": "life-red",
+        "f_max": 0.027777777777777776,
+        "f_min": 0.0,
+        "role": "red"
+      }
+    },
+    "stage4_csv_byte_regression": {
+      "evaluation": {
+        "sha256": "e54567bf2257bdf90856b9e8acce5b389e005cdc4ef729b3b71f99a9f9d19865",
+        "size_bytes": 755
+      },
+      "rri": {
+        "sha256": "7caa4953887d3dee9b9dbb1ad8ae992a0f5c12ac190cdac24ba1d022985618fc",
+        "size_bytes": 55216
+      },
+      "signal": {
+        "sha256": "b694fd74137540e7b6a90563c5a8f5cfa95dc6595ccaaf61220bb03701b7bd17",
+        "size_bytes": 28376
+      }
+    },
+    "stage4_standard_n": [
+      0.1641195720593294,
+      0.17783395762886722,
+      0.16342965068696474,
+      0.17184501115930495
+    ],
+    "stage5a_green_evaluation_boundaries": [
+      {
+        "e": 0.0,
+        "n_baseline_session": 0.1641195720593294,
+        "n_current": 0.1641195720593294,
+        "nd": 0.5,
+        "p": 0.4083874184184465,
+        "q": 0.5,
+        "revision": 1,
+        "s": 1,
+        "tau": 0.5515408729267095,
+        "time_us": 60000000,
+        "v": 0.3320597860296647,
+        "w": 0.5
+      },
+      {
+        "e": 0.0,
+        "n_baseline_session": 0.1641195720593294,
+        "n_current": 0.17783395762886722,
+        "nd": 0.5685719278476892,
+        "p": 0.4083874184184465,
+        "q": 0.5,
+        "revision": 2,
+        "s": 1,
+        "tau": 0.546479994436101,
+        "time_us": 120000000,
+        "v": 0.3389169788144336,
+        "w": 0.5685719278476892
+      },
+      {
+        "e": 0.0,
+        "n_baseline_session": 0.1641195720593294,
+        "n_current": 0.16342965068696474,
+        "nd": 0.4965503931381767,
+        "p": 0.4083874184184465,
+        "q": 0.5,
+        "revision": 3,
+        "s": 1,
+        "tau": 0.5517979450383652,
+        "time_us": 180000000,
+        "v": 0.3317148253434824,
+        "w": 0.4965503931381767
+      },
+      {
+        "e": 0.0,
+        "n_baseline_session": 0.1641195720593294,
+        "n_current": 0.17184501115930495,
+        "nd": 0.5386271954998778,
+        "p": 1.0,
+        "q": 0.5,
+        "revision": 4,
+        "s": 0,
+        "tau": null,
+        "time_us": 240000000,
+        "v": 0.3359225055796525,
+        "w": 0.5386271954998778
+      }
+    ]
+  }
+}
