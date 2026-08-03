@@ -123,3 +123,19 @@ Coreの係数、Hash key、strict `<` / `>`、A/D固定、F/Tのみの連続探�
 Stage 5Cの`AdaptiveConnectedDigitalLifeComponent`、immutable record/schema、JSON/CSV/digest、off-center診断fixture、GUIのF/T最適点、方向norm threshold、state-machineの監査語彙は開発・検証用の具体実装である。診断上の仮想ユーザー最適kをDigital Life Coreへ渡さず、RuntimeとGardenはcandidateを生成・選択しない。
 
 strict persistent-state I/OはStage 8が初期値と正常final stateを受け渡すためのseamである。Stage 5Cが実行するのは単一の240秒sessionだけであり、複数sessionの自動連結、baseline再取得lifecycle、session間W比較、長期収束・sustained convergence判定、Monte Carlo、係数tuningは未実装・未評価である。
+
+## Stage 8Aの固定好み・複数セッション収束診断との境界
+
+Stage 8Aがv2.0から引き継ぐ規範範囲は、第20.6節、第25.4節、第25.18節、第27章にあるsession間state lifecycleである。正常な240秒closingの後だけ`k_anchor`、`q`、user_garden scopeの`E`、`trial_count`、`session_count`とversion metadataを次sessionへ渡す。各sessionでは`N_baseline_session`を再取得し、N/Nd/W、`W_anchor_session`、`k_trial`、trial評価、adaptation phase、exploration decision、資格holder、light/responseのsession-local stateをresetする。異なるbaselineで得たWを直接比較しない。追加のinter-session gapや日単位E回復は導入せず、新session冒頭の既存S=0期間で既存E回復式だけを適用する。
+
+次はv2.0規範ではなく、Stage 8Aでversion管理する **simulation diagnostic assumption** である。
+
+- fixed single/multi-peak stationary preference landscapeと6つのdiagnostic preset
+- master seed、user type ID、session indexのSHA-256先頭unsigned 32-bitによるsession physiology seed
+- 完了sessionを独立票とし、同じ生命かつ近いHue/BPMの直近4有効session中3sessionを初期収束条件とするrolling majority
+- 全pairwise距離を満たすbounded subset探索、cluster medoid、outlier/loss/reconvergence監視
+- observed convergenceとhidden landscape truth alignmentの分離
+
+1session内の3Bundleは同じ資格holderを共有するため、一次収束の独立票にはしない。session代表patternはclosing後に正式保存されたholderの`k_anchor`から算出し、trial中の一時光は監査だけへ残す。convergence evaluatorとtruth diagnosticはDigital Life、Runtime、Garden、candidate、holder、k、q、E、`p_explore`、sigma、session停止条件へ値を返さない。収束後も現行v2.0の探索をmaximum sessionsまで継続する。
+
+user preferenceはrun中に完全固定する。moving preference、時間・気温・疲労依存、context別anchorはStage 8Bまで未実装である。v2.0の探索係数は変更せず、係数tuningとMonte CarloもStage 8Aでは実装しない。固定preset、heatmap、truth classification、CSV、GUI chart、digestはsimulation-only診断であり、隠れたpeakを探索入力へ用いない。

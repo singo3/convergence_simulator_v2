@@ -1,4 +1,4 @@
-"""Command entry point for Stage 1-7.1 compatibility and the Stage 5C app."""
+"""Command entry point for Stage 1-7.1/5C compatibility and the Stage 8A app."""
 
 from __future__ import annotations
 
@@ -166,11 +166,26 @@ STAGE_5A_HEADLESS_PROJECT_VERSION = "0.5.0"
 STAGE_5B1_HEADLESS_PROJECT_VERSION = "0.6.1"
 STAGE_6_HEADLESS_PROJECT_VERSION = "0.7.0"
 STAGE_7_1_HEADLESS_PROJECT_VERSION = "0.8.1"
+STAGE_5C_HEADLESS_PROJECT_VERSION = "0.9.0"
 DEFAULT_RELATION_MEMORY_PRESET = "off_center_green"
+STATIONARY_USER_TYPE_IDS = (
+    "green_broad_strong",
+    "green_narrow_moderate",
+    "red_broad_moderate",
+    "blue_broad_weak",
+    "red_blue_dual_peak",
+    "flat_control",
+)
+SESSION_SEED_POLICIES = (
+    "deterministic_per_session_physiology_seed_v0_1",
+    "repeat_same_physiology_seed_v0_1",
+)
 
 
 def _build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Symbiotic simulator Stage 5C")
+    parser = argparse.ArgumentParser(
+        description="Symbiotic simulator Stage 8A (Stage 1–7 compatibility retained)"
+    )
     headless_group = parser.add_mutually_exclusive_group()
     headless_group.add_argument(
         "--headless-demo",
@@ -225,6 +240,11 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="run the Stage 5C confirmed relation-memory closed loop",
     )
+    headless_group.add_argument(
+        "--headless-multi-session-convergence-demo",
+        action="store_true",
+        help="run the Stage 8A fixed-preference multi-session convergence lab",
+    )
     parser.add_argument(
         "--life-role",
         choices=("red", "green", "blue"),
@@ -264,9 +284,13 @@ def _build_parser() -> argparse.ArgumentParser:
             "stage-05c-relation-memory-overview",
             "stage-05c-k-ft-search-and-thresholds",
             "stage-05c-transition-and-persistent-state",
+            "stage-08a-multi-session-convergence-overview",
+            "stage-08a-holder-pattern-trajectory",
+            "stage-08a-stationary-user-types",
+            "stage-08a-convergence-truth-comparison",
         ),
         default="window",
-        help="capture the selected Stage 5A/5B/5C/6/7 diagnostic view",
+        help="capture the selected Stage 5A–8A diagnostic view",
     )
     parser.add_argument(
         "--export-virtual-user-csv",
@@ -327,6 +351,80 @@ def _build_parser() -> argparse.ArgumentParser:
         "--export-relation-memory-csv",
         type=Path,
         help="write the five Stage 5C relation-memory CSV files to a directory",
+    )
+    parser.add_argument(
+        "--stationary-user-type",
+        choices=STATIONARY_USER_TYPE_IDS,
+        default="green_narrow_moderate",
+        help="select the fixed Stage 8A virtual-user profile",
+    )
+    parser.add_argument(
+        "--maximum-sessions",
+        type=int,
+        default=24,
+        help="maximum independent Stage 8A sessions",
+    )
+    parser.add_argument(
+        "--convergence-window",
+        type=int,
+        default=4,
+        help="number of recent valid sessions in the rolling window",
+    )
+    parser.add_argument(
+        "--convergence-required",
+        type=int,
+        default=3,
+        help="minimum complete-link cluster support required for convergence",
+    )
+    parser.add_argument(
+        "--hue-tolerance-degree",
+        type=float,
+        default=2.0,
+        help="Hue radius used to normalize the diagnostic pattern distance",
+    )
+    parser.add_argument(
+        "--blink-bpm-tolerance",
+        type=float,
+        default=20.0,
+        help="blink-BPM radius used to normalize diagnostic pattern distance",
+    )
+    parser.add_argument(
+        "--truth-response-gap-threshold",
+        type=float,
+        default=0.05,
+        help="simulation-only correct/suboptimal diagnostic threshold",
+    )
+    parser.add_argument(
+        "--master-seed",
+        type=int,
+        default=20260802,
+        help="unsigned 32-bit Stage 8A session-seed master value",
+    )
+    parser.add_argument(
+        "--session-seed-policy",
+        choices=SESSION_SEED_POLICIES,
+        default="deterministic_per_session_physiology_seed_v0_1",
+        help="select deterministic per-session or repeat physiology noise",
+    )
+    parser.add_argument(
+        "--initial-multi-session-state-json",
+        type=Path,
+        help="resume a strict Stage 8A multi-session state JSON document",
+    )
+    parser.add_argument(
+        "--export-final-multi-session-state-json",
+        type=Path,
+        help="write the final strict Stage 8A multi-session state JSON",
+    )
+    parser.add_argument(
+        "--export-multi-session-csv",
+        type=Path,
+        help="write all six Stage 8A diagnostic CSV files to a directory",
+    )
+    parser.add_argument(
+        "--compare-all-stationary-user-types",
+        action="store_true",
+        help="also run all six fixed profiles independently under one config",
     )
     return parser
 
@@ -1110,7 +1208,7 @@ def run_headless_relation_memory_demo(
 
     responsive_user = simulation.light_responsive_virtual_user_component
     result = {
-        "project_version": __version__,
+        "project_version": STAGE_5C_HEADLESS_PROJECT_VERSION,
         "document_version": DOCUMENT_VERSION,
         "profile_version": PROFILE_VERSION,
         "algorithm_version": ALGORITHM_VERSION,
@@ -1210,6 +1308,255 @@ def run_headless_relation_memory_demo(
             "adaptive_signals": str(csv_paths[2]),
             "persistent_states": str(csv_paths[3]),
             "session_summary": str(csv_paths[4]),
+        }
+    print(json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True))
+    return 0
+
+
+def run_headless_multi_session_convergence_demo(
+    *,
+    stationary_user_type: str = "green_narrow_moderate",
+    maximum_sessions: int = 24,
+    convergence_window: int = 4,
+    convergence_required: int = 3,
+    hue_tolerance_degree: float = 2.0,
+    blink_bpm_tolerance: float = 20.0,
+    truth_response_gap_threshold: float = 0.05,
+    master_seed: int = 20260802,
+    session_seed_policy: str = (
+        "deterministic_per_session_physiology_seed_v0_1"
+    ),
+    initial_state_json: Path | None = None,
+    export_final_state_json: Path | None = None,
+    export_csv: Path | None = None,
+    compare_all_stationary_user_types: bool = False,
+) -> int:
+    """Run Stage 8A without Qt and emit one canonical diagnostic projection."""
+
+    from symbiotic_sim_v2.convergence import RollingConvergenceConfig
+    from symbiotic_sim_v2.runtime.multi_session import (
+        MultiSessionRelationMemoryRunner,
+        MultiSessionRunnerConfig,
+        compare_stationary_user_types,
+        convergence_history_digest,
+        export_multi_session_diagnostics,
+        export_multi_session_state_file,
+        final_multi_session_state_digest,
+        load_multi_session_state_file,
+        session_outcome_digest,
+        stationary_user_type_digest,
+        user_type_comparison_digest,
+    )
+    from symbiotic_sim_v2.virtual_user.stationary_landscape import (
+        STATIONARY_PREFERENCE_LANDSCAPE_VERSION,
+    )
+
+    resume_state = None
+    default_life_ids = tuple(
+        digital_life_config_for_role(role).digital_life_id
+        for role in ("red", "green", "blue")
+    )
+    if initial_state_json is not None:
+        resume_state = load_multi_session_state_file(
+            initial_state_json,
+            expected_digital_life_ids=default_life_ids,
+        )
+    if resume_state is None:
+        convergence_config = RollingConvergenceConfig(
+            window_sessions=convergence_window,
+            required_sessions=convergence_required,
+            hue_tolerance_degree=hue_tolerance_degree,
+            blink_bpm_tolerance=blink_bpm_tolerance,
+            truth_response_gap_threshold=truth_response_gap_threshold,
+            maximum_sessions=maximum_sessions,
+        )
+        runner_config = MultiSessionRunnerConfig(
+            user_type_id=stationary_user_type,
+            master_seed=master_seed,
+            session_seed_policy=session_seed_policy,
+            convergence_config=convergence_config,
+        )
+        runner = MultiSessionRelationMemoryRunner(runner_config)
+    else:
+        # A strict resume file is authoritative for every run-setting field.
+        # Parser defaults must never make a valid non-default state unresumable.
+        runner = MultiSessionRelationMemoryRunner(resume_state=resume_state)
+        runner_config = runner.config
+    initial_states = relation_memory_state_map_to_dict(
+        runner.initial_persistent_state_by_life(),
+        expected_digital_life_ids=runner.digital_life_ids,
+    )
+    state = runner.run_all()
+    outcomes = state.session_outcomes
+    convergence_records = state.convergence_records
+    truth_records = runner.truth_alignment_records()
+    latest = convergence_records[-1] if convergence_records else None
+    latest_truth = truth_records[-1] if truth_records else None
+
+    comparison = (
+        compare_stationary_user_types(runner_config)
+        if compare_all_stationary_user_types
+        else None
+    )
+    if export_final_state_json is not None:
+        export_multi_session_state_file(export_final_state_json, state)
+    csv_paths = None
+    if export_csv is not None:
+        csv_paths = export_multi_session_diagnostics(
+            export_csv,
+            state,
+            truth_records,
+            comparison=comparison,
+        )
+
+    holder_count_by_life = {
+        life_id: sum(outcome.holder_id == life_id for outcome in outcomes)
+        for life_id in runner.digital_life_ids
+    }
+    explore_count = sum(
+        outcome.exploration_decision == "explore" for outcome in outcomes
+    )
+    hold_count = sum(
+        outcome.exploration_decision == "hold" for outcome in outcomes
+    )
+    candidate_count = sum(outcome.candidate_generated for outcome in outcomes)
+    accepted_count = sum(outcome.candidate_accepted for outcome in outcomes)
+    total_after = (
+        0
+        if latest is None
+        else latest.post_convergence_cluster_member_count
+        + latest.post_convergence_outlier_count
+    )
+    post_outliers = (
+        0 if latest is None else latest.post_convergence_outlier_count
+    )
+    normative_tuple = {
+        "document_version": DOCUMENT_VERSION,
+        "profile_version": PROFILE_VERSION,
+        "algorithm_version": ALGORITHM_VERSION,
+        "state_schema_version": STATE_SCHEMA_VERSION,
+    }
+    result = {
+        "project_version": __version__,
+        **normative_tuple,
+        "normative_version_tuple": normative_tuple,
+        "runner_version": runner.config.runner_version,
+        "stationary_landscape_version": STATIONARY_PREFERENCE_LANDSCAPE_VERSION,
+        "user_type_profile": runner.user_type_profile.to_dict(),
+        "stationary_user_type_profile": runner.user_type_profile.to_dict(),
+        "convergence_config": runner.config.convergence_config.to_dict(),
+        "seed_policy": runner.config.session_seed_policy,
+        "master_seed": runner.config.master_seed,
+        "maximum_sessions": runner.config.maximum_sessions,
+        "completed_sessions": state.completed_session_count,
+        "valid_sessions": state.valid_session_count,
+        "invalid_sessions": len(outcomes) - state.valid_session_count,
+        "first_convergence_session_index": (
+            state.first_convergence_session_index
+        ),
+        "current_convergence_state": state.current_convergence_state,
+        "currently_converged": (
+            False if latest is None else latest.currently_converged
+        ),
+        "dominant_holder_id": None if latest is None else latest.holder_id,
+        "cluster_support": 0 if latest is None else latest.support_count,
+        "window_size": 0 if latest is None else latest.window_size,
+        "cluster_member_session_indices": (
+            [] if latest is None else list(latest.member_session_indices)
+        ),
+        "outlier_session_indices": (
+            [] if latest is None else list(latest.outlier_session_indices)
+        ),
+        "medoid_hue_degree": (
+            None if latest is None else latest.medoid_hue_degree
+        ),
+        "medoid_blink_bpm": (
+            None if latest is None else latest.medoid_blink_bpm
+        ),
+        "truth_classification": (
+            "not_converged"
+            if latest_truth is None
+            else latest_truth.truth_classification
+        ),
+        "preference_match_at_medoid": (
+            None
+            if latest_truth is None
+            else latest_truth.preference_match_at_medoid
+        ),
+        "global_maximum_match": (
+            None
+            if latest_truth is None
+            else latest_truth.global_maximum_preference_match
+        ),
+        "response_gap": (
+            None if latest_truth is None else latest_truth.response_gap
+        ),
+        "nearest_peak_id": (
+            None if latest_truth is None else latest_truth.nearest_peak_id
+        ),
+        "convergence_loss_count": (
+            0 if latest is None else latest.convergence_lost_count
+        ),
+        "reconvergence_count": (
+            0 if latest is None else latest.reconvergence_count
+        ),
+        "dominant_cluster_switch_count": (
+            0 if latest is None else latest.dominant_cluster_switch_count
+        ),
+        "post_convergence_outlier_count": post_outliers,
+        "post_convergence_outlier_rate": (
+            0.0 if total_after == 0 else post_outliers / total_after
+        ),
+        "holder_count_by_life": holder_count_by_life,
+        "explore_count": explore_count,
+        "hold_count": hold_count,
+        "candidate_count": candidate_count,
+        "accepted_count": accepted_count,
+        "rejected_count": candidate_count - accepted_count,
+        "initial_persistent_state": initial_states,
+        "final_persistent_state": relation_memory_state_map_to_dict(
+            state.current_persistent_state_by_life,
+            expected_digital_life_ids=runner.digital_life_ids,
+        ),
+        "session_outcomes": [outcome.to_dict() for outcome in outcomes],
+        "convergence_history": [
+            record.to_dict() for record in convergence_records
+        ],
+        "truth_alignment_history": [record.to_dict() for record in truth_records],
+        "stationary_user_type_digest": stationary_user_type_digest(
+            (runner.user_type_profile,)
+        ),
+        "session_outcome_digest": session_outcome_digest(outcomes),
+        "convergence_history_digest": convergence_history_digest(
+            convergence_records
+        ),
+        "final_multi_session_state_digest": final_multi_session_state_digest(
+            state
+        ),
+        "comparison_digest": (
+            None
+            if comparison is None
+            else user_type_comparison_digest(comparison)
+        ),
+        "per_session_full_event_digests": {
+            str(outcome.session_index): outcome.session_digest
+            for outcome in outcomes
+        },
+        "stationary_preference": True,
+        "moving_preference": False,
+        "convergence_is_diagnostic_only": True,
+        "exploration_continues_after_convergence": True,
+        "v2_coefficients_modified": False,
+        "multi_session": True,
+        "Monte_Carlo": False,
+    }
+    if comparison is not None:
+        result["user_type_comparison"] = comparison.to_dict()
+    if export_final_state_json is not None:
+        result["final_multi_session_state_json"] = str(export_final_state_json)
+    if csv_paths is not None:
+        result["diagnostic_csvs"] = {
+            path.name: str(path) for path in csv_paths
         }
     print(json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True))
     return 0
@@ -1427,7 +1774,6 @@ def run_stage6_gui(
 
     smoke_failures: list[str] = []
     if smoke_test:
-
         def finish_smoke_run() -> None:
             # The button below exercises the normal bounded GUI path. Finish the
             # same production engine synchronously so dense offscreen chart draws
@@ -1685,7 +2031,7 @@ def run_stage6_gui(
     return 1 if smoke_failures else exit_code
 
 
-def run_gui(
+def run_stage5c_gui(
     *,
     smoke_test: bool,
     auto_close_ms: int,
@@ -1693,7 +2039,7 @@ def run_gui(
     screenshot_target: str = "window",
     preset_name: str = DEFAULT_RELATION_MEMORY_PRESET,
 ) -> int:
-    """Start the Stage 5C nine-tab confirmed relation-memory GUI."""
+    """Start the retained Stage 5C nine-tab confirmed relation-memory GUI."""
 
     if auto_close_ms <= 0:
         raise ValueError("--auto-close-ms must be positive")
@@ -1984,6 +2330,301 @@ def run_gui(
     return 1 if smoke_failures else exit_code
 
 
+def run_gui(
+    *,
+    smoke_test: bool,
+    auto_close_ms: int,
+    screenshot: Path | None,
+    screenshot_target: str = "window",
+    stationary_user_type: str = "green_narrow_moderate",
+    maximum_sessions: int = 24,
+    convergence_window: int = 4,
+    convergence_required: int = 3,
+    hue_tolerance_degree: float = 2.0,
+    blink_bpm_tolerance: float = 20.0,
+    truth_response_gap_threshold: float = 0.05,
+    master_seed: int = 20260802,
+    session_seed_policy: str = (
+        "deterministic_per_session_physiology_seed_v0_1"
+    ),
+) -> int:
+    """Start the Stage 8A eleven-tab fixed-preference convergence lab."""
+
+    if auto_close_ms <= 0:
+        raise ValueError("--auto-close-ms must be positive")
+    if os.environ.get("LC_ALL", "") in {"", "C", "C.UTF-8", "POSIX"}:
+        os.environ["LC_ALL"] = "en_US.UTF-8"
+    if os.environ.get("LANG", "") in {"", "C", "C.UTF-8", "POSIX"}:
+        os.environ["LANG"] = "en_US.UTF-8"
+
+    from PySide6.QtCore import QTimer
+    from PySide6.QtGui import QFont, QFontDatabase
+    from PySide6.QtWidgets import QApplication
+
+    from symbiotic_sim_v2.convergence import RollingConvergenceConfig
+    from symbiotic_sim_v2.gui.controller import SimulationController
+    from symbiotic_sim_v2.gui.multi_session_convergence_window import (
+        TAB_TITLES,
+        MultiSessionConvergenceMainWindow,
+        create_stage8a_preview_simulation,
+    )
+    from symbiotic_sim_v2.runtime.multi_session import (
+        MultiSessionRelationMemoryRunner,
+        MultiSessionRunnerConfig,
+        compare_stationary_user_types,
+    )
+
+    if smoke_test:
+        # The smoke contract exercises both incremental and batch paths inside
+        # 12 seconds; production defaults remain 24 sessions.
+        maximum_sessions = 4
+        convergence_window = 4
+        convergence_required = 3
+    convergence_config = RollingConvergenceConfig(
+        window_sessions=convergence_window,
+        required_sessions=convergence_required,
+        hue_tolerance_degree=hue_tolerance_degree,
+        blink_bpm_tolerance=blink_bpm_tolerance,
+        truth_response_gap_threshold=truth_response_gap_threshold,
+        maximum_sessions=maximum_sessions,
+    )
+    runner = MultiSessionRelationMemoryRunner(
+        MultiSessionRunnerConfig(
+            user_type_id=stationary_user_type,
+            master_seed=master_seed,
+            session_seed_policy=session_seed_policy,
+            convergence_config=convergence_config,
+        )
+    )
+    preview = create_stage8a_preview_simulation(runner)
+
+    app = QApplication.instance() or QApplication(sys.argv[:1])
+    available_fonts = set(QFontDatabase.families())
+    for family in (".AppleSystemUIFont", "Noto Sans", "DejaVu Sans", "Arial"):
+        if family in available_fonts:
+            app.setFont(QFont(family))
+            break
+    controller = SimulationController(preview.engine)
+    window = MultiSessionConvergenceMainWindow(
+        controller,
+        preview,
+        runner,
+    )
+    app.aboutToQuit.connect(controller.shutdown)
+    window.show()
+
+    smoke_failures: list[str] = []
+    if smoke_test:
+        canonical_smoke = (
+            stationary_user_type == "green_narrow_moderate"
+            and master_seed == 20_260_802
+            and session_seed_policy
+            == "deterministic_per_session_physiology_seed_v0_1"
+            and hue_tolerance_degree == 2.0
+            and blink_bpm_tolerance == 20.0
+            and truth_response_gap_threshold == 0.05
+        )
+
+        def smoke_workflow() -> None:
+            try:
+                # Incremental execution and handoff: one session through the
+                # window, then three through the same runner with one final GUI
+                # rebind to keep this offscreen check bounded.
+                window._run_one_session()
+                first_outcome = window.runner.session_outcomes()[0]
+                while window.runner.can_run_next_session:
+                    window.runner.run_next_session()
+                latest_simulation = window.runner.current_simulation
+                if latest_simulation is not None:
+                    window._install_session_simulation(latest_simulation)
+                window._refresh_aggregate_views()
+                first_pass = window.runner.state()
+
+                if first_pass.completed_session_count != 4:
+                    smoke_failures.append(
+                        f"incremental completed={first_pass.completed_session_count}"
+                    )
+                if first_pass.valid_session_count != 4:
+                    smoke_failures.append(
+                        f"incremental valid={first_pass.valid_session_count}"
+                    )
+                if first_outcome.session_count_before_by_life != {
+                    life_id: 0 for life_id in window.runner.digital_life_ids
+                }:
+                    smoke_failures.append("session 0 persistent-state boundary")
+                if any(
+                    outcome.baseline_evaluation is None
+                    or not outcome.baseline_evaluation.is_valid
+                    or outcome.holder_W_anchor_session is None
+                    for outcome in first_pass.session_outcomes
+                ):
+                    smoke_failures.append("per-session baseline/W anchor")
+                if (
+                    session_seed_policy == "repeat_same_physiology_seed_v0_1"
+                    and len(
+                        {
+                            outcome.physiology_root_seed
+                            for outcome in first_pass.session_outcomes
+                        }
+                    )
+                    != 1
+                ):
+                    smoke_failures.append("repeat seed policy")
+
+                # Reset and batch execution must reconstruct the same run.
+                first_digests = tuple(
+                    outcome.session_digest for outcome in first_pass.session_outcomes
+                )
+                window._reset_multi_session_run()
+                batch_state = window.runner.run_all()
+                batch_simulation = window.runner.current_simulation
+                if batch_simulation is not None:
+                    window._install_session_simulation(batch_simulation)
+                window._refresh_aggregate_views()
+                if tuple(
+                    outcome.session_digest for outcome in batch_state.session_outcomes
+                ) != first_digests:
+                    smoke_failures.append("incremental/batch digests")
+
+                window._comparison = compare_stationary_user_types(
+                    window.runner.config
+                )
+                window.multi_session_panel.set_comparison_records(
+                    window._comparison.rows
+                )
+                for index in range(window.tabs.count()):
+                    window.tabs.setCurrentIndex(index)
+                    app.processEvents()
+
+                actual_tabs = tuple(
+                    window.tabs.tabText(index)
+                    for index in range(window.tabs.count())
+                )
+                if actual_tabs != TAB_TITLES:
+                    smoke_failures.append(f"tabs={actual_tabs!r}")
+                if window.multi_session_panel.session_history_model.rowCount() != 4:
+                    smoke_failures.append("session history rows")
+                if window.multi_session_panel.convergence_history_model.rowCount() != 4:
+                    smoke_failures.append("convergence history rows")
+                if window.multi_session_panel.comparison_model.rowCount() != 6:
+                    smoke_failures.append("type comparison rows")
+                if window.multi_session_panel.chart.session_count != 4:
+                    smoke_failures.append("multi-session charts")
+                if window.relation_memory_panel.transition_model.rowCount() != 12:
+                    smoke_failures.append("retained Stage 5C diagnostics")
+                if window.light_output_panel.preview_checkbox.isChecked():
+                    smoke_failures.append("real-light preview unexpectedly enabled")
+                latest = batch_state.convergence_records[-1]
+                truth_records = window.runner.truth_alignment_records()
+                if len(truth_records) != len(batch_state.session_outcomes):
+                    smoke_failures.append("truth/session alignment")
+                if canonical_smoke:
+                    if (
+                        latest.support_count != 3
+                        or latest.member_session_indices != (0, 1, 3)
+                        or latest.outlier_session_indices != (2,)
+                        or not latest.currently_converged
+                    ):
+                        smoke_failures.append("canonical 3/4 convergence")
+                    if truth_records[-1].truth_classification != "stable_suboptimal":
+                        smoke_failures.append("truth alignment")
+            except Exception as exc:  # pragma: no cover - smoke failure path
+                smoke_failures.append(f"exception={type(exc).__name__}:{exc}")
+            if smoke_failures:
+                print(
+                    "GUI smoke failed: " + "; ".join(smoke_failures),
+                    file=sys.stderr,
+                )
+                app.quit()
+
+        QTimer.singleShot(50, smoke_workflow)
+        QTimer.singleShot(auto_close_ms, app.quit)
+
+    if screenshot is not None:
+        screenshot.parent.mkdir(parents=True, exist_ok=True)
+
+        def save_screenshot() -> None:
+            multi = window.multi_session_panel
+            stationary = window.stationary_user_type_panel
+            targets = {
+                "window": window,
+                "stage-08a-multi-session-convergence-overview": window,
+                "stage-08a-holder-pattern-trajectory": multi.chart,
+                "stage-08a-stationary-user-types": stationary.diagnostics_content,
+                "stage-08a-convergence-truth-comparison": (
+                    multi.chart_table_splitter
+                ),
+                "stage-05c-relation-memory-overview": window,
+                "stage-05c-k-ft-search-and-thresholds": (
+                    window.relation_memory_panel.chart
+                ),
+                "stage-05c-transition-and-persistent-state": (
+                    window.relation_memory_panel.table_tabs
+                ),
+                "stage-07-light-response-overview": window,
+                "stage-07-preference-response-physiology": (
+                    window.light_response_user_panel.chart_table_splitter
+                ),
+                "stage-07-heartbeat-rmssd-closed-loop": (
+                    window.light_response_user_panel.chart_table_splitter
+                ),
+                "three-life-overview": window,
+                "touch-holder-second-round": (
+                    window.multi_life_panel.chart_table_splitter
+                ),
+                "garden-output-qualified-b": (
+                    window.garden_output_panel.diagnostics_content
+                ),
+                "light-output-overview": window,
+                "continuous-phase-waveform": (
+                    window.light_output_panel.waveform_chart
+                ),
+                "light-command-segments": (
+                    window.light_output_panel.chart_table_splitter
+                ),
+            }
+            if screenshot_target in {
+                "stage-08a-multi-session-convergence-overview",
+                "stage-08a-holder-pattern-trajectory",
+                "stage-08a-convergence-truth-comparison",
+            }:
+                window.tabs.setCurrentWidget(multi)
+                if screenshot_target == "stage-08a-convergence-truth-comparison":
+                    multi.table_tabs.setCurrentIndex(2)
+                    multi.diagnostics_scroll.ensureWidgetVisible(multi.table_tabs)
+                else:
+                    multi.diagnostics_scroll.verticalScrollBar().setValue(0)
+            elif screenshot_target == "stage-08a-stationary-user-types":
+                window.tabs.setCurrentWidget(stationary)
+                stationary.diagnostics_scroll.verticalScrollBar().setValue(0)
+            elif screenshot_target.startswith("stage-05c"):
+                window.tabs.setCurrentWidget(window.relation_memory_panel)
+            elif screenshot_target.startswith("stage-07"):
+                window.tabs.setCurrentWidget(window.light_response_user_panel)
+            elif screenshot_target in {"three-life-overview", "touch-holder-second-round"}:
+                window.tabs.setCurrentWidget(window.multi_life_panel)
+            elif screenshot_target == "garden-output-qualified-b":
+                window.tabs.setCurrentWidget(window.garden_output_panel)
+            elif screenshot_target in {
+                "light-output-overview",
+                "continuous-phase-waveform",
+                "light-command-segments",
+            }:
+                window.tabs.setCurrentWidget(window.light_output_panel)
+            app.processEvents()
+            target = targets.get(screenshot_target, window)
+            if not target.grab().save(str(screenshot)):
+                raise RuntimeError(f"failed to save screenshot: {screenshot}")
+
+        screenshot_delay_ms = (
+            max(1_500, auto_close_ms - 150) if smoke_test else 350
+        )
+        QTimer.singleShot(screenshot_delay_ms, save_screenshot)
+
+    exit_code = app.exec()
+    return 1 if smoke_failures else exit_code
+
+
 def main(argv: list[str] | None = None) -> int:
     """Parse CLI options without importing Qt on the headless path."""
 
@@ -2023,6 +2664,19 @@ def main(argv: list[str] | None = None) -> int:
         raise ValueError(
             "Stage 5C state/CSV options require --headless-relation-memory-demo"
         )
+    multi_session_file_options = (
+        args.initial_multi_session_state_json,
+        args.export_final_multi_session_state_json,
+        args.export_multi_session_csv,
+    )
+    if (
+        any(value is not None for value in multi_session_file_options)
+        or args.compare_all_stationary_user_types
+    ) and not args.headless_multi_session_convergence_demo:
+        raise ValueError(
+            "Stage 8A state/CSV/comparison options require "
+            "--headless-multi-session-convergence-demo"
+        )
     if args.headless_demo or args.headless_time_demo:
         return run_headless_demo()
     if args.headless_virtual_user_demo:
@@ -2052,6 +2706,26 @@ def main(argv: list[str] | None = None) -> int:
             export_final_state_json=args.export_final_relation_state_json,
             export_csv=args.export_relation_memory_csv,
         )
+    if args.headless_multi_session_convergence_demo:
+        return run_headless_multi_session_convergence_demo(
+            stationary_user_type=args.stationary_user_type,
+            maximum_sessions=args.maximum_sessions,
+            convergence_window=args.convergence_window,
+            convergence_required=args.convergence_required,
+            hue_tolerance_degree=args.hue_tolerance_degree,
+            blink_bpm_tolerance=args.blink_bpm_tolerance,
+            truth_response_gap_threshold=args.truth_response_gap_threshold,
+            master_seed=args.master_seed,
+            session_seed_policy=args.session_seed_policy,
+            initial_state_json=args.initial_multi_session_state_json,
+            export_final_state_json=(
+                args.export_final_multi_session_state_json
+            ),
+            export_csv=args.export_multi_session_csv,
+            compare_all_stationary_user_types=(
+                args.compare_all_stationary_user_types
+            ),
+        )
     if args.life_role is not None or args.screenshot_target == "digital-life-graphs":
         return run_single_life_gui(
             smoke_test=args.smoke_test,
@@ -2060,12 +2734,45 @@ def main(argv: list[str] | None = None) -> int:
             screenshot_target=args.screenshot_target,
             life_role=args.life_role or "green",
         )
+    legacy_adaptive_targets = {
+        "stage-05c-relation-memory-overview",
+        "stage-05c-k-ft-search-and-thresholds",
+        "stage-05c-transition-and-persistent-state",
+        "stage-07-light-response-overview",
+        "stage-07-preference-response-physiology",
+        "stage-07-heartbeat-rmssd-closed-loop",
+        "three-life-overview",
+        "touch-holder-second-round",
+        "garden-output-qualified-b",
+        "light-output-overview",
+        "continuous-phase-waveform",
+        "light-command-segments",
+    }
+    if (
+        args.light_response_preset is not None
+        or args.screenshot_target in legacy_adaptive_targets
+    ):
+        return run_stage5c_gui(
+            smoke_test=args.smoke_test,
+            auto_close_ms=args.auto_close_ms,
+            screenshot=args.screenshot,
+            screenshot_target=args.screenshot_target,
+            preset_name=args.light_response_preset or DEFAULT_RELATION_MEMORY_PRESET,
+        )
     return run_gui(
         smoke_test=args.smoke_test,
         auto_close_ms=args.auto_close_ms,
         screenshot=args.screenshot,
         screenshot_target=args.screenshot_target,
-        preset_name=args.light_response_preset or DEFAULT_RELATION_MEMORY_PRESET,
+        stationary_user_type=args.stationary_user_type,
+        maximum_sessions=args.maximum_sessions,
+        convergence_window=args.convergence_window,
+        convergence_required=args.convergence_required,
+        hue_tolerance_degree=args.hue_tolerance_degree,
+        blink_bpm_tolerance=args.blink_bpm_tolerance,
+        truth_response_gap_threshold=args.truth_response_gap_threshold,
+        master_seed=args.master_seed,
+        session_seed_policy=args.session_seed_policy,
     )
 
 

@@ -166,8 +166,14 @@ class VirtualUserPanel(QWidget):
             self.jitter_sd_spin,
             "各拍に独立して加わる小さな変動",
         )
-        self.seed_spin = QSpinBox()
+        # QSpinBox is backed by a signed C++ int, while the deterministic
+        # Stage 8A session policy intentionally spans the complete uint32
+        # domain. A zero-decimal double spin box represents every uint32 value
+        # exactly and preserves the existing integer-only UI semantics.
+        self.seed_spin = QDoubleSpinBox()
+        self.seed_spin.setDecimals(0)
         self.seed_spin.setRange(0, MAX_ROOT_SEED)
+        self.seed_spin.setSingleStep(1)
         self._add_setting(
             form,
             "再現用seed",
@@ -289,7 +295,7 @@ class VirtualUserPanel(QWidget):
             beat_jitter_sd_ms=self.jitter_sd_spin.value(),
             min_rri_ms=self.min_rri_spin.value(),
             max_rri_ms=self.max_rri_spin.value(),
-            root_seed=self.seed_spin.value(),
+            root_seed=int(self.seed_spin.value()),
         )
 
     def update_diagnostics(self, engine_snapshot: EngineSnapshot) -> None:

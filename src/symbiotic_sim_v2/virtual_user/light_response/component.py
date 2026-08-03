@@ -114,9 +114,28 @@ class LightResponsiveVirtualUserComponent(VirtualUserComponent):
             raise TypeError("virtual_user_config must be a VirtualUserConfig")
         if not isinstance(light_response_config, LightResponseConfig):
             raise TypeError("light_response_config must be a LightResponseConfig")
+        preference_evaluator = getattr(
+            light_response_config,
+            "_stage8a_preference_evaluator",
+            None,
+        )
+        if preference_evaluator is not None and not callable(preference_evaluator):
+            raise TypeError("preference_evaluator must be callable or null")
+        selected_preference_model_version = getattr(
+            light_response_config,
+            "_stage8a_preference_model_version",
+            light_response_config.preference_model_version,
+        )
+        if (
+            not isinstance(selected_preference_model_version, str)
+            or not selected_preference_model_version.strip()
+        ):
+            raise ValueError("preference_model_version must be a non-empty string")
         super().__init__(virtual_user_config)
         self.virtual_user_config = virtual_user_config
         self.light_response_config = light_response_config
+        self._preference_evaluator = preference_evaluator
+        self.preference_model_version = selected_preference_model_version
         self.reset()
 
     def reset(self) -> None:
@@ -124,10 +143,7 @@ class LightResponsiveVirtualUserComponent(VirtualUserComponent):
 
         super().reset()
         initial_stimulus = inactive_physical_light_stimulus()
-        initial_preference = evaluate_light_preference(
-            initial_stimulus,
-            self.light_response_config,
-        )
+        initial_preference = self._evaluate_preference(initial_stimulus)
         self._responsive_records: list[LightResponsiveHeartbeatRecord] = []
         self._light_receipts: list[LightStimulusReceiptRecord] = []
         self._response_segments: list[LightResponseSegment] = []
@@ -183,7 +199,7 @@ class LightResponsiveVirtualUserComponent(VirtualUserComponent):
         if pending_for_arriving_interval is None:
             sample_time_us = event.scheduled_time_us
             stimulus = self._physical_at(sample_time_us)
-            preference = evaluate_light_preference(stimulus, self.light_response_config)
+            preference = self._evaluate_preference(stimulus)
             target = response_target_for(
                 stimulus,
                 preference,
@@ -269,7 +285,7 @@ class LightResponsiveVirtualUserComponent(VirtualUserComponent):
             raise ValueError("duplicate light source signal index")
 
         stimulus = project_physical_light_stimulus(state)
-        preference = evaluate_light_preference(stimulus, self.light_response_config)
+        preference = self._evaluate_preference(stimulus)
         target = response_target_for(stimulus, preference, self.light_response_config)
         response_before = self.response_at(state.effective_time_us)
         physical_parameters_changed = (
@@ -374,7 +390,7 @@ class LightResponsiveVirtualUserComponent(VirtualUserComponent):
                 physical_projection_version=(
                     self.light_response_config.physical_projection_version
                 ),
-                preference_model_version=self.light_response_config.preference_model_version,
+                preference_model_version=self.preference_model_version,
                 physical_stimulus_change_policy_version=(
                     self.light_response_config.physical_stimulus_change_policy_version
                 ),
@@ -437,7 +453,7 @@ class LightResponsiveVirtualUserComponent(VirtualUserComponent):
         latest = self._records[-1] if self._records else None
         time_us = self._latest_observed_time_us
         stimulus = self._physical_at(time_us)
-        preference = evaluate_light_preference(stimulus, self.light_response_config)
+        preference = self._evaluate_preference(stimulus)
         target = response_target_for(stimulus, preference, self.light_response_config)
         response = self.response_at(time_us)
         (
@@ -594,7 +610,7 @@ class LightResponsiveVirtualUserComponent(VirtualUserComponent):
             return
         sample_time_us = event.scheduled_time_us
         stimulus = self._physical_at(sample_time_us)
-        preference = evaluate_light_preference(stimulus, self.light_response_config)
+        preference = self._evaluate_preference(stimulus)
         target = response_target_for(stimulus, preference, self.light_response_config)
         responsive = calculate_light_responsive_next_rri(
             self.virtual_user_config,
@@ -668,7 +684,7 @@ class LightResponsiveVirtualUserComponent(VirtualUserComponent):
                 segment_split_policy_version=(
                     self.light_response_config.segment_split_policy_version
                 ),
-                preference_model_version=self.light_response_config.preference_model_version,
+                preference_model_version=self.preference_model_version,
                 schema_version=self.light_response_config.response_segment_schema_version,
             )
         )
@@ -705,9 +721,36 @@ class LightResponsiveVirtualUserComponent(VirtualUserComponent):
             return inactive_physical_light_stimulus()
         return self._physical_history[physical_index]
 
+    def _evaluate_preference(
+        self,
+        stimulus: PhysicalLightStimulus,
+    ) -> LightPreferenceMatch:
+        """Use the private Stage 8A seam or the unchanged Stage 7 evaluator."""
+
+        evaluator = self._preference_evaluator
+        result = (
+            evaluate_light_preference(stimulus, self.light_response_config)
+            if evaluator is None
+            else evaluator(stimulus)
+        )
+        if not isinstance(result, LightPreferenceMatch):
+            raise TypeError("preference evaluator must return LightPreferenceMatch")
+        values = (result.hue_match, result.bpm_match, result.preference_match)
+        if any(
+            value is not None
+            and (
+                isinstance(value, bool)
+                or not isinstance(value, (int, float))
+                or not 0.0 <= float(value) <= 1.0
+            )
+            for value in values
+        ):
+            raise ValueError("preference match values must be null or within [0, 1]")
+        return result
+
     def _sample_at(self, sample_index: int, time_us: int) -> LightResponseSample:
         stimulus = self._physical_at(time_us)
-        preference = evaluate_light_preference(stimulus, self.light_response_config)
+        preference = self._evaluate_preference(stimulus)
         target = response_target_for(stimulus, preference, self.light_response_config)
         response = self.response_at(time_us)
         (

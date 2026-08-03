@@ -29,6 +29,12 @@ def test_config_json_round_trip_is_exact() -> None:
     assert VirtualUserConfig.from_dict(config.to_dict()) == config
 
 
+def test_root_seed_accepts_the_complete_unsigned_32_bit_domain() -> None:
+    config = VirtualUserConfig(root_seed=MAX_ROOT_SEED)
+    assert config.root_seed == 2**32 - 1
+    assert VirtualUserConfig.from_json(config.to_json()) == config
+
+
 def test_config_is_immutable() -> None:
     config = VirtualUserConfig()
     with pytest.raises(dataclasses.FrozenInstanceError):

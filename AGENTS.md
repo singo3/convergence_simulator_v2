@@ -66,5 +66,14 @@
 - 関係記憶のk更新はfeedback第2周で確定し、`relation_update_effective_next_signal_v0_1` に従って次signalのBから使う。同じsignal内で更新後kからBを再計算しない。
 - candidateの生成・採否は各Digital Life Core内のC_iの責務とし、RuntimeやGardenへcandidate selector、他生命比較、関係記憶stateを置かない。
 - Stage 5Cはpersistent state入出力をStage 8用seamとして持つが、single-sessionに限定し、複数セッション自動連結、長期収束判定、Monte Carlo、係数tuningを先回り実装しない。
+- Stage 8Aの一次収束判定は正常完了したsession outcomeを独立単位とし、同じholderを共有する1session内の3Bundleを独立票として数えない。
+- Stage 8Aのconvergence evaluatorは観測専用の診断層とし、Digital Life、Runtime、Garden、candidate、holder、k、q、E、p_explore、sigma、session停止条件を変更しない。
+- 収束後も`p_explore_min`と`sigma_min`による探索をmaximum sessionsまで継続し、latest outlierだけで直ちにconvergence lostとしない。
+- stationary preference landscapeとuser typeはmulti-session run中に固定し、session index、時刻、bundle、holder、source B、Digital Life ID、k、W、q、E、履歴、収束状態で変化させない。
+- hidden preference peak、truth response gap、真値分類を探索計算へ渡さず、observed convergenceとsimulation-only truth alignmentを分離する。
+- 正常session終了時だけ`k_anchor`、`q`、`E`、`trial_count`、`session_count`とversion metadataを次sessionへ引き継ぎ、error/未完了sessionではcommitせず停止する。
+- 各sessionでbaselineを再取得し、N/Nd/W、`W_anchor_session`、trial評価、adaptation phase、holder、touch order、light/response session-local stateをresetする。異なるbaselineのWを直接比較しない。
+- baseline無効などのinvalid sessionは監査historyへ残すが、一次rolling convergence windowの票から除外する。
+- Stage 8Aでmoving preference、context依存peak、係数tuning、Monte Carloを先回り実装しない。
 - Stageごとに独立commitを作り、push前にcompileall、全pytest、Ruff、headless、GUI smoke、digest回帰を検証する。
 - force push、force-with-lease、既存commitのamend/rebaseを行わない。

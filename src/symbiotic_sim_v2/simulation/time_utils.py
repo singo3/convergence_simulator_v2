@@ -47,6 +47,26 @@ def format_time_us(microseconds: int) -> str:
     return f"{hours:02d}:{minutes:02d}:{seconds:02d}.{milliseconds:03d}"
 
 
+def indexed_local_time_to_global_us(
+    index: int,
+    segment_duration_us: int,
+    local_time_us: int,
+) -> int:
+    """Translate one indexed segment's local integer time to aggregate time."""
+
+    if isinstance(index, bool) or not isinstance(index, int):
+        raise TypeError("index must be an integer")
+    if index < 0:
+        raise ValueError("index must be non-negative")
+    duration = _validate_us(segment_duration_us)
+    if duration == 0:
+        raise ValueError("segment_duration_us must be positive")
+    local = _validate_us(local_time_us)
+    if local > duration:
+        raise ValueError("local_time_us must not exceed segment_duration_us")
+    return index * duration + local
+
+
 def _validate_us(value: object) -> int:
     if isinstance(value, bool) or not isinstance(value, int):
         raise TypeError("microseconds must be an integer")

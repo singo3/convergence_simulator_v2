@@ -13,7 +13,8 @@
 - Stage 7「固定反応特性を持つ光応答仮想ユーザー」: 完成
 - Stage 7.1「物理光刺激の監査segmentとresponse dynamics epochの分離」: 完成
 - Stage 5C「3Bundle関係記憶探索・確認型候補採否」: 完成
-- 現在のGUI主対象: Stage 5Cの1-session関係記憶探索と、Stage 7.1までの光→心拍→H10→Garden閉ループ
+- Stage 8A「固定好みユーザー・複数セッション収束ラボ」: 完成
+- 現在のGUI主対象: Stage 8Aの固定好み・state handoff・3-of-4 rolling収束診断
 
 正式な信号経路は次のとおりです。
 
@@ -51,7 +52,9 @@ Garden入力層は `RriMeasurementEvent` だけをraw inputとし、artifactを�
 
 Stage 5BではG、E/q第2周、touch配送、3生命の資格競争を接続しました。Stage 5B.1では生命由来touchをID/Bだけのv2境界へ絞り、active qualified Bをholder touchの実到着時刻に出力します。Stage 6はこのformal eventだけを入力に、FをHue、Tをblink BPMへ写像し、仮想時計から連続sine位相を解析的に再構成します。Stage 7は `LightStimulusStateEvent` だけを光入力として固定Hue/BPM嗜好と一次遅れresponseを評価し、将来の心拍間隔生成へ接続します。Stage 7.1は物理parameterが変わる監査segmentとtargetが変わるresponse dynamics epochを分離し、同targetの光変更でresponseをresetしません。光からRMSSD、N、Nd、Wを直接更新しません。
 
-Stage 5Cは、各生命内部の `adaptive_random_search_confirmed_v1` をこの閉ループの第2周へ接続します。Bundle 0で `W_anchor_session` を初めて設定し、生得探究心cと `sigma_min/max`、`epsilon_accept`、`p_explore_min`、決定論的Hash方向でhold/exploreします。trialは `reflect01` でF/Tだけを連続探索し、A/Dを固定します。Bundle 1は仮評価に過ぎず、Bundle 2で同じcandidateをstrictに確認した場合だけ正式採用します。G=0生命はcandidate採否やk_anchor更新を行いません。persistent stateとsession-local stateを分離し、更新kは次signalからBへ反映します。Stage 5Cはsingle-session onlyで、複数sessionの自動連結やconvergence判定は未実装です。
+Stage 5Cは、各生命内部の `adaptive_random_search_confirmed_v1` をこの閉ループの第2周へ接続します。Bundle 0で `W_anchor_session` を初めて設定し、生得探究心cと `sigma_min/max`、`epsilon_accept`、`p_explore_min`、決定論的Hash方向でhold/exploreします。trialは `reflect01` でF/Tだけを連続探索し、A/Dを固定します。Bundle 1は仮評価に過ぎず、Bundle 2で同じcandidateをstrictに確認した場合だけ正式採用します。G=0生命はcandidate採否やk_anchor更新を行いません。persistent stateとsession-local stateを分離し、更新kは次signalからBへ反映します。
+
+Stage 8AはStage 5C public factoryを1session単位で再利用し、正常終了後の`k_anchor/q/E/trial_count/session_count`を次sessionへ引き継ぎます。baselineと`W_anchor_session`は毎session取り直します。仮想ユーザーのsingle/multi-peak好みはrun中に固定し、生理noiseだけを決定論的なsession seedで変化させます。一次収束は1sessionを独立票とする「同じDigital Life + 近いHue/BPM」の直近4有効session中3sessionです。1sessionの3Bundleを独立票にしません。latest outlierを許容し、収束後もStage 5Cの探索を停止しません。各Bundleの実提示k/B/Hue/BPMはsegment監査として残しますが票にはしません。observed convergenceとhidden landscape truth alignmentは分離され、どちらもDigital Life、Runtime、Gardenへ入力されません。truth分類は`response_gap=max(0, global maximum match - medoid match)`を使い、threshold以下を`correct_convergence`、超過を`stable_suboptimal`、未収束を`not_converged`、flat型を`no_preference_control`とします。nearest peakのsigma正規化距離もsimulation-only診断です。
 
 現在の `ideal_polar_h10_rri_device_v0_1` は、誤差・欠損・遅延なしの理想的な入力デバイスを表すsimulation assumptionです。実機Polar H10のBLE GATT packet、firmware、電波、pairing、Polar SDKを再現するpacket-level emulatorではありません。
 
@@ -179,7 +182,21 @@ Stage 2のRRI、RMSSD、内部変動成分は仮想ユーザー内部の開発�
 - q/E/kを同じbefore stateから第2周で並列的に確定し、更新kを次signalから使う `relation_update_effective_next_signal_v0_1`
 - immutable persistent stateとsession-local stateの分離、strict JSON import/export、Stage 8向けstate seam
 - 9-tab GUI、single-session headless JSON、5種類CSV、独立reference vectors、pure state-machine全分岐fixture
-- multi-session runner、長期/sustained convergence、Monte Carlo、係数tuningは未実装・未評価
+- Stage 5C public factory自体はsingle-session contractを維持
+
+### Stage 8A
+
+- `multi_session_relation_memory_runner_v0_1`による独立240秒engineの連結
+- 正常sessionだけのstrict persistent-state commitと、error時のnon-commit停止
+- 毎sessionのbaseline、`W_anchor_session`、trial/holder/light/response local state reset
+- `stationary_preference_landscape_v0_1`と固定6 user type（単峰、広/狭、弱反応、二峰、flat control）
+- SHA-256先頭unsigned 32-bitによる`deterministic_per_session_physiology_seed_v0_1`
+- final committed holder anchorをsession代表値にする`multi_session_outcome_v1`
+- same-life限定の円環Hue/BPM距離、全pairwise subset、3-of-4 rolling majority
+- latest outlier、loss/reconvergence、cluster switch、post-convergence探索の監視
+- observed convergenceと`stationary_landscape_truth_alignment_v0_1`の完全分離
+- strict multi-session state JSON resume、6 CSV、canonical digest、全タイプ比較
+- moving preference、係数tuning、Monte Carloは未実装
 
 ## Requirements / setup
 
@@ -189,7 +206,7 @@ Stage 2のRRI、RMSSD、内部変動成分は仮想ユーザー内部の開発�
 - pytest / pytest-qt
 - Ruff
 
-Stage 5C固定検証環境はPython 3.13.4、PySide6 6.11.1、PyQtGraph 0.14.0、NumPy 2.5.1、pytest 9.1.1、pytest-qt 4.5.0、Ruff 0.16.1です。
+Stage 8A固定検証環境はPython 3.13.4、PySide6 6.11.1、PyQtGraph 0.14.0、NumPy 2.5.1、pytest 9.1.1、pytest-qt 4.5.0、Ruff 0.16.1です。
 
 プロジェクト直下の `.venv` をStage間で再利用します。
 
@@ -207,17 +224,21 @@ python3.13 -m venv .venv
 
 macOSでは、汎用launcher `環境共生型デジタル生命シミュレーターv2を起動.command` をダブルクリックできます。`時間シミュレーターを起動.command` も後方互換用に維持しています。
 
-GUI上部にはStage 1共通の時計、状態、速度、step controlsがあります。中央のtabは次の9つです。
+GUI上部には共通の実行状態があり、中央のtabは次の11個です。
 
-1. 関係記憶探索: 3生命profile/state、F/T探索空間、W/strict threshold、3Bundle timeline、transition、persistent before/after
-2. 光応答仮想ユーザー: 固定特性、物理光、preference、response、生理作用、Garden正式RMSSD/N、receipt/heartbeat表
-3. 光点滅シミュレーター: current HSV/phase、opt-in preview、waveform、parameter、command/segment表。previewは初期OFFで、10倍・100倍・最速では自動OFF
-4. 3生命・資格競争: 3状態card、tau/touch、G/holder、E/q、P/V、B、touch/第2周table
-5. Garden出力資格層: holder timeline、資格規則、qualified B、qualification table
-6. Garden入力層: phase/S、RRI/artifact、RMSSD/N、N/S、RRI・評価table
-7. 仮想ユーザー心拍: Stage 2互換の内部真値診断
-8. Polar H10: ideal mode固定条件、raw RRI、真値比較、誤差、測定table
-9. 時間・イベント診断: timeline、実行済みevent log、wall/virtual time診断
+1. 複数セッション収束: 設定/操作、state card、holder/Hue-BPM/k/support/action/truth chart、session/convergence/type比較表
+2. 固定仮想ユーザータイプ: 固定peak、physiology gain、hidden diagnostic heatmapと生命別出力可能Hue帯
+3. 関係記憶探索: 現在または直近sessionの3生命profile/state、F/T探索、3Bundle transition、persistent before/after
+4. 光応答仮想ユーザー: 物理光、preference、response、生理作用、Garden正式RMSSD/N、receipt/heartbeat表
+5. 光点滅シミュレーター: current HSV/phase、opt-in preview、waveform、parameter、command/segment表
+6. 3生命・資格競争: 3状態card、tau/touch、G/holder、E/q、P/V、B、touch/第2周table
+7. Garden出力資格層: holder timeline、資格規則、qualified B、qualification table
+8. Garden入力層: phase/S、RRI/artifact、RMSSD/N、N/S、RRI・評価table
+9. 仮想ユーザー心拍: Stage 2互換の内部真値診断
+10. Polar H10: ideal mode固定条件、raw RRI、真値比較、誤差、測定table
+11. 時間・イベント診断: timeline、実行済みevent log、wall/virtual time診断
+
+Stage 8A設定はstopped/reset時だけ変更できます。「次の1セッション」「残りを最後まで」「session完了後pause」「全タイプ比較」「reset」「state JSON保存/読込」「CSV保存」を備えます。hidden heatmapはsimulation-only診断であり、Digital Lifeの探索入力ではありません。
 
 仮想ユーザー設定は開始前またはreset後だけ変更できます。Stage 5Aの1体専用GUI/role fixtureも後方互換として残します。H10にはnoise、latency、packet loss、artifact rateなどの調整parameterはありません。Garden入力・出力のモデル値とpolicyは固定設定として表示し、GUIからscheduler内部heapを操作しません。
 
@@ -298,9 +319,23 @@ initial stateを指定しない場合は3生命のfresh stateを使います。S
   --export-final-relation-state-json final-relation-state.json
 ```
 
-IDの欠落/不一致、unknown/missing field、範囲外値、bool counter、非有限値、version不一致を拒否します。出力は `single_session_only=true`、`multi_session_not_implemented=true`、`convergence_evaluated=false` を明示します。state I/Oは1回のrunの入出力境界であり、自動multi-session runnerではありません。
+IDの欠落/不一致、unknown/missing field、範囲外値、bool counter、非有限値、version不一致を拒否します。Stage 5C出力は後方互換の `single_session_only=true`、`multi_session_not_implemented=true`、`convergence_evaluated=false` を維持します。
 
-`off_center_green` と `light_insensitive_control` も指定できます。いずれもreal-time待機をせずJSONを標準出力します。package versionは `0.9.0` です。既存JSON contractを変えないため、Stage 3/4/5A/5B.1/6/7.1 headlessの `project_version` はそれぞれ `0.3.0`、`0.4.0`、`0.5.0`、`0.6.1`、`0.7.0`、`0.8.1` を意図的に維持します。
+Stage 8Aの固定好みmulti-session run:
+
+```bash
+.venv/bin/python -m symbiotic_sim_v2 \
+  --headless-multi-session-convergence-demo \
+  --stationary-user-type green_narrow_moderate \
+  --maximum-sessions 24 \
+  --convergence-window 4 \
+  --convergence-required 3 \
+  --master-seed 20260802
+```
+
+`--session-seed-policy`、Hue/BPM tolerance、truth gapを指定できます。`--initial-multi-session-state-json`と`--export-final-multi-session-state-json`で厳密にresumeでき、resume時は保存state内の設定がauthoritativeです。`--compare-all-stationary-user-types`は同じconfigで6タイプを独立比較します。出力は`stationary_preference=true`、`moving_preference=false`、`convergence_is_diagnostic_only=true`、`exploration_continues_after_convergence=true`、`v2_coefficients_modified=false`、`multi_session=true`、`Monte_Carlo=false`を明示します。
+
+`off_center_green` と `light_insensitive_control` も指定できます。いずれもreal-time待機をせずJSONを標準出力します。package versionは `0.10.0` です。既存JSON contractを変えないため、Stage 3/4/5A/5B.1/6/7.1 headlessの `project_version` はそれぞれ `0.3.0`、`0.4.0`、`0.5.0`、`0.6.1`、`0.7.0`、`0.8.1` を意図的に維持します。
 
 既存Stage 1〜5A JSONは変更しません。Stage 5B JSONはholder、生命別E/q/G/k、touch/feedback/qualified B件数と分離digestを表示し、探索状態、Hue、BPM、I、光波形を含めません。
 
@@ -397,6 +432,22 @@ Stage 5Cは次の5ファイルを保存します。
   --export-relation-memory-csv artifacts/csv/stage-05c
 ```
 
+Stage 8Aは次の6ファイルを保存します。
+
+- `stage_08a_stationary_user_types.csv`
+- `stage_08a_session_outcomes.csv`
+- `stage_08a_convergence_history.csv`
+- `stage_08a_pattern_trajectory.csv`
+- `stage_08a_persistent_state_trajectory.csv`
+- `stage_08a_user_type_comparison.csv`
+
+```bash
+.venv/bin/python -m symbiotic_sim_v2 \
+  --headless-multi-session-convergence-demo \
+  --maximum-sessions 24 \
+  --export-multi-session-csv artifacts/csv/stage-08a
+```
+
 GUIからも診断CSVを保存できます。H10 CSVのraw device output列と `diagnostic_true_rri_*` / `absolute_error_us` / `match` 列は責務上分離され、`diagnostic_notice` 列で開発用比較であることを明示します。GardenはCSVではなく `RriMeasurementEvent` を直接受信し、Digital LifeもCSVではなくGarden formal eventを受信します。CSV exportの有無はsimulation結果とdigestを変えません。
 
 ## Formal event boundaries
@@ -448,6 +499,8 @@ Stage 5A Digital Lifeの正式入力はこの `GardenInputSignalEvent` と `Gard
 Stage 5B.1の正式touch v2はID、signal識別metadata、Bだけを含み、role、P、V、tauは含みません。参加IDはRuntime/session rosterからGardenへ注入され、Garden coreはroleを参照せずactual arrival orderだけでholderを決めます。active `GardenQualifiedBEvent` v2はholder touchの実到着時刻を `effective_time_us` として同じmicrosecondに出力され、round finalizeでは再出力されません。Stage 6 Mapperはこのeventだけから `LightCommandEvent=I` を作り、Deviceは同時刻の `LightStimulusStateEvent` と半開区間segmentを作ります。各生命へのfeedbackと第2周は従来どおりround finalize後です。
 
 Stage 5Cはformal event schemaを増やさず、このfeedback第2周を関係記憶遷移の入力境界とします。candidate、W anchor/trial、profile、persistent/session state、transition recordはDigital Life内部の監査値で、touchまたはGarden formal payloadへ入れません。Runtime/Gardenはcandidate生成や採否に関与しません。
+
+Stage 8Aもformal event schemaを増やしません。`SessionOutcome`、rolling cluster、truth alignment、multi-session state、heatmap、比較表はすべてsimulation診断です。Digital Lifeがhidden peak、convergence state、session historyを受け取る経路はありません。
 
 ## Stage 4 Garden input model
 
@@ -566,16 +619,18 @@ Stage 7.1はformal heartbeat、responsive heartbeat診断、light receipt、phys
 
 Stage 5Cはintrinsic profile、adaptive signal、relation-memory transition、final persistent state、session summaryを別々にcanonical digest化します。run-to-end、1秒/1-event step、速度mode、reset、snapshot頻度、preview、GUI/headless、CSV export、state JSON round-tripで一致します。独立期待値は [Stage 5C reference vectors](docs/conformance/stage-05c-reference-vectors.json) をsource of truthとし、既存Stage 1〜7.1のdigest/CSVを変更しません。
 
+Stage 8Aはstationary user type、session outcome、convergence history、multi-session persistent state、type comparisonをcanonical UTF-8 JSONで別々にdigest化します。session-by-session、batch、pause、reset、GUI/headless、CSV有無、state JSON round-trip、同じseed/configで一致します。独立期待値は [Stage 8A reference vectors](docs/conformance/stage-08a-reference-vectors.json) をsource of truthとし、Stage 1〜5Cの既存headless JSON/digest/CSVを変更しません。
+
 ## Test / lint / smoke
 
 ```bash
 .venv/bin/python -m compileall -q src tests tools
 QT_QPA_PLATFORM=offscreen .venv/bin/pytest -q
 .venv/bin/ruff check .
-QT_QPA_PLATFORM=offscreen .venv/bin/python -m symbiotic_sim_v2 --smoke-test --auto-close-ms 8500
+QT_QPA_PLATFORM=offscreen .venv/bin/python -m symbiotic_sim_v2 --smoke-test --auto-close-ms 12000
 ```
 
-テストはStage 1〜7.1の全回帰に加え、strict persistent state、生得profile、`r(W)`、sigma/probability境界、strict閾値、Hash方向、`reflect01`、F/T候補、A/D不変、hold/accepted/reject/G=0の全state-machine分岐、counter、q/E/k並列更新、next-signal因果、240秒閉ループ、state I/O、digest、CSV、9-tab GUI、architecture分離を確認します。
+テストは既存1274件以上のStage 1〜5C回帰に加え、固定6 user type、single/multi-peak式、unsigned session seed、state handoff/reset、SessionOutcome、same-life pattern距離、全pairwise 3-of-4 cluster、latest outlier、loss/reconvergence、truth分離、1/4/24 session、resume、type比較、digest/CSV、11-tab GUI、architecture非干渉を確認します。
 
 Stage 5Aの設計境界は [1体のデジタル生命・第1周](docs/stage-05a-single-digital-life-first-round.md)、式と分類は [Digital Life first-round model v0.1](docs/digital-life-first-round-model_v0.1.md) を参照してください。Stage 4の設計境界は [Garden入力層設計](docs/stage-04-garden-input-layer.md)、モデル値は [Garden input model v0.1](docs/relax-with-light-garden-input-model_v0.1.md)、境界所属の仮定は [RRI window membership policy v0.1](docs/rri-window-membership-policy_v0.1.md) にあります。規範との境界は [規範スコープ](docs/normative-scope.md) を参照してください。
 
@@ -583,4 +638,6 @@ Stage 5Bの設計境界は [3生命・資格競争・第2周](docs/stage-05b-thr
 
 Stage 6は [光点滅シミュレーター](docs/stage-06-light-blink-simulator.md)、[B→I mapping](docs/b-to-i-light-mapping-model_v0.1.md)、[Virtual Light Device](docs/virtual-light-device-model_v0.1.md)、[continuous phase policy](docs/continuous-phase-policy_v0.1.md) を参照してください。Stage 7/7.1は [光応答仮想ユーザー](docs/stage-07-light-responsive-virtual-user.md)、[Stage 7.1監査分離](docs/stage-07-1-physical-audit-response-epochs.md)、[固定光嗜好](docs/stationary-light-preference-model_v0.1.md)、[一次遅れresponse](docs/first-order-light-response-model_v0.1.md)、[心拍連成](docs/light-response-heartbeat-coupling_v0.1.md) を参照してください。
 
-Stage 5Cは [3Bundle関係記憶探索](docs/stage-05c-confirmed-relation-memory-search.md)、[adaptive algorithm実装](docs/adaptive-random-search-confirmed-v1-implementation.md)、[persistent state contract](docs/relation-memory-state-v2-simulation-contract.md)、[next-signal policy](docs/relation-update-next-signal-policy_v0.1.md) を参照してください。次工程は **Stage 8: 複数セッション状態引継ぎ・収束確認** です。Stage 5Cでは複数sessionまたはconvergenceを実行・評価していません。
+Stage 5Cは [3Bundle関係記憶探索](docs/stage-05c-confirmed-relation-memory-search.md)、[adaptive algorithm実装](docs/adaptive-random-search-confirmed-v1-implementation.md)、[persistent state contract](docs/relation-memory-state-v2-simulation-contract.md)、[next-signal policy](docs/relation-update-next-signal-policy_v0.1.md) を参照してください。
+
+Stage 8Aは [固定好み・複数セッション収束ラボ](docs/stage-08a-fixed-preference-multi-session-convergence.md)、[rolling majority定義](docs/rolling-majority-convergence-definition_v0.1.md)、[固定user landscape](docs/stationary-user-type-landscapes_v0.1.md)、[state handoff](docs/multi-session-state-handoff_v0.1.md)、[session seed policy](docs/session-physiology-seed-policy_v0.1.md) を参照してください。次工程は **Stage 8B: 変化する好み・追従性** です。

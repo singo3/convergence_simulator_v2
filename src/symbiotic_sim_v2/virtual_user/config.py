@@ -8,7 +8,7 @@ from dataclasses import asdict, dataclass
 from typing import Any
 
 VIRTUAL_USER_MODEL_VERSION = "baseline_virtual_user_physiology_v0_1"
-MAX_ROOT_SEED = 2**31 - 1
+MAX_ROOT_SEED = 2**32 - 1
 
 
 def _finite_number(name: str, value: object) -> float:
