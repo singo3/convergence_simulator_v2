@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
 from symbiotic_sim_v2.devices.polar_h10.config import PolarH10Config
@@ -19,8 +19,10 @@ from symbiotic_sim_v2.garden.output_layer.config import GardenOutputConfig
 from symbiotic_sim_v2.garden.output_layer.events import GARDEN_QUALIFIED_B_EVENT_TYPE
 from symbiotic_sim_v2.runtime.multi_life.config import MultiLifeRuntimeConfig
 from symbiotic_sim_v2.runtime.multi_life.scenario import (
+    DigitalLifeComponentFactory,
     ThreeDigitalLifeCompetitionScenario,
     ThreeDigitalLifeCompetitionSimulation,
+    _create_legacy_connected_life,
     _create_three_digital_life_competition_simulation,
 )
 from symbiotic_sim_v2.simulation.engine import SimulationEngine
@@ -123,8 +125,12 @@ def _create_light_feedback_simulation(
     garden_light_mapper_config: GardenLightMapperConfig | None = None,
     virtual_light_device_config: VirtualLightDeviceConfig | None = None,
     heartbeat_source_factory: HeartbeatSourceFactory,
+    digital_life_component_factory: DigitalLifeComponentFactory = (
+        _create_legacy_connected_life
+    ),
+    initial_persistent_states_by_life_id: Mapping[str, object] | None = None,
 ) -> LightFeedbackSimulation:
-    """Build Stage 6 while preserving an injected upstream heartbeat source."""
+    """Build Stage 6 while preserving both private upstream injection seams."""
 
     upstream = _create_three_digital_life_competition_simulation(
         virtual_user_config=virtual_user_config,
@@ -134,6 +140,8 @@ def _create_light_feedback_simulation(
         runtime_config=runtime_config,
         garden_output_config=garden_output_config,
         heartbeat_source_factory=heartbeat_source_factory,
+        digital_life_component_factory=digital_life_component_factory,
+        initial_persistent_states_by_life_id=initial_persistent_states_by_life_id,
     )
     mapper_config = garden_light_mapper_config or GardenLightMapperConfig(
         garden_id=upstream.garden_output_config.garden_id

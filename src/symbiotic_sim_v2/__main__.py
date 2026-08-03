@@ -1,4 +1,4 @@
-"""Command entry point for Stage 1-7.1 headless demos and the Stage 7.1 GUI."""
+"""Command entry point for Stage 1-7.1 compatibility and the Stage 5C app."""
 
 from __future__ import annotations
 
@@ -43,6 +43,29 @@ from symbiotic_sim_v2.digital_life.diagnostics import (
     export_evaluation_updates_csv,
     export_first_round_diagnostics_csv,
 )
+from symbiotic_sim_v2.digital_life.relation_memory.config import (
+    ADAPTIVE_DIGITAL_LIFE_MODEL_VERSION,
+    ADAPTIVE_DIGITAL_LIFE_SIGNAL_RECORD_SCHEMA_VERSION,
+    BUNDLE1_REJECT_POLICY_VERSION,
+    RELATION_MEMORY_INTRINSIC_PROFILE_SCHEMA_VERSION,
+    RELATION_MEMORY_PERSISTENT_STATE_RECORD_SCHEMA_VERSION,
+    RELATION_MEMORY_SESSION_STATE_RECORD_SCHEMA_VERSION,
+    RELATION_MEMORY_TRANSITION_RECORD_SCHEMA_VERSION,
+    RELATION_UPDATE_EFFECTIVE_POLICY_VERSION,
+)
+from symbiotic_sim_v2.digital_life.relation_memory.diagnostics import (
+    adaptive_signal_digest,
+    export_relation_memory_diagnostics,
+    final_persistent_state_digest,
+    intrinsic_profile_digest,
+    relation_memory_transition_digest,
+    session_summary_digest,
+)
+from symbiotic_sim_v2.digital_life.relation_memory.state_io import (
+    export_relation_memory_state_file,
+    load_relation_memory_state_file,
+    relation_memory_state_map_to_dict,
+)
 from symbiotic_sim_v2.digital_life.scenario import create_single_digital_life_simulation
 from symbiotic_sim_v2.digital_life.second_round_diagnostics import (
     SECOND_ROUND_CSV_FILENAME,
@@ -84,6 +107,10 @@ from symbiotic_sim_v2.garden.output_layer.config import (
 )
 from symbiotic_sim_v2.garden.output_layer.diagnostics import (
     export_garden_output_diagnostics,
+)
+from symbiotic_sim_v2.runtime.adaptive_closed_loop import (
+    adaptive_digital_life_components,
+    create_adaptive_relation_memory_closed_loop_simulation,
 )
 from symbiotic_sim_v2.runtime.closed_loop import (
     create_light_responsive_closed_loop_simulation,
@@ -138,10 +165,12 @@ STAGE_4_HEADLESS_PROJECT_VERSION = "0.4.0"
 STAGE_5A_HEADLESS_PROJECT_VERSION = "0.5.0"
 STAGE_5B1_HEADLESS_PROJECT_VERSION = "0.6.1"
 STAGE_6_HEADLESS_PROJECT_VERSION = "0.7.0"
+STAGE_7_1_HEADLESS_PROJECT_VERSION = "0.8.1"
+DEFAULT_RELATION_MEMORY_PRESET = "off_center_green"
 
 
 def _build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Symbiotic simulator Stage 7.1")
+    parser = argparse.ArgumentParser(description="Symbiotic simulator Stage 5C")
     headless_group = parser.add_mutually_exclusive_group()
     headless_group.add_argument(
         "--headless-demo",
@@ -191,6 +220,11 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="run the 240-second Stage 7 light-responsive closed loop",
     )
+    headless_group.add_argument(
+        "--headless-relation-memory-demo",
+        action="store_true",
+        help="run the Stage 5C confirmed relation-memory closed loop",
+    )
     parser.add_argument(
         "--life-role",
         choices=("red", "green", "blue"),
@@ -227,9 +261,12 @@ def _build_parser() -> argparse.ArgumentParser:
             "stage-07-light-response-overview",
             "stage-07-preference-response-physiology",
             "stage-07-heartbeat-rmssd-closed-loop",
+            "stage-05c-relation-memory-overview",
+            "stage-05c-k-ft-search-and-thresholds",
+            "stage-05c-transition-and-persistent-state",
         ),
         default="window",
-        help="capture the selected Stage 5A/5B/6/7 diagnostic view",
+        help="capture the selected Stage 5A/5B/5C/6/7 diagnostic view",
     )
     parser.add_argument(
         "--export-virtual-user-csv",
@@ -264,13 +301,32 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--light-response-preset",
         choices=light_response_preset_names(),
-        default=DEFAULT_LIGHT_RESPONSE_PRESET,
-        help="select the fixed Stage 7 light-response characteristic",
+        default=None,
+        help=(
+            "select the fixed light-response characteristic (Stage 7 default: "
+            f"{DEFAULT_LIGHT_RESPONSE_PRESET}; Stage 5C default: "
+            f"{DEFAULT_RELATION_MEMORY_PRESET})"
+        ),
     )
     parser.add_argument(
         "--export-light-responsive-user-csv",
         type=Path,
         help="write the five Stage 7.1 response diagnostic CSV files to a directory",
+    )
+    parser.add_argument(
+        "--initial-relation-state-json",
+        type=Path,
+        help="load the exact three-life Stage 5C persistent-state JSON document",
+    )
+    parser.add_argument(
+        "--export-final-relation-state-json",
+        type=Path,
+        help="write the normally finalized Stage 5C persistent states as JSON",
+    )
+    parser.add_argument(
+        "--export-relation-memory-csv",
+        type=Path,
+        help="write the five Stage 5C relation-memory CSV files to a directory",
     )
     return parser
 
@@ -558,15 +614,12 @@ def run_headless_three_life_competition_demo(
     qualification_records = garden.qualification_records()
     qualified_b_records = garden.qualified_b_records()
     feedback_records = garden.feedback_records()
-    active_qualified_b_records = tuple(
-        record for record in qualified_b_records if record.active
-    )
+    active_qualified_b_records = tuple(record for record in qualified_b_records if record.active)
     inactive_qualified_b_records = tuple(
         record for record in qualified_b_records if not record.active
     )
     touch_by_signal_and_id = {
-        (record.signal_index, record.digital_life_id): record
-        for record in touch_records
+        (record.signal_index, record.digital_life_id): record for record in touch_records
     }
     holder_touch_delays_us = tuple(
         record.effective_time_us
@@ -578,8 +631,7 @@ def run_headless_three_life_competition_demo(
     round_finalize_offset_us = simulation.garden_output_config.round_finalize_offset_us
     life_ids = tuple(sorted(simulation.digital_life_components))
     life_snapshots = {
-        life_id: simulation.digital_life_components[life_id].snapshot()
-        for life_id in life_ids
+        life_id: simulation.digital_life_components[life_id].snapshot() for life_id in life_ids
     }
     touch_count_by_life = {
         life_id: sum(record.digital_life_id == life_id for record in touch_records)
@@ -615,31 +667,21 @@ def run_headless_three_life_competition_demo(
         "state_schema_version": STATE_SCHEMA_VERSION,
         "runtime_model_version": THREE_DIGITAL_LIFE_RUNTIME_MODEL_VERSION,
         "garden_output_model_version": GARDEN_OUTPUT_MODEL_VERSION,
-        "qualification_state_schema_version": (
-            GARDEN_QUALIFICATION_STATE_SCHEMA_VERSION
-        ),
+        "qualification_state_schema_version": (GARDEN_QUALIFICATION_STATE_SCHEMA_VERSION),
         "tau_delivery_policy_version": TAU_TOUCH_DELIVERY_POLICY_VERSION,
-        "qualified_b_emission_policy_version": (
-            QUALIFIED_B_EMISSION_POLICY_VERSION
-        ),
+        "qualified_b_emission_policy_version": (QUALIFIED_B_EMISSION_POLICY_VERSION),
         "digital_life_touch_schema_version": DIGITAL_LIFE_TOUCH_SCHEMA_VERSION,
         "garden_qualified_b_schema_version": GARDEN_QUALIFIED_B_SCHEMA_VERSION,
         "event_schema_versions": {
             "touch": DIGITAL_LIFE_TOUCH_SCHEMA_VERSION,
-            "interoceptive_feedback": (
-                GARDEN_INTEROCEPTIVE_FEEDBACK_SCHEMA_VERSION
-            ),
+            "interoceptive_feedback": (GARDEN_INTEROCEPTIVE_FEEDBACK_SCHEMA_VERSION),
             "qualified_b": GARDEN_QUALIFIED_B_SCHEMA_VERSION,
-            "second_round_record": (
-                DIGITAL_LIFE_SECOND_ROUND_RECORD_SCHEMA_VERSION
-            ),
+            "second_round_record": (DIGITAL_LIFE_SECOND_ROUND_RECORD_SCHEMA_VERSION),
         },
         "final_virtual_time_us": simulation.engine.clock.current_time_us,
         "final_state": simulation.engine.clock.state.value,
         "executed_event_count": len(simulation.engine.executed_events()),
-        "garden_signal_count": len(
-            simulation.garden_input_component.signal_records()
-        ),
+        "garden_signal_count": len(simulation.garden_input_component.signal_records()),
         "touch_count": len(touch_records),
         "feedback_count": len(feedback_records),
         "qualified_b_output_count": len(qualified_b_records),
@@ -653,62 +695,40 @@ def run_headless_three_life_competition_demo(
         "last_active_qualified_b_effective_time_us": (
             active_qualified_b_records[-1].effective_time_us
         ),
-        "closing_inactive_effective_time_us": (
-            inactive_qualified_b_records[-1].effective_time_us
-        ),
-        "holder_touch_to_qualified_b_delay_us_max": max(
-            holder_touch_delays_us
-        ),
+        "closing_inactive_effective_time_us": (inactive_qualified_b_records[-1].effective_time_us),
+        "holder_touch_to_qualified_b_delay_us_max": max(holder_touch_delays_us),
         "active_qualified_b_at_holder_touch_count": sum(
             delay_us == 0 for delay_us in holder_touch_delays_us
         ),
         "active_qualified_b_at_round_finalize_count": sum(
-            record.effective_time_us
-            == record.signal_time_us + round_finalize_offset_us
+            record.effective_time_us == record.signal_time_us + round_finalize_offset_us
             for record in active_qualified_b_records
         ),
-        "qualification_holder_id_during_session": (
-            garden_snapshot.last_assigned_holder_id
-        ),
-        "final_qualification_holder_id": (
-            garden_snapshot.qualification_holder_id
-        ),
+        "qualification_holder_id_during_session": (garden_snapshot.last_assigned_holder_id),
+        "final_qualification_holder_id": (garden_snapshot.qualification_holder_id),
         "holder_assignment_signal_index": assignment_signal_index,
-        "holder_assignment_time_us": (
-            garden_snapshot.qualification_assignment_time_us
-        ),
+        "holder_assignment_time_us": (garden_snapshot.qualification_assignment_time_us),
         "touch_count_by_life": touch_count_by_life,
         "first_touch_order": first_touch_order,
         "per_life": per_life,
         "per_life_first_round_count": {
-            life_id: snapshot.first_round_count
-            for life_id, snapshot in life_snapshots.items()
+            life_id: snapshot.first_round_count for life_id, snapshot in life_snapshots.items()
         },
         "per_life_second_round_count": {
-            life_id: snapshot.second_round_count
-            for life_id, snapshot in life_snapshots.items()
+            life_id: snapshot.second_round_count for life_id, snapshot in life_snapshots.items()
         },
-        "per_life_final_E": {
-            life_id: snapshot.e for life_id, snapshot in life_snapshots.items()
-        },
-        "per_life_final_q": {
-            life_id: snapshot.q for life_id, snapshot in life_snapshots.items()
-        },
+        "per_life_final_E": {life_id: snapshot.e for life_id, snapshot in life_snapshots.items()},
+        "per_life_final_q": {life_id: snapshot.q for life_id, snapshot in life_snapshots.items()},
         "per_life_final_G": {
-            life_id: snapshot.current_g
-            for life_id, snapshot in life_snapshots.items()
+            life_id: snapshot.current_g for life_id, snapshot in life_snapshots.items()
         },
         "per_life_final_k": {
-            life_id: snapshot.k_current
-            for life_id, snapshot in life_snapshots.items()
+            life_id: snapshot.k_current for life_id, snapshot in life_snapshots.items()
         },
         "per_life_q_update_count": {
-            life_id: snapshot.q_update_count
-            for life_id, snapshot in life_snapshots.items()
+            life_id: snapshot.q_update_count for life_id, snapshot in life_snapshots.items()
         },
-        "k_update_count": sum(
-            snapshot.k_update_count for snapshot in life_snapshots.values()
-        ),
+        "k_update_count": sum(snapshot.k_update_count for snapshot in life_snapshots.values()),
         "completed_round_count": runtime_snapshot.completed_round_count,
         "qualification_record_count": len(qualification_records),
         "touch_digest": garden.touch_digest(),
@@ -779,12 +799,8 @@ def run_headless_light_device_demo(export_csv: Path | None = None) -> int:
         "mapping_version": B_TO_I_MAPPING_VERSION,
         "light_command_schema_version": LIGHT_COMMAND_SCHEMA_VERSION,
         "virtual_light_device_model_version": VIRTUAL_LIGHT_DEVICE_MODEL_VERSION,
-        "light_stimulus_state_schema_version": (
-            LIGHT_STIMULUS_STATE_SCHEMA_VERSION
-        ),
-        "light_stimulus_segment_schema_version": (
-            LIGHT_STIMULUS_SEGMENT_SCHEMA_VERSION
-        ),
+        "light_stimulus_state_schema_version": (LIGHT_STIMULUS_STATE_SCHEMA_VERSION),
+        "light_stimulus_segment_schema_version": (LIGHT_STIMULUS_SEGMENT_SCHEMA_VERSION),
         "phase_policy_version": CONTINUOUS_PHASE_POLICY_VERSION,
         "command_hold_policy_version": COMMAND_HOLD_POLICY_VERSION,
         "inactive_output_policy_version": INACTIVE_OUTPUT_POLICY_VERSION,
@@ -802,9 +818,7 @@ def run_headless_light_device_demo(export_csv: Path | None = None) -> int:
         "inactive_segment_count": len(inactive_segments),
         "first_active_effective_time_us": first_active_command.effective_time_us,
         "last_active_effective_time_us": active_commands[-1].effective_time_us,
-        "closing_inactive_effective_time_us": (
-            inactive_commands[-1].effective_time_us
-        ),
+        "closing_inactive_effective_time_us": (inactive_commands[-1].effective_time_us),
         "first_active_holder_id": first_active_command.qualification_holder_id,
         "first_active_source_b": first_active_command.source_b,
         "first_active_hue_degree": first_active_command.hue_degree,
@@ -814,9 +828,7 @@ def run_headless_light_device_demo(export_csv: Path | None = None) -> int:
         "phase_reset_count": final_snapshot.phase_reset_count,
         "phase_continuation_count": final_snapshot.phase_continuation_count,
         "equivalent_command_count": final_snapshot.equivalent_command_count,
-        "physical_parameter_change_count": (
-            final_snapshot.physical_parameter_change_count
-        ),
+        "physical_parameter_change_count": (final_snapshot.physical_parameter_change_count),
         "final_active": final_snapshot.active,
         "final_value": final_snapshot.current_value,
         "final_phase": final_snapshot.phase_cycles,
@@ -863,9 +875,7 @@ def run_headless_light_responsive_user_demo(
     responsive_heartbeats = component.responsive_heartbeat_records()
     first_active = next(record for record in receipts if record.active)
     first_heartbeat_at_or_after_active = next(
-        record
-        for record in heartbeats
-        if record.heartbeat_time_us >= first_active.event_time_us
+        record for record in heartbeats if record.heartbeat_time_us >= first_active.event_time_us
     )
     first_affected_interval = next(
         record
@@ -881,9 +891,7 @@ def run_headless_light_responsive_user_demo(
         record for record in evaluations if record.evaluation_kind == "baseline"
     )
     bundle_evaluations = {
-        record.bundle_index: record
-        for record in evaluations
-        if record.evaluation_kind == "bundle"
+        record.bundle_index: record for record in evaluations if record.evaluation_kind == "bundle"
     }
     life_snapshots = {
         life_id: component.snapshot()
@@ -904,7 +912,7 @@ def run_headless_light_responsive_user_demo(
         written_csvs = export_light_response_diagnostics(export_csv, component)
 
     result = {
-        "project_version": __version__,
+        "project_version": STAGE_7_1_HEADLESS_PROJECT_VERSION,
         "document_version": DOCUMENT_VERSION,
         "profile_version": PROFILE_VERSION,
         "algorithm_version": ALGORITHM_VERSION,
@@ -914,20 +922,12 @@ def run_headless_light_responsive_user_demo(
         "preference_model_version": PREFERENCE_MODEL_VERSION,
         "response_dynamics_version": RESPONSE_DYNAMICS_VERSION,
         "response_segment_schema_version": LIGHT_RESPONSE_SEGMENT_SCHEMA_VERSION,
-        "response_dynamics_epoch_schema_version": (
-            LIGHT_RESPONSE_DYNAMICS_EPOCH_SCHEMA_VERSION
-        ),
-        "physical_stimulus_change_policy_version": (
-            PHYSICAL_STIMULUS_CHANGE_POLICY_VERSION
-        ),
-        "physical_light_parameter_signature_version": (
-            PHYSICAL_LIGHT_PARAMETER_SIGNATURE_VERSION
-        ),
+        "response_dynamics_epoch_schema_version": (LIGHT_RESPONSE_DYNAMICS_EPOCH_SCHEMA_VERSION),
+        "physical_stimulus_change_policy_version": (PHYSICAL_STIMULUS_CHANGE_POLICY_VERSION),
+        "physical_light_parameter_signature_version": (PHYSICAL_LIGHT_PARAMETER_SIGNATURE_VERSION),
         "segment_split_policy_version": SEGMENT_SPLIT_POLICY_VERSION,
         "physiology_coupling_version": PHYSIOLOGY_COUPLING_VERSION,
-        "heartbeat_causality_policy_version": (
-            HEARTBEAT_CAUSALITY_POLICY_VERSION
-        ),
+        "heartbeat_causality_policy_version": (HEARTBEAT_CAUSALITY_POLICY_VERSION),
         "virtual_user_config": simulation.virtual_user_config.to_dict(),
         "light_response_config": light_response_config.to_dict(),
         "preset": preset_name,
@@ -937,20 +937,14 @@ def run_headless_light_responsive_user_demo(
         "light_stimulus_input_count": len(receipts),
         "active_light_input_count": sum(record.active for record in receipts),
         "inactive_light_input_count": sum(not record.active for record in receipts),
-        "response_target_change_count": (
-            component.snapshot().response_target_change_count
-        ),
-        "physical_stimulus_change_count": (
-            component.snapshot().physical_stimulus_change_count
-        ),
+        "response_target_change_count": (component.snapshot().response_target_change_count),
+        "physical_stimulus_change_count": (component.snapshot().physical_stimulus_change_count),
         "physical_audit_segment_count": len(segments),
         "response_dynamics_epoch_count": len(response_dynamics_epochs),
         "response_segment_count": len(segments),
         "response_sample_count": len(samples),
         "first_active_effective_time_us": first_active.event_time_us,
-        "first_active_hue_degree": (
-            first_active.physical_stimulus.render_hue_degree
-        ),
+        "first_active_hue_degree": (first_active.physical_stimulus.render_hue_degree),
         "first_active_blink_bpm": first_active.physical_stimulus.blink_bpm,
         "first_active_hue_match": first_active.hue_match,
         "first_active_bpm_match": first_active.bpm_match,
@@ -958,12 +952,8 @@ def run_headless_light_responsive_user_demo(
         "first_heartbeat_at_or_after_active_time_us": (
             first_heartbeat_at_or_after_active.heartbeat_time_us
         ),
-        "first_light_affected_interval_start_us": (
-            first_affected_interval.response_sample_time_us
-        ),
-        "first_light_affected_interval_end_us": (
-            first_affected_interval.heartbeat_time_us
-        ),
+        "first_light_affected_interval_start_us": (first_affected_interval.response_sample_time_us),
+        "first_light_affected_interval_end_us": (first_affected_interval.heartbeat_time_us),
         "response_at_90s": response_at_90s,
         "response_at_120s": response_at_120s,
         "response_at_180s": response_at_180s,
@@ -971,37 +961,26 @@ def run_headless_light_responsive_user_demo(
         "effective_respiratory_amplitude_at_90s": physiology_at_90s[4],
         "effective_mean_rri_at_90s": physiology_at_90s[1],
         "heartbeat_count": len(heartbeats),
-        "rri_measurement_count": len(
-            simulation.polar_h10_component.measurement_records()
-        ),
+        "rri_measurement_count": len(simulation.polar_h10_component.measurement_records()),
         "artifact_count": garden_snapshot.artifact_rri_count,
         "evaluation_count": len(evaluations),
         "baseline_evaluation": baseline_evaluation.to_dict(),
         "bundle_0_evaluation": bundle_evaluations[0].to_dict(),
         "bundle_1_evaluation": bundle_evaluations[1].to_dict(),
         "bundle_2_evaluation": bundle_evaluations[2].to_dict(),
-        "per_life_final_E": {
-            life_id: snapshot.e for life_id, snapshot in life_snapshots.items()
-        },
-        "per_life_final_q": {
-            life_id: snapshot.q for life_id, snapshot in life_snapshots.items()
-        },
+        "per_life_final_E": {life_id: snapshot.e for life_id, snapshot in life_snapshots.items()},
+        "per_life_final_q": {life_id: snapshot.q for life_id, snapshot in life_snapshots.items()},
         "per_life_final_k": {
-            life_id: snapshot.k_current
-            for life_id, snapshot in life_snapshots.items()
+            life_id: snapshot.k_current for life_id, snapshot in life_snapshots.items()
         },
         "holder_id": garden_output_snapshot.last_assigned_holder_id,
         "final_holder_id": garden_output_snapshot.qualification_holder_id,
         "heartbeat_digest": component.heartbeat_digest(),
         "responsive_diagnostic_digest": component.responsive_diagnostic_digest(),
         "light_receipt_digest": component.light_receipt_digest(),
-        "physical_audit_segment_digest": (
-            component.physical_audit_segment_digest()
-        ),
+        "physical_audit_segment_digest": (component.physical_audit_segment_digest()),
         "response_segment_digest": component.response_segment_digest(),
-        "response_dynamics_epoch_digest": (
-            component.response_dynamics_epoch_digest()
-        ),
+        "response_dynamics_epoch_digest": (component.response_dynamics_epoch_digest()),
         "response_sample_digest": component.response_sample_digest(),
         "full_event_digest": simulation.engine.deterministic_digest(),
     }
@@ -1012,6 +991,225 @@ def run_headless_light_responsive_user_demo(
             "response_dynamics_epochs": str(written_csvs[2]),
             "light_responsive_heartbeats": str(written_csvs[3]),
             "light_response_samples": str(written_csvs[4]),
+        }
+    print(json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True))
+    return 0
+
+
+def run_headless_relation_memory_demo(
+    *,
+    preset_name: str = DEFAULT_RELATION_MEMORY_PRESET,
+    initial_state_json: Path | None = None,
+    export_final_state_json: Path | None = None,
+    export_csv: Path | None = None,
+) -> int:
+    """Run one Stage 5C session and emit state, transition, and causal audits."""
+
+    digital_life_configs = tuple(
+        digital_life_config_for_role(role) for role in ("red", "green", "blue")
+    )
+    life_ids = tuple(config.digital_life_id for config in digital_life_configs)
+    initial_states = (
+        None
+        if initial_state_json is None
+        else load_relation_memory_state_file(
+            initial_state_json,
+            expected_digital_life_ids=life_ids,
+        )
+    )
+    light_response_config = light_response_config_for_preset(preset_name)
+    simulation = create_adaptive_relation_memory_closed_loop_simulation(
+        digital_life_configs=digital_life_configs,
+        light_response_config=light_response_config,
+        initial_persistent_states_by_life_id=initial_states,
+    )
+    simulation.engine.run_until_end()
+    components = adaptive_digital_life_components(simulation)
+    initial_by_life = {
+        life_id: components[life_id].initial_persistent_state() for life_id in life_ids
+    }
+    final_by_life = {life_id: components[life_id].final_persistent_state() for life_id in life_ids}
+    if any(state is None for state in final_by_life.values()):
+        raise RuntimeError("Stage 5C session did not commit every final state")
+    committed_final_by_life = {
+        life_id: state for life_id, state in final_by_life.items() if state is not None
+    }
+    initial_state_values = relation_memory_state_map_to_dict(
+        initial_by_life,
+        expected_digital_life_ids=life_ids,
+    )
+    final_state_values = relation_memory_state_map_to_dict(
+        committed_final_by_life,
+        expected_digital_life_ids=life_ids,
+    )
+    if export_final_state_json is not None:
+        export_relation_memory_state_file(
+            export_final_state_json,
+            committed_final_by_life,
+            expected_digital_life_ids=life_ids,
+        )
+
+    session_by_life = {
+        life_id: components[life_id].relation_memory_session_state() for life_id in life_ids
+    }
+    intrinsic_by_life = {
+        life_id: components[life_id].relation_memory_intrinsic_profile() for life_id in life_ids
+    }
+    candidate_by_life = {
+        life_id: next(
+            (
+                record.k_trial
+                for record in components[life_id].relation_memory_transition_records()
+                if record.k_trial is not None
+            ),
+            None,
+        )
+        for life_id in life_ids
+    }
+    garden_output_snapshot = simulation.garden_output_component.snapshot()
+    holder_id = garden_output_snapshot.last_assigned_holder_id
+    holder_session = None if holder_id is None else session_by_life[holder_id]
+
+    evaluations = {
+        record.bundle_index: record
+        for record in simulation.garden_input_component.evaluation_records()
+        if record.evaluation_kind == "bundle"
+    }
+    if set(evaluations) != {0, 1, 2}:
+        raise RuntimeError("Stage 5C requires one evaluation for every bundle")
+
+    qualified_by_signal = {
+        record.signal_index: record
+        for record in simulation.garden_output_component.qualified_b_records()
+    }
+    command_by_signal = {
+        record.source_signal_index: record
+        for record in simulation.garden_light_mapper_component.command_records()
+    }
+    # Bundle 0 is presented from signal 60. Decisions made in the second round
+    # of signals 120 and 180 can affect presentation only from 121 and 181.
+    representative_signal_by_bundle = {0: 60, 1: 121, 2: 181}
+    qualified_b_by_bundle = {
+        str(bundle_index): {
+            "representative_signal_index": signal_index,
+            "effective_time_us": qualified_by_signal[signal_index].effective_time_us,
+            "qualification_holder_id": qualified_by_signal[signal_index].qualification_holder_id,
+            "b": qualified_by_signal[signal_index].b,
+        }
+        for bundle_index, signal_index in representative_signal_by_bundle.items()
+    }
+    hue_bpm_by_bundle = {
+        str(bundle_index): {
+            "representative_signal_index": signal_index,
+            "effective_time_us": command_by_signal[signal_index].command_effective_time_us,
+            "hue_degree": command_by_signal[signal_index].hue_degree,
+            "blink_bpm": command_by_signal[signal_index].blink_bpm,
+        }
+        for bundle_index, signal_index in representative_signal_by_bundle.items()
+    }
+
+    responsive_user = simulation.light_responsive_virtual_user_component
+    result = {
+        "project_version": __version__,
+        "document_version": DOCUMENT_VERSION,
+        "profile_version": PROFILE_VERSION,
+        "algorithm_version": ALGORITHM_VERSION,
+        "state_schema_version": STATE_SCHEMA_VERSION,
+        "adaptive_life_model_version": ADAPTIVE_DIGITAL_LIFE_MODEL_VERSION,
+        "intrinsic_profile_schema_version": (RELATION_MEMORY_INTRINSIC_PROFILE_SCHEMA_VERSION),
+        "transition_schema_version": (RELATION_MEMORY_TRANSITION_RECORD_SCHEMA_VERSION),
+        "persistent_state_schema_version": (RELATION_MEMORY_PERSISTENT_STATE_RECORD_SCHEMA_VERSION),
+        "session_state_schema_version": (RELATION_MEMORY_SESSION_STATE_RECORD_SCHEMA_VERSION),
+        "adaptive_signal_schema_version": (ADAPTIVE_DIGITAL_LIFE_SIGNAL_RECORD_SCHEMA_VERSION),
+        "relation_update_effective_policy_version": (RELATION_UPDATE_EFFECTIVE_POLICY_VERSION),
+        "bundle1_reject_policy_version": BUNDLE1_REJECT_POLICY_VERSION,
+        "light_response_preset": preset_name,
+        "final_virtual_time_us": simulation.engine.clock.current_time_us,
+        "final_state": simulation.engine.clock.state.value,
+        "executed_event_count": len(simulation.engine.executed_events()),
+        "holder_id": holder_id,
+        "final_holder_id": garden_output_snapshot.qualification_holder_id,
+        "initial_persistent_state_by_life": initial_state_values,
+        "final_persistent_state_by_life": final_state_values,
+        "intrinsic_relation_profile_by_life": {
+            life_id: intrinsic_by_life[life_id].to_dict() for life_id in life_ids
+        },
+        "session_state_by_life": {
+            life_id: session_by_life[life_id].to_dict() for life_id in life_ids
+        },
+        "per_life_adaptation_phase": {
+            life_id: session_by_life[life_id].adaptation_phase for life_id in life_ids
+        },
+        "per_life_exploration_decision": {
+            life_id: session_by_life[life_id].exploration_decision for life_id in life_ids
+        },
+        "per_life_adoption_result": {
+            life_id: session_by_life[life_id].adoption_result for life_id in life_ids
+        },
+        "per_life_initial_k_anchor": {
+            life_id: initial_by_life[life_id].k_anchor for life_id in life_ids
+        },
+        "per_life_k_trial": candidate_by_life,
+        "per_life_final_k_anchor": {
+            life_id: committed_final_by_life[life_id].k_anchor for life_id in life_ids
+        },
+        "per_life_trial_count_before": {
+            life_id: initial_by_life[life_id].trial_count for life_id in life_ids
+        },
+        "per_life_trial_count_after": {
+            life_id: committed_final_by_life[life_id].trial_count for life_id in life_ids
+        },
+        "per_life_session_count_before": {
+            life_id: initial_by_life[life_id].session_count for life_id in life_ids
+        },
+        "per_life_session_count_after": {
+            life_id: committed_final_by_life[life_id].session_count for life_id in life_ids
+        },
+        "holder_W_anchor_session": (
+            None if holder_session is None else holder_session.w_anchor_session
+        ),
+        "holder_W_trial_1": (None if holder_session is None else holder_session.w_trial_1),
+        "holder_W_trial_2": (None if holder_session is None else holder_session.w_trial_2),
+        "holder_sigma": None if holder_session is None else holder_session.sigma,
+        "holder_p_explore": (None if holder_session is None else holder_session.p_explore),
+        "holder_u_explore": (None if holder_session is None else holder_session.u_explore),
+        "holder_epsilon_accept": (
+            None if holder_session is None else holder_session.epsilon_accept
+        ),
+        "bundle_0_evaluation": evaluations[0].to_dict(),
+        "bundle_1_evaluation": evaluations[1].to_dict(),
+        "bundle_2_evaluation": evaluations[2].to_dict(),
+        "qualified_B_by_bundle": qualified_b_by_bundle,
+        "Hue_BPM_by_bundle": hue_bpm_by_bundle,
+        "relation_memory_transition_count": sum(
+            len(component.relation_memory_transition_records()) for component in components.values()
+        ),
+        "k_anchor_update_count": sum(
+            component.k_anchor_update_count() for component in components.values()
+        ),
+        "candidate_count": sum(component.candidate_count() for component in components.values()),
+        "intrinsic_profile_digest": intrinsic_profile_digest(components),
+        "adaptive_signal_digest": adaptive_signal_digest(components),
+        "relation_memory_transition_digest": (relation_memory_transition_digest(components)),
+        "final_persistent_state_digest": (final_persistent_state_digest(components)),
+        "session_summary_digest": session_summary_digest(components),
+        "physical_audit_segment_digest": (responsive_user.physical_audit_segment_digest()),
+        "response_dynamics_epoch_digest": (responsive_user.response_dynamics_epoch_digest()),
+        "full_event_digest": simulation.engine.deterministic_digest(),
+        "single_session_only": True,
+        "convergence_evaluated": False,
+        "multi_session_not_implemented": True,
+    }
+    if export_final_state_json is not None:
+        result["final_relation_state_json"] = str(export_final_state_json)
+    if export_csv is not None:
+        csv_paths = export_relation_memory_diagnostics(export_csv, components)
+        result["relation_memory_csvs"] = {
+            "intrinsic_profiles": str(csv_paths[0]),
+            "relation_transitions": str(csv_paths[1]),
+            "adaptive_signals": str(csv_paths[2]),
+            "persistent_states": str(csv_paths[3]),
+            "session_summary": str(csv_paths[4]),
         }
     print(json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True))
     return 0
@@ -1117,9 +1315,7 @@ def run_single_life_gui(
             if len(life.first_round_records()) != 241:
                 failures.append(f"life_record_count={len(life.first_round_records())}")
             if len(life.evaluation_update_records()) != 4:
-                failures.append(
-                    f"life_evaluation_count={len(life.evaluation_update_records())}"
-                )
+                failures.append(f"life_evaluation_count={len(life.evaluation_update_records())}")
             life_snapshot = life.snapshot()
             if life_snapshot.g_status != "not_connected":
                 failures.append(f"G_status={life_snapshot.g_status}")
@@ -1184,17 +1380,11 @@ def run_single_life_gui(
         screenshot.parent.mkdir(parents=True, exist_ok=True)
 
         def save_screenshot() -> None:
-            target = (
-                window
-                if screenshot_target == "window"
-                else window.digital_life_panel.chart
-            )
+            target = window if screenshot_target == "window" else window.digital_life_panel.chart
             if not target.grab().save(str(screenshot)):
                 raise RuntimeError(f"failed to save screenshot: {screenshot}")
 
-        screenshot_delay_ms = (
-            min(2200, max(1500, auto_close_ms - 100)) if smoke_test else 250
-        )
+        screenshot_delay_ms = min(2200, max(1500, auto_close_ms - 100)) if smoke_test else 250
         QTimer.singleShot(screenshot_delay_ms, save_screenshot)
 
     return app.exec()
@@ -1237,6 +1427,7 @@ def run_stage6_gui(
 
     smoke_failures: list[str] = []
     if smoke_test:
+
         def finish_smoke_run() -> None:
             # The button below exercises the normal bounded GUI path. Finish the
             # same production engine synchronously so dense offscreen chart draws
@@ -1280,9 +1471,7 @@ def run_stage6_gui(
                 "Polar H10",
                 "時間・イベント診断",
             )
-            actual_tabs = tuple(
-                window.tabs.tabText(index) for index in range(window.tabs.count())
-            )
+            actual_tabs = tuple(window.tabs.tabText(index) for index in range(window.tabs.count()))
             if actual_tabs != expected_tabs:
                 failures.append(f"tabs={actual_tabs!r}")
             active = window.simulation
@@ -1455,12 +1644,8 @@ def run_stage6_gui(
             targets = {
                 "window": window,
                 "three-life-overview": window,
-                "touch-holder-second-round": (
-                    window.multi_life_panel.chart_table_splitter
-                ),
-                "garden-output-qualified-b": (
-                    window.garden_output_panel.diagnostics_content
-                ),
+                "touch-holder-second-round": (window.multi_life_panel.chart_table_splitter),
+                "garden-output-qualified-b": (window.garden_output_panel.diagnostics_content),
                 "light-output-overview": window,
                 "continuous-phase-waveform": light_panel.waveform_chart,
                 "light-command-segments": light_panel.chart_table_splitter,
@@ -1481,9 +1666,7 @@ def run_stage6_gui(
                 if screenshot_target == "light-output-overview":
                     light_panel.diagnostics_scroll.verticalScrollBar().setValue(0)
                 elif screenshot_target == "continuous-phase-waveform":
-                    light_panel.diagnostics_scroll.ensureWidgetVisible(
-                        light_panel.waveform_chart
-                    )
+                    light_panel.diagnostics_scroll.ensureWidgetVisible(light_panel.waveform_chart)
                 else:
                     light_panel.table_tabs.setCurrentIndex(1)
                     light_panel.chart_table_splitter.setSizes([480, 520, 480])
@@ -1508,9 +1691,9 @@ def run_gui(
     auto_close_ms: int,
     screenshot: Path | None,
     screenshot_target: str = "window",
-    preset_name: str = DEFAULT_LIGHT_RESPONSE_PRESET,
+    preset_name: str = DEFAULT_RELATION_MEMORY_PRESET,
 ) -> int:
-    """Start the Stage 7 eight-tab fixed-preference closed-loop GUI."""
+    """Start the Stage 5C nine-tab confirmed relation-memory GUI."""
 
     if auto_close_ms <= 0:
         raise ValueError("--auto-close-ms must be positive")
@@ -1524,10 +1707,10 @@ def run_gui(
     from PySide6.QtGui import QFont, QFontDatabase
     from PySide6.QtWidgets import QApplication
 
-    from symbiotic_sim_v2.gui.controller import SimulationController
-    from symbiotic_sim_v2.gui.light_responsive_window import (
-        LightResponsiveMainWindow,
+    from symbiotic_sim_v2.gui.adaptive_closed_loop_window import (
+        AdaptiveClosedLoopMainWindow,
     )
+    from symbiotic_sim_v2.gui.controller import SimulationController
 
     app = QApplication.instance() or QApplication(sys.argv[:1])
     available_fonts = set(QFontDatabase.families())
@@ -1535,11 +1718,11 @@ def run_gui(
         if family in available_fonts:
             app.setFont(QFont(family))
             break
-    simulation = create_light_responsive_closed_loop_simulation(
+    simulation = create_adaptive_relation_memory_closed_loop_simulation(
         light_response_config=light_response_config,
     )
     controller = SimulationController(simulation.engine)
-    window = LightResponsiveMainWindow(
+    window = AdaptiveClosedLoopMainWindow(
         controller,
         simulation,
         preset_name=preset_name,
@@ -1575,7 +1758,7 @@ def run_gui(
             (450, lambda: window.speed_combo.setCurrentIndex(3)),
             (500, window.reset_button.click),
             (650, lambda: select_preset("light_insensitive_control")),
-            (850, lambda: select_preset("aligned_green_center")),
+            (850, lambda: select_preset("off_center_green")),
             (1_050, window.run_to_end_button.click),
             (1_250, finish_smoke_run),
             (1_500, lambda: window.tabs.setCurrentIndex(0)),
@@ -1586,7 +1769,8 @@ def run_gui(
             (2_000, lambda: window.tabs.setCurrentIndex(5)),
             (2_100, lambda: window.tabs.setCurrentIndex(6)),
             (2_200, lambda: window.tabs.setCurrentIndex(7)),
-            (2_300, lambda: window.tabs.setCurrentIndex(0)),
+            (2_300, lambda: window.tabs.setCurrentIndex(8)),
+            (2_400, lambda: window.tabs.setCurrentIndex(0)),
         )
         for delay_ms, action in actions:
             QTimer.singleShot(delay_ms, action)
@@ -1594,6 +1778,7 @@ def run_gui(
         def validate_smoke() -> None:
             failures: list[str] = []
             expected_tabs = (
+                "関係記憶探索",
                 "光応答仮想ユーザー",
                 "光点滅シミュレーター",
                 "3生命・資格競争",
@@ -1603,9 +1788,7 @@ def run_gui(
                 "Polar H10",
                 "時間・イベント診断",
             )
-            actual_tabs = tuple(
-                window.tabs.tabText(index) for index in range(window.tabs.count())
-            )
+            actual_tabs = tuple(window.tabs.tabText(index) for index in range(window.tabs.count()))
             if actual_tabs != expected_tabs:
                 failures.append(f"tabs={actual_tabs!r}")
             active = window.simulation
@@ -1613,7 +1796,7 @@ def run_gui(
             response_panel = window.light_response_user_panel
             if active.engine.clock.state.value != "completed":
                 failures.append(f"state={active.engine.clock.state.value}")
-            if response_panel.preset_name != "aligned_green_center":
+            if response_panel.preset_name != "off_center_green":
                 failures.append(f"preset={response_panel.preset_name}")
             receipts = component.light_receipt_records()
             responsive_heartbeats = component.responsive_heartbeat_records()
@@ -1623,7 +1806,7 @@ def run_gui(
             first_active = next((record for record in receipts if record.active), None)
             if (
                 len(receipts) != 241
-                or len(responsive_heartbeats) != 277
+                or len(responsive_heartbeats) != 279
                 or len(segments) != 2
                 or len(response_epochs) != 2
                 or len(samples) != 2_401
@@ -1632,17 +1815,17 @@ def run_gui(
             if (
                 first_active is None
                 or first_active.event_time_us != 60_551_540
-                or first_active.preference_match != 1.0
+                or not 0.33 < first_active.preference_match < 0.34
                 or first_active.response_before != 0.0
-                or component.response_at(90_000_000) <= 0.95
+                or not 0.32 < component.response_at(90_000_000) < 0.33
             ):
                 failures.append("first active/preference/response onset")
             snapshot = component.snapshot()
             if (
                 snapshot.current_light_active
                 or snapshot.current_response_target != 0.0
-                or snapshot.current_response_level <= 0.99
-                or snapshot.effective_respiratory_amplitude_ms <= 64.9
+                or not 0.33 < snapshot.current_response_level < 0.34
+                or snapshot.effective_respiratory_amplitude_ms <= 44.9
                 or not snapshot.completed
             ):
                 failures.append(f"closing response={snapshot!r}")
@@ -1651,25 +1834,20 @@ def run_gui(
                 len(evaluations) != 4
                 or any(record.rmssd_ms is None for record in evaluations)
                 or any(record.n is None for record in evaluations)
-                or any(
-                    record.rmssd_ms <= evaluations[0].rmssd_ms
-                    for record in evaluations[1:]
-                )
+                or any(record.rmssd_ms <= evaluations[0].rmssd_ms for record in evaluations[1:])
             ):
                 failures.append("Garden RMSSD/N evaluations")
-            if len(active.polar_h10_component.measurement_records()) != 276:
+            if len(active.polar_h10_component.measurement_records()) != 278:
                 failures.append("H10 changed RRI count")
             if (
                 response_panel.receipt_model.rowCount() != 241
                 or response_panel.audit_segment_model.rowCount() != 2
                 or response_panel.response_epoch_model.rowCount() != 2
-                or response_panel.heartbeat_model.rowCount() != 277
+                or response_panel.heartbeat_model.rowCount() != 279
                 or response_panel.light_response_chart.sample_count != 2_401
-                or response_panel.light_response_chart.audit_segment_boundary_count
-                != 2
-                or response_panel.light_response_chart.response_epoch_boundary_count
-                != 2
-                or response_panel.physiology_chart.record_count != 277
+                or response_panel.light_response_chart.audit_segment_boundary_count != 2
+                or response_panel.light_response_chart.response_epoch_boundary_count != 2
+                or response_panel.physiology_chart.record_count != 279
                 or response_panel.garden_evaluation_chart.evaluation_count != 4
             ):
                 failures.append("Stage 7 charts/tables")
@@ -1678,17 +1856,44 @@ def run_gui(
                 or window.multi_life_panel.touch_model.rowCount() != 540
                 or window.garden_output_panel.qualification_model.rowCount() != 241
                 or window.garden_input_panel.chart.evaluation_count != 4
-                or window.virtual_user_panel.chart.record_count != 277
-                or window.polar_h10_panel.chart.record_count != 276
+                or window.virtual_user_panel.chart.record_count != 279
+                or window.polar_h10_panel.chart.record_count != 278
             ):
                 failures.append("retained Stage 2-6 tabs")
+            relation_panel = window.relation_memory_panel
+            adaptive_components = adaptive_digital_life_components(active)
+            holder_session = adaptive_components[
+                "life-green"
+            ].relation_memory_session_state()
+            if (
+                relation_panel.transition_model.rowCount() != 12
+                or relation_panel.signal_model.rowCount() != 723
+                or relation_panel.persistent_model.rowCount() != 6
+                or relation_panel.chart.transition_count != 12
+                or relation_panel.chart.signal_count != 723
+                or relation_panel.chart.qualified_b_change_count != 1
+                or relation_panel.chart.hue_bpm_change_count != 1
+                or holder_session.w_anchor_session != 1.0
+                or holder_session.exploration_decision != "hold"
+                or holder_session.candidate_generated
+                or holder_session.adoption_result != "hold"
+                or not holder_session.session_finalized
+                or any(
+                    component.final_persistent_state() is None
+                    for component in adaptive_components.values()
+                )
+                or any(
+                    component.final_persistent_state().session_count != 1
+                    for component in adaptive_components.values()
+                )
+            ):
+                failures.append("Stage 5C relation-memory diagnostics")
             if window.light_output_panel.preview_checkbox.isChecked():
                 failures.append("real-light preview unexpectedly enabled")
             if response_panel.settings_frame.isEnabled():
                 failures.append("fixed preference settings enabled after completion")
             life_snapshots = {
-                life_id: life.snapshot()
-                for life_id, life in active.digital_life_components.items()
+                life_id: life.snapshot() for life_id, life in active.digital_life_components.items()
             }
             if any(snapshot.k_update_count != 0 for snapshot in life_snapshots.values()):
                 failures.append("Stage 5C k update unexpectedly present")
@@ -1705,27 +1910,42 @@ def run_gui(
 
         def save_screenshot() -> None:
             panel = window.light_response_user_panel
+            relation_panel = window.relation_memory_panel
             targets = {
                 "window": window,
+                "stage-05c-relation-memory-overview": window,
+                "stage-05c-k-ft-search-and-thresholds": relation_panel.chart,
+                "stage-05c-transition-and-persistent-state": (
+                    relation_panel.table_tabs
+                ),
                 "stage-07-light-response-overview": window,
-                "stage-07-preference-response-physiology": (
-                    panel.chart_table_splitter
-                ),
-                "stage-07-heartbeat-rmssd-closed-loop": (
-                    panel.chart_table_splitter
-                ),
+                "stage-07-preference-response-physiology": (panel.chart_table_splitter),
+                "stage-07-heartbeat-rmssd-closed-loop": (panel.chart_table_splitter),
                 "three-life-overview": window,
                 "touch-holder-second-round": window.multi_life_panel.chart_table_splitter,
-                "garden-output-qualified-b": (
-                    window.garden_output_panel.diagnostics_content
-                ),
+                "garden-output-qualified-b": (window.garden_output_panel.diagnostics_content),
                 "light-output-overview": window,
                 "continuous-phase-waveform": window.light_output_panel.waveform_chart,
-                "light-command-segments": (
-                    window.light_output_panel.chart_table_splitter
-                ),
+                "light-command-segments": (window.light_output_panel.chart_table_splitter),
             }
             if screenshot_target in {
+                "stage-05c-relation-memory-overview",
+                "stage-05c-k-ft-search-and-thresholds",
+                "stage-05c-transition-and-persistent-state",
+            }:
+                window.tabs.setCurrentWidget(relation_panel)
+                if screenshot_target == "stage-05c-relation-memory-overview":
+                    relation_panel.diagnostics_scroll.verticalScrollBar().setValue(0)
+                elif screenshot_target == "stage-05c-k-ft-search-and-thresholds":
+                    relation_panel.diagnostics_scroll.ensureWidgetVisible(
+                        relation_panel.chart
+                    )
+                else:
+                    relation_panel.table_tabs.setCurrentIndex(2)
+                    relation_panel.diagnostics_scroll.ensureWidgetVisible(
+                        relation_panel.table_tabs
+                    )
+            elif screenshot_target in {
                 "stage-07-light-response-overview",
                 "stage-07-preference-response-physiology",
                 "stage-07-heartbeat-rmssd-closed-loop",
@@ -1735,14 +1955,10 @@ def run_gui(
                     panel.diagnostics_scroll.verticalScrollBar().setValue(0)
                 elif screenshot_target == "stage-07-preference-response-physiology":
                     panel.table_tabs.setCurrentIndex(0)
-                    panel.diagnostics_scroll.ensureWidgetVisible(
-                        panel.light_response_chart
-                    )
+                    panel.diagnostics_scroll.ensureWidgetVisible(panel.light_response_chart)
                 else:
                     panel.table_tabs.setCurrentIndex(1)
-                    panel.diagnostics_scroll.ensureWidgetVisible(
-                        panel.garden_evaluation_chart
-                    )
+                    panel.diagnostics_scroll.ensureWidgetVisible(panel.garden_evaluation_chart)
             elif screenshot_target in {
                 "three-life-overview",
                 "touch-holder-second-round",
@@ -1785,20 +2001,27 @@ def main(argv: list[str] | None = None) -> int:
         and not args.headless_three_life_competition_demo
     ):
         raise ValueError(
-            "--export-three-life-competition-csv requires "
-            "--headless-three-life-competition-demo"
+            "--export-three-life-competition-csv requires --headless-three-life-competition-demo"
         )
     if args.export_light_device_csv is not None and not args.headless_light_device_demo:
-        raise ValueError(
-            "--export-light-device-csv requires --headless-light-device-demo"
-        )
+        raise ValueError("--export-light-device-csv requires --headless-light-device-demo")
     if (
         args.export_light_responsive_user_csv is not None
         and not args.headless_light_responsive_user_demo
     ):
         raise ValueError(
-            "--export-light-responsive-user-csv requires "
-            "--headless-light-responsive-user-demo"
+            "--export-light-responsive-user-csv requires --headless-light-responsive-user-demo"
+        )
+    relation_memory_options = (
+        args.initial_relation_state_json,
+        args.export_final_relation_state_json,
+        args.export_relation_memory_csv,
+    )
+    if any(value is not None for value in relation_memory_options) and not (
+        args.headless_relation_memory_demo
+    ):
+        raise ValueError(
+            "Stage 5C state/CSV options require --headless-relation-memory-demo"
         )
     if args.headless_demo or args.headless_time_demo:
         return run_headless_demo()
@@ -1814,15 +2037,20 @@ def main(argv: list[str] | None = None) -> int:
             export_csv=args.export_single_life_csv,
         )
     if args.headless_three_life_competition_demo:
-        return run_headless_three_life_competition_demo(
-            args.export_three_life_competition_csv
-        )
+        return run_headless_three_life_competition_demo(args.export_three_life_competition_csv)
     if args.headless_light_device_demo:
         return run_headless_light_device_demo(args.export_light_device_csv)
     if args.headless_light_responsive_user_demo:
         return run_headless_light_responsive_user_demo(
-            preset_name=args.light_response_preset,
+            preset_name=args.light_response_preset or DEFAULT_LIGHT_RESPONSE_PRESET,
             export_csv=args.export_light_responsive_user_csv,
+        )
+    if args.headless_relation_memory_demo:
+        return run_headless_relation_memory_demo(
+            preset_name=args.light_response_preset or DEFAULT_RELATION_MEMORY_PRESET,
+            initial_state_json=args.initial_relation_state_json,
+            export_final_state_json=args.export_final_relation_state_json,
+            export_csv=args.export_relation_memory_csv,
         )
     if args.life_role is not None or args.screenshot_target == "digital-life-graphs":
         return run_single_life_gui(
@@ -1837,7 +2065,7 @@ def main(argv: list[str] | None = None) -> int:
         auto_close_ms=args.auto_close_ms,
         screenshot=args.screenshot,
         screenshot_target=args.screenshot_target,
-        preset_name=args.light_response_preset,
+        preset_name=args.light_response_preset or DEFAULT_RELATION_MEMORY_PRESET,
     )
 
 

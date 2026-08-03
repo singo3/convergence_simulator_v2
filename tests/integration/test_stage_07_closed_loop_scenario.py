@@ -19,6 +19,9 @@ from symbiotic_sim_v2.runtime.closed_loop import (
     LightResponsiveClosedLoopSimulation,
     create_light_responsive_closed_loop_simulation,
 )
+from symbiotic_sim_v2.runtime.closed_loop.light_responsive_scenario import (
+    _create_light_responsive_closed_loop_simulation,
+)
 from symbiotic_sim_v2.runtime.light_simulation import (
     LightFeedbackSimulation,
     create_light_feedback_simulation,
@@ -86,8 +89,35 @@ def test_private_injection_seam_preserves_every_existing_public_signature() -> N
     for public_factory, internal_builder in pairs:
         assert "heartbeat_source_factory" not in inspect.signature(public_factory).parameters
         assert "heartbeat_source_factory" in inspect.signature(internal_builder).parameters
+        assert (
+            "digital_life_component_factory"
+            not in inspect.signature(public_factory).parameters
+        )
+        assert (
+            "initial_persistent_states_by_life_id"
+            not in inspect.signature(public_factory).parameters
+        )
 
-    stage7_source = inspect.getsource(create_light_responsive_closed_loop_simulation)
+    for internal_builder in (
+        _create_three_digital_life_competition_simulation,
+        _create_light_feedback_simulation,
+        _create_light_responsive_closed_loop_simulation,
+    ):
+        parameters = inspect.signature(internal_builder).parameters
+        assert "digital_life_component_factory" in parameters
+        assert "initial_persistent_states_by_life_id" in parameters
+
+    stage7_public_parameters = inspect.signature(
+        create_light_responsive_closed_loop_simulation
+    ).parameters
+    assert "digital_life_component_factory" not in stage7_public_parameters
+    assert "initial_persistent_states_by_life_id" not in stage7_public_parameters
+
+    stage7_public_source = inspect.getsource(
+        create_light_responsive_closed_loop_simulation
+    )
+    assert "_create_light_responsive_closed_loop_simulation" in stage7_public_source
+    stage7_source = inspect.getsource(_create_light_responsive_closed_loop_simulation)
     assert "_create_light_feedback_simulation" in stage7_source
     assert "SimulationEngine(" not in stage7_source
     assert "GardenInputComponent(" not in stage7_source

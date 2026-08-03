@@ -107,3 +107,19 @@ Stage 7.1の物理signature対象field、exact equality、`physical_stimulus_par
 光responseが変更するのは将来のheartbeat intervalを生成する平均RRIと呼吸性成分だけである。H10は引き続きheartbeat正式時刻差からraw RRIを測定し、GardenがRRIからRMSSDとNを計算する。光からRMSSD、N、Nd、Wを直接変更しない。予約済みheartbeatをlight receipt時にrescheduleせず、Stage 2と同じroot seed、named random stream、beat-index keyを使用する。gain 0のcontrolはStage 6 formal streamを再現する。
 
 Stage 7はcandidate、`k_trial`、adoption、convergence、関係記憶探索を持たず、kを固定する。これらは次工程Stage 5Cの責務である。
+
+## Stage 5Cの3Bundle関係記憶探索との境界
+
+Stage 5Cがv2.0から実装する規範範囲は第25〜27章である。生命固有の `c_i=Hash01(ID_i,"curiosity")`、cから導く `sigma_min/max`、`epsilon_accept`、`p_explore_min`、`W_anchor_session`に応じたsigmaと探索確率、`session_count`を使うhold/explore、`trial_count`を使うF/T方向、`reflect01`による連続candidate、1session最大1candidate、Bundle 0 anchor評価、Bundle 1仮評価、Bundle 2での同一trial確認・anchor復帰、正式採用・rollback、G=0の採否禁止、persistent/session-local stateの区別を対象とする。
+
+Coreの係数、Hash key、strict `<` / `>`、A/D固定、F/Tのみの連続探索、Bundle 2 confirmation必須、`trial_count`のcandidate生成時増加、`session_count`の正常session確定時増加はv2.0の規範である。baseline終了時の `W=0.5` はanchor評価ではなく、`W_anchor_session` はBundle 0の有効anchor評価で初めて設定し、next sessionへは比較値として引き継がない。
+
+次の具体policyはv2.0のCoreではなく、Stage 5Cのversion管理された **simulation implementation assumption** である。
+
+- `positive_f_axis_on_near_zero_direction_norm_v0_1`: v2.0が具体方向を固定しない極小norm fallbackを、`norm<=1e-12`の正F軸に固定する。
+- `keep_same_trial_for_bundle2_but_require_two_valid_trial_evaluations_v0_1`: Bundle 1 evaluation reject後は同じtrialをBundle 2へ維持するが、有効trial評価が1回なら採用せずrollbackする。v2.0の「残りbundleで同じ候補を再評価してよい」を本参照分岐に固定したものである。
+- `relation_update_effective_next_signal_v0_1`: feedback第2周で変更したkを次signalの `Phi_B(k)` から使い、同一signal内のBを再計算しないinteger-microsecond simulation上のseamである。
+
+Stage 5Cの`AdaptiveConnectedDigitalLifeComponent`、immutable record/schema、JSON/CSV/digest、off-center診断fixture、GUIのF/T最適点、方向norm threshold、state-machineの監査語彙は開発・検証用の具体実装である。診断上の仮想ユーザー最適kをDigital Life Coreへ渡さず、RuntimeとGardenはcandidateを生成・選択しない。
+
+strict persistent-state I/OはStage 8が初期値と正常final stateを受け渡すためのseamである。Stage 5Cが実行するのは単一の240秒sessionだけであり、複数sessionの自動連結、baseline再取得lifecycle、session間W比較、長期収束・sustained convergence判定、Monte Carlo、係数tuningは未実装・未評価である。

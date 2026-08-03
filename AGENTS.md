@@ -56,5 +56,15 @@
 - Eは毎signalの第2周で更新する。qは新しい有効なintervention bundle評価がありG=1の生命だけ更新し、baseline評価では更新しない。
 - 240秒closingでは新しい評価revisionを適用し、release前holderでfeedbackと全3生命の第2周を完了した後だけholderを解放する。
 - kと関係記憶の探索・trial・adoptionはStage 5Cまで実装しない。
+- Stage 5Cの作業前に規範仕様v2.0の第25〜27章を指定絶対パスから直接読み、生得写像C_i、3bundle状態遷移、更新・維持・引継ぎの式とversion tupleを確認する。
+- baseline初期化時の `W=0.5` を `W_anchor_session` として扱わず、資格生命のBundle 0の新しい有効評価で初めて設定する。
+- Stage 5Cで生成するcandidateは1セッション最大1つとし、Bundle 1の1評価だけで正式採用せず、Bundle 2で同じcandidateの再現性を確認する。
+- Bundle 1の仮採用、Bundle 2のanchor超過、2評価平均の条件はすべてstrict `>` を使い、閾値と完全一致は不成立とする。
+- G=0生命はcandidate生成、trial_count増加、k_current/k_anchor更新、採否を行わない。
+- relation memoryはF/Tだけを探索し、A/Dを完全維持する。候補生成は `reflect01` を使い、clipへの置換や25セルへの丸めを行わない。
+- `trial_count` はcandidate生成時だけ増加し、Hash方向にはincrement前の値を使う。`session_count` は正常な240秒closingの第2周完了時だけ全生命で1増加する。
+- 関係記憶のk更新はfeedback第2周で確定し、`relation_update_effective_next_signal_v0_1` に従って次signalのBから使う。同じsignal内で更新後kからBを再計算しない。
+- candidateの生成・採否は各Digital Life Core内のC_iの責務とし、RuntimeやGardenへcandidate selector、他生命比較、関係記憶stateを置かない。
+- Stage 5Cはpersistent state入出力をStage 8用seamとして持つが、single-sessionに限定し、複数セッション自動連結、長期収束判定、Monte Carlo、係数tuningを先回り実装しない。
 - Stageごとに独立commitを作り、push前にcompileall、全pytest、Ruff、headless、GUI smoke、digest回帰を検証する。
 - force push、force-with-lease、既存commitのamend/rebaseを行わない。

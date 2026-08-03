@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from types import MappingProxyType
+from typing import Protocol
 
 from symbiotic_sim_v2.devices.polar_h10.component import PolarH10Component
 from symbiotic_sim_v2.devices.polar_h10.config import PolarH10Config
@@ -45,6 +46,30 @@ from symbiotic_sim_v2.simulation.engine import SimulationEngine
 from symbiotic_sim_v2.simulation.scheduler import EventScheduler
 from symbiotic_sim_v2.virtual_user.component import VirtualUserComponent
 from symbiotic_sim_v2.virtual_user.config import VirtualUserConfig
+
+
+class DigitalLifeComponentFactory(Protocol):
+    """Private construction seam for one roster-owned connected component."""
+
+    def __call__(
+        self,
+        config: DigitalLifeConfig,
+        initial_persistent_state: object | None,
+        /,
+    ) -> ConnectedDigitalLifeComponent: ...
+
+
+def _create_legacy_connected_life(
+    config: DigitalLifeConfig,
+    initial_persistent_state: object | None,
+) -> ConnectedDigitalLifeComponent:
+    """Keep every public Stage 5B-7.1 factory on the original component."""
+
+    if initial_persistent_state is not None:
+        raise ValueError(
+            "initial persistent state requires an injected Digital Life component factory"
+        )
+    return ConnectedDigitalLifeComponent(config)
 
 
 @dataclass(slots=True)
@@ -176,8 +201,12 @@ def _create_three_digital_life_competition_simulation(
     runtime_config: MultiLifeRuntimeConfig | None = None,
     garden_output_config: GardenOutputConfig | None = None,
     heartbeat_source_factory: HeartbeatSourceFactory,
+    digital_life_component_factory: DigitalLifeComponentFactory = (
+        _create_legacy_connected_life
+    ),
+    initial_persistent_states_by_life_id: Mapping[str, object] | None = None,
 ) -> ThreeDigitalLifeCompetitionSimulation:
-    """Build Stage 5B over the injected Stage 4 heartbeat-source seam."""
+    """Build Stage 5B over private heartbeat and Digital Life injection seams."""
 
     supplied_configs = (
         tuple(digital_life_configs)
@@ -214,6 +243,22 @@ def _create_three_digital_life_competition_simulation(
     selected_life_configs = tuple(
         configs_by_id[life_id] for life_id in selected_runtime_config.expected_digital_life_ids
     )
+    if not callable(digital_life_component_factory):
+        raise TypeError("digital_life_component_factory must be callable")
+    if initial_persistent_states_by_life_id is None:
+        initial_states_by_id = {
+            life_id: None for life_id in selected_runtime_config.expected_digital_life_ids
+        }
+    else:
+        if not isinstance(initial_persistent_states_by_life_id, Mapping):
+            raise TypeError("initial_persistent_states_by_life_id must be a mapping")
+        initial_states_by_id = dict(initial_persistent_states_by_life_id)
+        if set(initial_states_by_id) != set(
+            selected_runtime_config.expected_digital_life_ids
+        ):
+            raise ValueError(
+                "initial persistent state IDs must match the runtime roster"
+            )
 
     upstream = _create_garden_input_simulation(
         virtual_user_config=virtual_user_config,
@@ -222,7 +267,10 @@ def _create_three_digital_life_competition_simulation(
         heartbeat_source_factory=heartbeat_source_factory,
     )
     life_components = {
-        config.digital_life_id: ConnectedDigitalLifeComponent(config)
+        config.digital_life_id: digital_life_component_factory(
+            config,
+            initial_states_by_id[config.digital_life_id],
+        )
         for config in selected_life_configs
     }
     immutable_life_components = MappingProxyType(life_components)

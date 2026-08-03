@@ -32,6 +32,10 @@ from symbiotic_sim_v2.runtime.multi_life.config import MultiLifeRuntimeConfig
 from symbiotic_sim_v2.runtime.multi_life.coordinator import (
     MultiLifeRuntimeCoordinator,
 )
+from symbiotic_sim_v2.runtime.multi_life.scenario import (
+    DigitalLifeComponentFactory,
+    _create_legacy_connected_life,
+)
 from symbiotic_sim_v2.simulation.engine import SimulationEngine
 from symbiotic_sim_v2.simulation.scheduler import EventScheduler
 from symbiotic_sim_v2.virtual_user.config import VirtualUserConfig
@@ -200,6 +204,37 @@ def create_light_responsive_closed_loop_simulation(
 ) -> LightResponsiveClosedLoopSimulation:
     """Wire only the Stage 6 formal light state back to the injected user."""
 
+    return _create_light_responsive_closed_loop_simulation(
+        virtual_user_config=virtual_user_config,
+        polar_h10_config=polar_h10_config,
+        garden_input_config=garden_input_config,
+        digital_life_configs=digital_life_configs,
+        runtime_config=runtime_config,
+        garden_output_config=garden_output_config,
+        garden_light_mapper_config=garden_light_mapper_config,
+        virtual_light_device_config=virtual_light_device_config,
+        light_response_config=light_response_config,
+    )
+
+
+def _create_light_responsive_closed_loop_simulation(
+    *,
+    virtual_user_config: VirtualUserConfig | None = None,
+    polar_h10_config: PolarH10Config | None = None,
+    garden_input_config: GardenInputConfig | None = None,
+    digital_life_configs: Sequence[DigitalLifeConfig] | None = None,
+    runtime_config: MultiLifeRuntimeConfig | None = None,
+    garden_output_config: GardenOutputConfig | None = None,
+    garden_light_mapper_config: GardenLightMapperConfig | None = None,
+    virtual_light_device_config: VirtualLightDeviceConfig | None = None,
+    light_response_config: LightResponseConfig | None = None,
+    digital_life_component_factory: DigitalLifeComponentFactory = (
+        _create_legacy_connected_life
+    ),
+    initial_persistent_states_by_life_id: Mapping[str, object] | None = None,
+) -> LightResponsiveClosedLoopSimulation:
+    """Build Stage 7 while retaining private heartbeat and life injection seams."""
+
     selected_light_response_config = light_response_config or aligned_green_center()
     if not isinstance(selected_light_response_config, LightResponseConfig):
         raise TypeError("light_response_config must be a LightResponseConfig")
@@ -222,6 +257,8 @@ def create_light_responsive_closed_loop_simulation(
         garden_light_mapper_config=garden_light_mapper_config,
         virtual_light_device_config=virtual_light_device_config,
         heartbeat_source_factory=create_responsive_user,
+        digital_life_component_factory=digital_life_component_factory,
+        initial_persistent_states_by_life_id=initial_persistent_states_by_life_id,
     )
     responsive_user = upstream.upstream_simulation.virtual_user_component
     if not isinstance(responsive_user, LightResponsiveVirtualUserComponent):
