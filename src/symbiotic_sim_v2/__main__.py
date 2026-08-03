@@ -1,4 +1,4 @@
-"""Command entry point for Stage 1-7 headless demos and the Stage 7 GUI."""
+"""Command entry point for Stage 1-7.1 headless demos and the Stage 7.1 GUI."""
 
 from __future__ import annotations
 
@@ -107,11 +107,16 @@ from symbiotic_sim_v2.virtual_user.diagnostics import (
 )
 from symbiotic_sim_v2.virtual_user.light_response.config import (
     HEARTBEAT_CAUSALITY_POLICY_VERSION,
+    LIGHT_RESPONSE_DYNAMICS_EPOCH_SCHEMA_VERSION,
     LIGHT_RESPONSE_MODEL_VERSION,
+    LIGHT_RESPONSE_SEGMENT_SCHEMA_VERSION,
+    PHYSICAL_LIGHT_PARAMETER_SIGNATURE_VERSION,
     PHYSICAL_PROJECTION_VERSION,
+    PHYSICAL_STIMULUS_CHANGE_POLICY_VERSION,
     PHYSIOLOGY_COUPLING_VERSION,
     PREFERENCE_MODEL_VERSION,
     RESPONSE_DYNAMICS_VERSION,
+    SEGMENT_SPLIT_POLICY_VERSION,
 )
 from symbiotic_sim_v2.virtual_user.light_response.diagnostics import (
     export_light_response_diagnostics,
@@ -136,7 +141,7 @@ STAGE_6_HEADLESS_PROJECT_VERSION = "0.7.0"
 
 
 def _build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Symbiotic simulator Stage 7")
+    parser = argparse.ArgumentParser(description="Symbiotic simulator Stage 7.1")
     headless_group = parser.add_mutually_exclusive_group()
     headless_group.add_argument(
         "--headless-demo",
@@ -265,7 +270,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--export-light-responsive-user-csv",
         type=Path,
-        help="write the four Stage 7 response diagnostic CSV files to a directory",
+        help="write the five Stage 7.1 response diagnostic CSV files to a directory",
     )
     return parser
 
@@ -852,6 +857,7 @@ def run_headless_light_responsive_user_demo(
     component = simulation.light_responsive_virtual_user_component
     receipts = component.light_receipt_records()
     segments = component.response_segments()
+    response_dynamics_epochs = component.response_dynamics_epoch_records()
     samples = component.response_samples()
     heartbeats = component.heartbeat_records()
     responsive_heartbeats = component.responsive_heartbeat_records()
@@ -893,7 +899,7 @@ def run_headless_light_responsive_user_demo(
         light_response_config,
         response_at_90s,
     )
-    written_csvs: tuple[Path, Path, Path, Path] | None = None
+    written_csvs: tuple[Path, Path, Path, Path, Path] | None = None
     if export_csv is not None:
         written_csvs = export_light_response_diagnostics(export_csv, component)
 
@@ -907,6 +913,17 @@ def run_headless_light_responsive_user_demo(
         "physical_projection_version": PHYSICAL_PROJECTION_VERSION,
         "preference_model_version": PREFERENCE_MODEL_VERSION,
         "response_dynamics_version": RESPONSE_DYNAMICS_VERSION,
+        "response_segment_schema_version": LIGHT_RESPONSE_SEGMENT_SCHEMA_VERSION,
+        "response_dynamics_epoch_schema_version": (
+            LIGHT_RESPONSE_DYNAMICS_EPOCH_SCHEMA_VERSION
+        ),
+        "physical_stimulus_change_policy_version": (
+            PHYSICAL_STIMULUS_CHANGE_POLICY_VERSION
+        ),
+        "physical_light_parameter_signature_version": (
+            PHYSICAL_LIGHT_PARAMETER_SIGNATURE_VERSION
+        ),
+        "segment_split_policy_version": SEGMENT_SPLIT_POLICY_VERSION,
         "physiology_coupling_version": PHYSIOLOGY_COUPLING_VERSION,
         "heartbeat_causality_policy_version": (
             HEARTBEAT_CAUSALITY_POLICY_VERSION
@@ -923,6 +940,11 @@ def run_headless_light_responsive_user_demo(
         "response_target_change_count": (
             component.snapshot().response_target_change_count
         ),
+        "physical_stimulus_change_count": (
+            component.snapshot().physical_stimulus_change_count
+        ),
+        "physical_audit_segment_count": len(segments),
+        "response_dynamics_epoch_count": len(response_dynamics_epochs),
         "response_segment_count": len(segments),
         "response_sample_count": len(samples),
         "first_active_effective_time_us": first_active.event_time_us,
@@ -973,7 +995,13 @@ def run_headless_light_responsive_user_demo(
         "heartbeat_digest": component.heartbeat_digest(),
         "responsive_diagnostic_digest": component.responsive_diagnostic_digest(),
         "light_receipt_digest": component.light_receipt_digest(),
+        "physical_audit_segment_digest": (
+            component.physical_audit_segment_digest()
+        ),
         "response_segment_digest": component.response_segment_digest(),
+        "response_dynamics_epoch_digest": (
+            component.response_dynamics_epoch_digest()
+        ),
         "response_sample_digest": component.response_sample_digest(),
         "full_event_digest": simulation.engine.deterministic_digest(),
     }
@@ -981,8 +1009,9 @@ def run_headless_light_responsive_user_demo(
         result["diagnostic_csvs"] = {
             "light_stimulus_receipts": str(written_csvs[0]),
             "light_response_segments": str(written_csvs[1]),
-            "light_responsive_heartbeats": str(written_csvs[2]),
-            "light_response_samples": str(written_csvs[3]),
+            "response_dynamics_epochs": str(written_csvs[2]),
+            "light_responsive_heartbeats": str(written_csvs[3]),
+            "light_response_samples": str(written_csvs[4]),
         }
     print(json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True))
     return 0
@@ -1589,12 +1618,14 @@ def run_gui(
             receipts = component.light_receipt_records()
             responsive_heartbeats = component.responsive_heartbeat_records()
             segments = component.response_segments()
+            response_epochs = component.response_dynamics_epoch_records()
             samples = component.response_samples() if component.snapshot().completed else ()
             first_active = next((record for record in receipts if record.active), None)
             if (
                 len(receipts) != 241
                 or len(responsive_heartbeats) != 277
                 or len(segments) != 2
+                or len(response_epochs) != 2
                 or len(samples) != 2_401
             ):
                 failures.append("Stage 7 record counts")
@@ -1630,8 +1661,14 @@ def run_gui(
                 failures.append("H10 changed RRI count")
             if (
                 response_panel.receipt_model.rowCount() != 241
+                or response_panel.audit_segment_model.rowCount() != 2
+                or response_panel.response_epoch_model.rowCount() != 2
                 or response_panel.heartbeat_model.rowCount() != 277
                 or response_panel.light_response_chart.sample_count != 2_401
+                or response_panel.light_response_chart.audit_segment_boundary_count
+                != 2
+                or response_panel.light_response_chart.response_epoch_boundary_count
+                != 2
                 or response_panel.physiology_chart.record_count != 277
                 or response_panel.garden_evaluation_chart.evaluation_count != 4
             ):

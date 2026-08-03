@@ -35,6 +35,7 @@ from symbiotic_sim_v2.virtual_user.light_response.dynamics import (
 from symbiotic_sim_v2.virtual_user.light_response.physical_projection import (
     PhysicalLightStimulus,
     inactive_physical_light_stimulus,
+    physical_light_parameter_signature,
     project_physical_light_stimulus,
 )
 from symbiotic_sim_v2.virtual_user.light_response.physiology import (
@@ -48,6 +49,7 @@ from symbiotic_sim_v2.virtual_user.light_response.preference import (
     response_target_for,
 )
 from symbiotic_sim_v2.virtual_user.light_response.records import (
+    LightResponseDynamicsEpochRecord,
     LightResponseSample,
     LightResponseSegment,
     LightResponsiveHeartbeatRecord,
@@ -60,12 +62,35 @@ from symbiotic_sim_v2.virtual_user.light_response.state import (
 
 @dataclass(frozen=True, slots=True)
 class _ResponseEpoch:
+    epoch_index: int
     start_time_us: int
     response_at_start: float
     response_target: float
     time_constant_seconds: float | None
+    target_changed_at_start: bool
+
+
+@dataclass(frozen=True, slots=True)
+class _AuditState:
+    segment_index: int
+    start_time_us: int
     stimulus: PhysicalLightStimulus
     preference: LightPreferenceMatch
+    response_target: float
+    response_dynamics_epoch_index: int
+    physical_parameters_changed_at_start: bool
+    target_changed_at_start: bool
+    split_reason: str
+
+
+AUDIT_SPLIT_REASON_SIMULATION_START = "simulation_start"
+AUDIT_SPLIT_REASON_PHYSICAL_PARAMETERS_CHANGED = "physical_parameters_changed"
+AUDIT_SPLIT_REASON_PHYSICAL_AND_TARGET_CHANGED = (
+    "physical_parameters_and_response_target_changed"
+)
+AUDIT_SPLIT_REASON_TARGET_WITHOUT_PHYSICAL_CHANGE = (
+    "response_target_changed_without_physical_parameter_change_unexpected_stationary_case"
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -106,21 +131,36 @@ class LightResponsiveVirtualUserComponent(VirtualUserComponent):
         self._responsive_records: list[LightResponsiveHeartbeatRecord] = []
         self._light_receipts: list[LightStimulusReceiptRecord] = []
         self._response_segments: list[LightResponseSegment] = []
+        self._response_dynamics_epoch_records: list[
+            LightResponseDynamicsEpochRecord
+        ] = []
         self._physical_history: list[PhysicalLightStimulus] = []
         self._physical_times_us: list[int] = []
         self._response_epochs: list[_ResponseEpoch] = [
             _ResponseEpoch(
+                epoch_index=0,
                 start_time_us=0,
                 response_at_start=0.0,
                 response_target=0.0,
                 time_constant_seconds=None,
-                stimulus=initial_stimulus,
-                preference=initial_preference,
+                target_changed_at_start=False,
             )
         ]
         self._response_epoch_times_us: list[int] = [0]
+        self._audit_state = _AuditState(
+            segment_index=0,
+            start_time_us=0,
+            stimulus=initial_stimulus,
+            preference=initial_preference,
+            response_target=0.0,
+            response_dynamics_epoch_index=0,
+            physical_parameters_changed_at_start=False,
+            target_changed_at_start=False,
+            split_reason=AUDIT_SPLIT_REASON_SIMULATION_START,
+        )
         self._pending_light_computation: _PendingLightComputation | None = None
         self._seen_source_signal_indices: set[int] = set()
+        self._physical_stimulus_change_count = 0
         self._response_target_change_count = 0
         self._latest_observed_time_us = 0
         self._completed = False
@@ -232,11 +272,28 @@ class LightResponsiveVirtualUserComponent(VirtualUserComponent):
         preference = evaluate_light_preference(stimulus, self.light_response_config)
         target = response_target_for(stimulus, preference, self.light_response_config)
         response_before = self.response_at(state.effective_time_us)
+        physical_parameters_changed = (
+            physical_light_parameter_signature(stimulus)
+            != physical_light_parameter_signature(self._audit_state.stimulus)
+        )
         current_epoch = self._response_epochs[-1]
         target_changed = target != current_epoch.response_target
+        audit_split_required = physical_parameters_changed or target_changed
+        audit_split_reason = (
+            self._audit_split_reason(
+                physical_parameters_changed=physical_parameters_changed,
+                target_changed=target_changed,
+            )
+            if audit_split_required
+            else None
+        )
+
+        if audit_split_required:
+            self._close_current_audit_segment(state.effective_time_us)
         if target_changed:
-            self._close_current_segment(state.effective_time_us)
+            self._close_current_response_dynamics_epoch(state.effective_time_us)
             new_epoch = _ResponseEpoch(
+                epoch_index=len(self._response_dynamics_epoch_records),
                 start_time_us=state.effective_time_us,
                 response_at_start=response_before,
                 response_target=target,
@@ -245,16 +302,41 @@ class LightResponsiveVirtualUserComponent(VirtualUserComponent):
                     target,
                     self.light_response_config,
                 ),
-                stimulus=stimulus,
-                preference=preference,
+                target_changed_at_start=True,
             )
             self._response_epochs.append(new_epoch)
             self._response_epoch_times_us.append(state.effective_time_us)
             self._response_target_change_count += 1
+        if audit_split_required:
+            if audit_split_reason is None:
+                raise RuntimeError("audit split requires a diagnostic reason")
+            self._audit_state = _AuditState(
+                segment_index=len(self._response_segments),
+                start_time_us=state.effective_time_us,
+                stimulus=stimulus,
+                preference=preference,
+                response_target=target,
+                response_dynamics_epoch_index=self._response_epochs[-1].epoch_index,
+                physical_parameters_changed_at_start=physical_parameters_changed,
+                target_changed_at_start=target_changed,
+                split_reason=audit_split_reason,
+            )
+        if physical_parameters_changed:
+            self._physical_stimulus_change_count += 1
 
         response_after = self.response_at(state.effective_time_us)
         if response_after != response_before:
             raise RuntimeError("light input caused a discontinuous response jump")
+        terminal_zero_duration_audit = (
+            audit_split_required
+            and state.effective_time_us
+            == self.light_response_config.simulation_end_time_us
+        )
+        terminal_zero_duration_epoch = (
+            target_changed
+            and state.effective_time_us
+            == self.light_response_config.simulation_end_time_us
+        )
         self._physical_history.append(stimulus)
         self._physical_times_us.append(state.effective_time_us)
         self._seen_source_signal_indices.add(state.source_signal_index)
@@ -271,7 +353,21 @@ class LightResponsiveVirtualUserComponent(VirtualUserComponent):
                 bpm_match=preference.bpm_match,
                 preference_match=preference.preference_match,
                 response_target=target,
+                physical_parameters_changed=physical_parameters_changed,
                 target_changed=target_changed,
+                audit_segment_index=(
+                    None
+                    if terminal_zero_duration_audit
+                    else self._audit_state.segment_index
+                ),
+                response_dynamics_epoch_index=(
+                    None
+                    if terminal_zero_duration_epoch
+                    else self._response_epochs[-1].epoch_index
+                ),
+                audit_split_reason=(
+                    audit_split_reason if audit_split_required else None
+                ),
                 response_before=response_before,
                 response_after_at_same_time=response_after,
                 provenance_used_by_physiology=False,
@@ -279,6 +375,15 @@ class LightResponsiveVirtualUserComponent(VirtualUserComponent):
                     self.light_response_config.physical_projection_version
                 ),
                 preference_model_version=self.light_response_config.preference_model_version,
+                physical_stimulus_change_policy_version=(
+                    self.light_response_config.physical_stimulus_change_policy_version
+                ),
+                physical_light_parameter_signature_version=(
+                    self.light_response_config.physical_light_parameter_signature_version
+                ),
+                segment_split_policy_version=(
+                    self.light_response_config.segment_split_policy_version
+                ),
                 input_schema_version=self.light_response_config.input_schema_version,
             )
         )
@@ -301,8 +406,11 @@ class LightResponsiveVirtualUserComponent(VirtualUserComponent):
             raise RuntimeError("light-responsive user is already completed")
         if event.scheduled_time_us < self._latest_observed_time_us:
             raise RuntimeError("completion time cannot move backwards")
-        self._close_current_segment(event.scheduled_time_us)
-        self._validate_response_segments()
+        self._close_current_audit_segment(event.scheduled_time_us)
+        self._close_current_response_dynamics_epoch(event.scheduled_time_us)
+        self._validate_audit_segments()
+        self._validate_response_dynamics_epochs()
+        self._validate_receipt_links()
         self._latest_observed_time_us = event.scheduled_time_us
         self._completed = True
 
@@ -369,8 +477,13 @@ class LightResponsiveVirtualUserComponent(VirtualUserComponent):
             effective_mean_rri_ms=effective_mean,
             current_mean_rri_increase_ms=mean_increase,
             light_input_count=len(self._light_receipts),
+            physical_stimulus_change_count=self._physical_stimulus_change_count,
             response_target_change_count=self._response_target_change_count,
-            response_segment_count=self._visible_response_segment_count(),
+            physical_audit_segment_count=self._visible_audit_segment_count(),
+            response_dynamics_epoch_count=(
+                self._visible_response_dynamics_epoch_count()
+            ),
+            response_segment_count=self._visible_audit_segment_count(),
             clamped_beat_count=self._clamped_beat_count,
             completed=self._completed,
         )
@@ -383,6 +496,19 @@ class LightResponsiveVirtualUserComponent(VirtualUserComponent):
 
     def response_segments(self) -> tuple[LightResponseSegment, ...]:
         return tuple(self._response_segments)
+
+    def physical_stimulus_segments(self) -> tuple[LightResponseSegment, ...]:
+        """Return finalized v2 physical-stimulus audit segments."""
+
+        return self.response_segments()
+
+    def physical_audit_segments(self) -> tuple[LightResponseSegment, ...]:
+        return self.response_segments()
+
+    def response_dynamics_epoch_records(
+        self,
+    ) -> tuple[LightResponseDynamicsEpochRecord, ...]:
+        return tuple(self._response_dynamics_epoch_records)
 
     def response_samples(self) -> tuple[LightResponseSample, ...]:
         """Return the required 0..240 s grid only after formal completion."""
@@ -417,13 +543,28 @@ class LightResponsiveVirtualUserComponent(VirtualUserComponent):
                     "bpm_match": record.bpm_match,
                     "preference_match": record.preference_match,
                     "response_target": record.response_target,
+                    "physical_parameters_changed": (
+                        record.physical_parameters_changed
+                    ),
                     "target_changed": record.target_changed,
+                    "audit_segment_index": record.audit_segment_index,
+                    "response_dynamics_epoch_index": (
+                        record.response_dynamics_epoch_index
+                    ),
+                    "audit_split_reason": record.audit_split_reason,
                     "response_before": record.response_before,
                     "provenance_used_by_physiology": (
                         record.provenance_used_by_physiology
                     ),
                     "physical_projection_version": record.physical_projection_version,
                     "preference_model_version": record.preference_model_version,
+                    "physical_stimulus_change_policy_version": (
+                        record.physical_stimulus_change_policy_version
+                    ),
+                    "physical_light_parameter_signature_version": (
+                        record.physical_light_parameter_signature_version
+                    ),
+                    "segment_split_policy_version": record.segment_split_policy_version,
                 }
                 for record in self._light_receipts
             ]
@@ -431,6 +572,14 @@ class LightResponsiveVirtualUserComponent(VirtualUserComponent):
 
     def response_segment_digest(self) -> str:
         return self._digest([record.to_dict() for record in self._response_segments])
+
+    def physical_audit_segment_digest(self) -> str:
+        return self.response_segment_digest()
+
+    def response_dynamics_epoch_digest(self) -> str:
+        return self._digest(
+            [record.to_dict() for record in self._response_dynamics_epoch_records]
+        )
 
     def response_sample_digest(self) -> str:
         return self._digest([record.to_dict() for record in self.response_samples()])
@@ -477,31 +626,76 @@ class LightResponsiveVirtualUserComponent(VirtualUserComponent):
             payload={"user_id": self.config.user_id, "beat_index": len(self._records)},
         )
 
-    def _close_current_segment(self, end_time_us: int) -> None:
-        epoch = self._response_epochs[-1]
-        if end_time_us < epoch.start_time_us:
-            raise RuntimeError("response segment end precedes its start")
-        if end_time_us == epoch.start_time_us:
+    def _close_current_audit_segment(self, end_time_us: int) -> None:
+        audit = self._audit_state
+        if end_time_us < audit.start_time_us:
+            raise RuntimeError("audit segment end precedes its start")
+        if end_time_us == audit.start_time_us:
             return
         self._response_segments.append(
             LightResponseSegment(
-                segment_index=len(self._response_segments),
+                segment_index=audit.segment_index,
+                start_time_us=audit.start_time_us,
+                end_time_us=end_time_us,
+                duration_us=end_time_us - audit.start_time_us,
+                light_active=audit.stimulus.active,
+                render_hue_degree=audit.stimulus.render_hue_degree,
+                saturation=audit.stimulus.saturation,
+                value_center=audit.stimulus.value_center,
+                value_amplitude=audit.stimulus.value_amplitude,
+                value_min=audit.stimulus.value_min,
+                value_max=audit.stimulus.value_max,
+                blink_bpm=audit.stimulus.blink_bpm,
+                waveform=audit.stimulus.waveform,
+                hue_match=audit.preference.hue_match,
+                bpm_match=audit.preference.bpm_match,
+                preference_match=audit.preference.preference_match,
+                response_target=audit.response_target,
+                response_dynamics_epoch_index=(
+                    audit.response_dynamics_epoch_index
+                ),
+                physical_parameters_changed_at_start=(
+                    audit.physical_parameters_changed_at_start
+                ),
+                target_changed_at_start=audit.target_changed_at_start,
+                split_reason=audit.split_reason,
+                physical_stimulus_change_policy_version=(
+                    self.light_response_config.physical_stimulus_change_policy_version
+                ),
+                physical_light_parameter_signature_version=(
+                    self.light_response_config.physical_light_parameter_signature_version
+                ),
+                segment_split_policy_version=(
+                    self.light_response_config.segment_split_policy_version
+                ),
+                preference_model_version=self.light_response_config.preference_model_version,
+                schema_version=self.light_response_config.response_segment_schema_version,
+            )
+        )
+
+    def _close_current_response_dynamics_epoch(self, end_time_us: int) -> None:
+        epoch = self._response_epochs[-1]
+        if end_time_us < epoch.start_time_us:
+            raise RuntimeError("response dynamics epoch end precedes its start")
+        if end_time_us == epoch.start_time_us:
+            return
+        self._response_dynamics_epoch_records.append(
+            LightResponseDynamicsEpochRecord(
+                epoch_index=epoch.epoch_index,
                 start_time_us=epoch.start_time_us,
                 end_time_us=end_time_us,
                 duration_us=end_time_us - epoch.start_time_us,
-                light_active=epoch.stimulus.active,
-                render_hue_degree=epoch.stimulus.render_hue_degree,
-                blink_bpm=epoch.stimulus.blink_bpm,
-                hue_match=epoch.preference.hue_match,
-                bpm_match=epoch.preference.bpm_match,
-                preference_match=epoch.preference.preference_match,
                 response_target=epoch.response_target,
                 response_at_start=epoch.response_at_start,
                 response_at_end=self.response_at(end_time_us),
                 time_constant_seconds=epoch.time_constant_seconds,
-                preference_model_version=self.light_response_config.preference_model_version,
-                response_dynamics_version=self.light_response_config.response_dynamics_version,
-                schema_version=self.light_response_config.response_segment_schema_version,
+                target_changed_at_start=epoch.target_changed_at_start,
+                response_dynamics_version=(
+                    self.light_response_config.response_dynamics_version
+                ),
+                schema_version=(
+                    self.light_response_config.response_dynamics_epoch_schema_version
+                ),
             )
         )
 
@@ -542,31 +736,130 @@ class LightResponsiveVirtualUserComponent(VirtualUserComponent):
             effective_mean_rri_ms=effective_mean,
         )
 
-    def _validate_response_segments(self) -> None:
+    def _validate_audit_segments(self) -> None:
         previous_end = 0
-        previous_response: float | None = None
+        previous_signature: tuple[object, ...] | None = None
         for index, segment in enumerate(self._response_segments):
             if segment.segment_index != index:
-                raise RuntimeError("response segment indices are not contiguous")
+                raise RuntimeError("audit segment indices are not contiguous")
             if segment.start_time_us != previous_end or segment.end_time_us <= previous_end:
-                raise RuntimeError("response segments have a gap, overlap, or empty interval")
-            if (
-                previous_response is not None
-                and segment.response_at_start != previous_response
+                raise RuntimeError("audit segments have a gap, overlap, or empty interval")
+            signature = self._audit_record_signature(segment)
+            if previous_signature is not None:
+                actual_physical_change = signature != previous_signature
+                if (
+                    segment.physical_parameters_changed_at_start
+                    != actual_physical_change
+                ):
+                    raise RuntimeError("audit physical-change flag differs from signature")
+                if not (
+                    segment.physical_parameters_changed_at_start
+                    or segment.target_changed_at_start
+                ):
+                    raise RuntimeError("audit segment was split without a versioned reason")
+            if not 0 <= segment.response_dynamics_epoch_index < len(
+                self._response_dynamics_epoch_records
             ):
-                raise RuntimeError("response segments are discontinuous")
+                raise RuntimeError("audit segment references an unknown response epoch")
             previous_end = segment.end_time_us
-            previous_response = segment.response_at_end
+            previous_signature = signature
         if previous_end != self.light_response_config.simulation_end_time_us:
-            raise RuntimeError("response segments do not cover the complete simulation")
+            raise RuntimeError("audit segments do not cover the complete simulation")
 
-    def _visible_response_segment_count(self) -> int:
+    def _validate_response_dynamics_epochs(self) -> None:
+        previous_end = 0
+        previous_response: float | None = None
+        previous_target: float | None = None
+        for index, epoch in enumerate(self._response_dynamics_epoch_records):
+            if epoch.epoch_index != index:
+                raise RuntimeError("response epoch indices are not contiguous")
+            if epoch.start_time_us != previous_end or epoch.end_time_us <= previous_end:
+                raise RuntimeError("response epochs have a gap, overlap, or empty interval")
+            if previous_response is not None:
+                if epoch.response_at_start != previous_response:
+                    raise RuntimeError("response dynamics epochs are discontinuous")
+                if not epoch.target_changed_at_start:
+                    raise RuntimeError("response epoch split without a target change")
+                if epoch.response_target == previous_target:
+                    raise RuntimeError("response epoch split retained the same target")
+            previous_end = epoch.end_time_us
+            previous_response = epoch.response_at_end
+            previous_target = epoch.response_target
+        if previous_end != self.light_response_config.simulation_end_time_us:
+            raise RuntimeError("response epochs do not cover the complete simulation")
+
+    def _validate_receipt_links(self) -> None:
+        end_time_us = self.light_response_config.simulation_end_time_us
+        audit_count = len(self._response_segments)
+        epoch_count = len(self._response_dynamics_epoch_records)
+        for receipt in self._light_receipts:
+            audit_index = receipt.audit_segment_index
+            if audit_index is None:
+                if not (
+                    receipt.event_time_us == end_time_us
+                    and (
+                        receipt.physical_parameters_changed
+                        or receipt.target_changed
+                    )
+                ):
+                    raise RuntimeError("only a terminal zero-duration audit may be unlinked")
+            elif not 0 <= audit_index < audit_count:
+                raise RuntimeError("light receipt references an unknown audit segment")
+
+            epoch_index = receipt.response_dynamics_epoch_index
+            if epoch_index is None:
+                if not (
+                    receipt.event_time_us == end_time_us
+                    and receipt.target_changed
+                ):
+                    raise RuntimeError("only a terminal zero-duration epoch may be unlinked")
+            elif not 0 <= epoch_index < epoch_count:
+                raise RuntimeError("light receipt references an unknown response epoch")
+
+    def _visible_audit_segment_count(self) -> int:
         if self._completed:
             return len(self._response_segments)
-        current = self._response_epochs[-1]
+        current = self._audit_state
         return len(self._response_segments) + int(
             self._latest_observed_time_us > current.start_time_us
             or current.start_time_us == 0
+        )
+
+    def _visible_response_dynamics_epoch_count(self) -> int:
+        if self._completed:
+            return len(self._response_dynamics_epoch_records)
+        current = self._response_epochs[-1]
+        return len(self._response_dynamics_epoch_records) + int(
+            self._latest_observed_time_us > current.start_time_us
+            or current.start_time_us == 0
+        )
+
+    @staticmethod
+    def _audit_split_reason(
+        *,
+        physical_parameters_changed: bool,
+        target_changed: bool,
+    ) -> str:
+        if physical_parameters_changed and target_changed:
+            return AUDIT_SPLIT_REASON_PHYSICAL_AND_TARGET_CHANGED
+        if physical_parameters_changed:
+            return AUDIT_SPLIT_REASON_PHYSICAL_PARAMETERS_CHANGED
+        if target_changed:
+            return AUDIT_SPLIT_REASON_TARGET_WITHOUT_PHYSICAL_CHANGE
+        raise ValueError("audit split reason requires a physical or target change")
+
+    @staticmethod
+    def _audit_record_signature(segment: LightResponseSegment) -> tuple[object, ...]:
+        return (
+            segment.light_active,
+            segment.render_hue_degree,
+            segment.saturation,
+            segment.value_center,
+            segment.value_amplitude,
+            segment.value_min,
+            segment.value_max,
+            segment.blink_bpm,
+            segment.waveform,
         )
 
     @staticmethod

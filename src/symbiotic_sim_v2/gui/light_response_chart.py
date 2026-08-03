@@ -7,7 +7,7 @@ from typing import Any
 
 import pyqtgraph as pg
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QVBoxLayout, QWidget
+from PySide6.QtWidgets import QLabel, QVBoxLayout, QWidget
 
 from symbiotic_sim_v2.simulation.time_utils import us_to_seconds
 
@@ -51,6 +51,18 @@ class LightStimulusResponseChart(QWidget):
         self.setMinimumHeight(LIGHT_RESPONSE_CHART_MIN_HEIGHT)
         root = QVBoxLayout(self)
         root.setContentsMargins(0, 0, 0, 0)
+        self.boundary_summary_label = QLabel(self)
+        self.boundary_summary_label.setObjectName("lightResponseBoundarySummary")
+        self.boundary_summary_label.setTextFormat(Qt.TextFormat.RichText)
+        self.boundary_summary_label.setTextInteractionFlags(
+            Qt.TextInteractionFlag.TextSelectableByMouse
+        )
+        self.boundary_summary_label.setStyleSheet(
+            "QLabel#lightResponseBoundarySummary {"
+            "background: #111827; color: #E5E7EB; padding: 4px 8px;"
+            "border-bottom: 1px solid #334155; }"
+        )
+        root.addWidget(self.boundary_summary_label)
         self.graphics = pg.GraphicsLayoutWidget(self)
         self.graphics.setObjectName("lightStimulusResponseGraphics")
         self.graphics.setBackground("#111827")
@@ -117,9 +129,13 @@ class LightStimulusResponseChart(QWidget):
         )
         self._current_lines = tuple(_current_line(plot) for plot in self.plots)
         self._first_active_lines: list[pg.InfiniteLine] = []
-        self._segment_lines: list[pg.InfiniteLine] = []
+        self._audit_segment_lines: list[pg.InfiniteLine] = []
+        self._response_epoch_lines: list[pg.InfiniteLine] = []
+        self._segment_lines = self._audit_segment_lines
         self.sample_count = 0
         self.receipt_count = 0
+        self.audit_segment_boundary_count = 0
+        self.response_epoch_boundary_count = 0
         self.segment_boundary_count = 0
         self.set_duration_seconds(duration_seconds)
         self.clear()
@@ -141,7 +157,8 @@ class LightStimulusResponseChart(QWidget):
         self,
         samples: tuple[Any, ...],
         receipts: tuple[Any, ...],
-        segments: tuple[Any, ...],
+        audit_segments: tuple[Any, ...],
+        response_epochs: tuple[Any, ...],
         current_time_us: int,
     ) -> None:
         sample_x = [us_to_seconds(record.time_us) for record in samples]
@@ -185,23 +202,28 @@ class LightStimulusResponseChart(QWidget):
             receipt_x,
             [record.bpm_match for record in receipts],
         )
-        self._replace_markers(receipts, segments)
+        self._replace_markers(receipts, audit_segments, response_epochs)
         self.set_current_time_us(current_time_us)
         self.sample_count = len(samples)
         self.receipt_count = len(receipts)
-        self.segment_boundary_count = len(segments)
+        self.segment_boundary_count = self.audit_segment_boundary_count
+        self._update_boundary_summary()
 
     def _replace_markers(
         self,
         receipts: tuple[Any, ...],
-        segments: tuple[Any, ...],
+        audit_segments: tuple[Any, ...],
+        response_epochs: tuple[Any, ...],
     ) -> None:
         for line in self._first_active_lines:
             self.active_plot.removeItem(line)
-        for line in self._segment_lines:
+        for line in self._audit_segment_lines:
+            self.physical_plot.removeItem(line)
+        for line in self._response_epoch_lines:
             self.response_plot.removeItem(line)
         self._first_active_lines.clear()
-        self._segment_lines.clear()
+        self._audit_segment_lines.clear()
+        self._response_epoch_lines.clear()
 
         first_active = next((record for record in receipts if record.active), None)
         if first_active is not None:
@@ -216,15 +238,64 @@ class LightStimulusResponseChart(QWidget):
             self.active_plot.addItem(line)
             self._first_active_lines.append(line)
 
-        for segment in segments:
+        audit_boundary_times_us = {
+            segment.start_time_us for segment in audit_segments
+        }
+        audit_boundary_times_us.update(
+            receipt.event_time_us
+            for receipt in receipts
+            if (
+                getattr(receipt, "physical_parameters_changed", False)
+                or getattr(receipt, "target_changed", False)
+            )
+            and getattr(receipt, "audit_segment_index", None) is not None
+        )
+        response_epoch_times_us = {
+            epoch.start_time_us for epoch in response_epochs
+        }
+        response_epoch_times_us.update(
+            receipt.event_time_us
+            for receipt in receipts
+            if getattr(receipt, "target_changed", False)
+            and getattr(receipt, "response_dynamics_epoch_index", None) is not None
+        )
+
+        for boundary_time_us in sorted(audit_boundary_times_us):
             line = pg.InfiniteLine(
-                pos=us_to_seconds(segment.start_time_us),
+                pos=us_to_seconds(boundary_time_us),
                 angle=90,
                 movable=False,
-                pen=pg.mkPen("#64748B", width=1, style=Qt.PenStyle.DotLine),
+                pen=pg.mkPen("#F59E0B", width=2, style=Qt.PenStyle.DotLine),
             )
+            line.setToolTip("physical audit segment start")
+            self.physical_plot.addItem(line)
+            self._audit_segment_lines.append(line)
+
+        for boundary_time_us in sorted(response_epoch_times_us):
+            line = pg.InfiniteLine(
+                pos=us_to_seconds(boundary_time_us),
+                angle=90,
+                movable=False,
+                pen=pg.mkPen("#C084FC", width=2, style=Qt.PenStyle.DashLine),
+            )
+            line.setToolTip("response dynamics epoch start")
             self.response_plot.addItem(line)
-            self._segment_lines.append(line)
+            self._response_epoch_lines.append(line)
+        self.audit_segment_boundary_count = len(audit_boundary_times_us)
+        self.response_epoch_boundary_count = len(response_epoch_times_us)
+
+    def _update_boundary_summary(self) -> None:
+        self.boundary_summary_label.setText(
+            '<span style="color:#F59E0B">● physical audit segment: '
+            f"{self.audit_segment_boundary_count}</span>"
+            "&nbsp;&nbsp;&nbsp;"
+            '<span style="color:#C084FC">● response dynamics epoch: '
+            f"{self.response_epoch_boundary_count}</span>"
+        )
+        self.boundary_summary_label.setToolTip(
+            "orange dotted: physical parameter audit boundary; "
+            "purple dashed: response target/dynamics boundary"
+        )
 
     def set_current_time_us(self, current_time_us: int) -> None:
         seconds = us_to_seconds(current_time_us)
@@ -243,11 +314,14 @@ class LightStimulusResponseChart(QWidget):
             self.response_item,
         ):
             item.setData([], [])
-        self._replace_markers((), ())
+        self._replace_markers((), (), ())
         self.set_current_time_us(0)
         self.sample_count = 0
         self.receipt_count = 0
+        self.audit_segment_boundary_count = 0
+        self.response_epoch_boundary_count = 0
         self.segment_boundary_count = 0
+        self._update_boundary_summary()
 
 
 class LightResponsePhysiologyChart(QWidget):

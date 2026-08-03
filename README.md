@@ -11,7 +11,8 @@
 - Stage 5B.1「Garden出力境界・qualified B実効時刻補正」: 完成
 - Stage 6「Garden Light Mapper・仮想光点滅device」: 完成
 - Stage 7「固定反応特性を持つ光応答仮想ユーザー」: 完成
-- 現在のGUI主対象: Stage 7の光→固定嗜好→一次遅れ→心拍→H10→Garden閉ループ
+- Stage 7.1「物理光刺激の監査segmentとresponse dynamics epochの分離」: 完成
+- 現在のGUI主対象: Stage 7.1の光→固定嗜好→一次遅れ→心拍→H10→Garden閉ループと分離監査
 
 正式な信号経路は次のとおりです。
 
@@ -44,7 +45,7 @@
 
 Garden入力層は `RriMeasurementEvent` だけをraw inputとし、artifactを除いた評価windowのRRIから実RMSSDとNを求めます。正式な1秒シグナル `GardenInputSignalEvent` はNとSを出力します。Stage 5Aのデジタル生命はこのformal signalと評価metadata eventだけを受け、Nd、W、P、V、B、tauを計算します。
 
-Stage 5BではG、E/q第2周、touch配送、3生命の資格競争を接続しました。Stage 5B.1では生命由来touchをID/Bだけのv2境界へ絞り、active qualified Bをholder touchの実到着時刻に出力します。Stage 6はこのformal eventだけを入力に、FをHue、Tをblink BPMへ写像し、仮想時計から連続sine位相を解析的に再構成します。Stage 7は `LightStimulusStateEvent` だけを光入力として固定Hue/BPM嗜好と一次遅れresponseを評価し、将来の心拍間隔生成へ接続します。光からRMSSD、N、Nd、Wを直接更新しません。Stage 5Cの関係記憶探索はまだ実装していません。
+Stage 5BではG、E/q第2周、touch配送、3生命の資格競争を接続しました。Stage 5B.1では生命由来touchをID/Bだけのv2境界へ絞り、active qualified Bをholder touchの実到着時刻に出力します。Stage 6はこのformal eventだけを入力に、FをHue、Tをblink BPMへ写像し、仮想時計から連続sine位相を解析的に再構成します。Stage 7は `LightStimulusStateEvent` だけを光入力として固定Hue/BPM嗜好と一次遅れresponseを評価し、将来の心拍間隔生成へ接続します。Stage 7.1は物理parameterが変わる監査segmentとtargetが変わるresponse dynamics epochを分離し、同targetの光変更でresponseをresetしません。光からRMSSD、N、Nd、Wを直接更新しません。Stage 5Cの関係記憶探索はまだ実装していません。
 
 現在の `ideal_polar_h10_rri_device_v0_1` は、誤差・欠損・遅延なしの理想的な入力デバイスを表すsimulation assumptionです。実機Polar H10のBLE GATT packet、firmware、電波、pairing、Polar SDKを再現するpacket-level emulatorではありません。
 
@@ -145,7 +146,7 @@ Stage 2のRRI、RMSSD、内部変動成分は仮想ユーザー内部の開発�
 
 ### Stage 7
 
-- `stationary_light_responsive_virtual_user_v0_1` とimmutableな `LightResponseConfig`
+- `stationary_light_responsive_virtual_user_v0_2` とimmutableな `LightResponseConfig`
 - formal inputは `LightStimulusStateEvent`、formal outputは既存 `HeartbeatEvent` だけ
 - holder/source B/signal IDを除いた `physical_light_stimulus_projection_v0_1`
 - 円環Hue距離とHue/BPM Gaussian積によるrun中固定のpreference
@@ -154,8 +155,9 @@ Stage 2のRRI、RMSSD、内部変動成分は仮想ユーザー内部の開発�
 - Stage 2と同じroot seed、named random stream、beat-index key、clamp、丸め
 - heartbeat開始時sampleと、予約済みheartbeatをrescheduleしない因果policy
 - gain 0でStage 6 formal streamを再現する `light_insensitive_control`
-- 241 light receipts、response segment、2401件100ms sample、responsive heartbeat診断
-- 8-tab GUI、headless JSON、4種類のStage 7 CSV、独立reference vectors
+- `physical_light_parameter_signature_v0_1` による物理監査segment v2と、target変更だけで分割するresponse dynamics epoch v1
+- 241 light receipts、physical audit segment、response dynamics epoch、2401件100ms sample、responsive heartbeat診断
+- 8-tab GUI、headless JSON、5種類のStage 7 CSV、独立reference vectors
 - 実データ未校正のsimulation assumption。moving preferenceとStage 5Cは未実装
 
 ## Requirements / setup
@@ -166,7 +168,7 @@ Stage 2のRRI、RMSSD、内部変動成分は仮想ユーザー内部の開発�
 - pytest / pytest-qt
 - Ruff
 
-Stage 7固定検証環境はPython 3.13.4、PySide6 6.11.1、PyQtGraph 0.14.0、NumPy 2.5.1、pytest 9.1.1、pytest-qt 4.5.0、Ruff 0.16.1です。
+Stage 7.1固定検証環境はPython 3.13.4、PySide6 6.11.1、PyQtGraph 0.14.0、NumPy 2.5.1、pytest 9.1.1、pytest-qt 4.5.0、Ruff 0.16.1です。
 
 プロジェクト直下の `.venv` をStage間で再利用します。
 
@@ -256,7 +258,7 @@ Stage 7の光応答閉ループ:
   --light-response-preset aligned_green_center
 ```
 
-`off_center_green` と `light_insensitive_control` も指定できます。いずれもreal-time待機をせずJSONを標準出力します。package versionは `0.8.0` です。既存JSON contractを変えないため、Stage 3/4/5A/5B.1/6 headlessの `project_version` はそれぞれ `0.3.0`、`0.4.0`、`0.5.0`、`0.6.1`、`0.7.0` を意図的に維持します。
+`off_center_green` と `light_insensitive_control` も指定できます。いずれもreal-time待機をせずJSONを標準出力します。package versionは `0.8.1` です。既存JSON contractを変えないため、Stage 3/4/5A/5B.1/6 headlessの `project_version` はそれぞれ `0.3.0`、`0.4.0`、`0.5.0`、`0.6.1`、`0.7.0` を意図的に維持します。
 
 既存Stage 1〜5A JSONは変更しません。Stage 5B JSONはholder、生命別E/q/G/k、touch/feedback/qualified B件数と分離digestを表示し、探索状態、Hue、BPM、I、光波形を含めません。
 
@@ -323,10 +325,11 @@ Stage 6は次の4ファイルを保存します。
   --export-light-device-csv artifacts/csv/stage-06
 ```
 
-Stage 7は次の4ファイルを保存します。
+Stage 7.1は次の5ファイルを保存します。
 
 - `stage_07_light_stimulus_receipts.csv`
 - `stage_07_light_response_segments.csv`
+- `stage_07_response_dynamics_epochs.csv`
 - `stage_07_light_responsive_heartbeats.csv`
 - `stage_07_light_response_samples_100ms.csv`
 
@@ -484,7 +487,7 @@ Stage 5B.1はtouch、qualification、qualified B、feedback、生命別second ro
 
 Stage 6はcommand、stimulus state、segment、20ms fixed-grid waveform、full eventを分離digest化します。標準runは241 command/state、240 segment、12001 sampleで、run mode、reset、snapshot頻度、GUI preview、CSV exportに対して同一です。固定値は [Stage 6 reference vectors](docs/conformance/stage-06-reference-vectors.json) をsource of truthとし、[Stage 6設計文書](docs/stage-06-light-blink-simulator.md) に監査用一覧を記載します。
 
-Stage 7はformal heartbeat、responsive heartbeat診断、light receipt、response segment、100ms fixed-grid sample、full eventを分離digest化します。controlはStage 6 heartbeat/formal streamを再現し、responsive presetは同じ乱数keyのまま生理連成だけを追加します。固定式は [Stage 7 reference vectors](docs/conformance/stage-07-reference-vectors.json) をsource of truthとします。
+Stage 7.1はformal heartbeat、responsive heartbeat診断、light receipt、physical audit segment、response dynamics epoch、100ms fixed-grid sample、full eventを分離digest化します。controlはStage 6 heartbeat/formal streamを再現し、responsive presetは同じ乱数keyのまま生理連成だけを追加します。監査分割は物理signatureのexact equality、response epoch分割はtargetのexact equalityで独立に決まります。固定式は [Stage 7 reference vectors](docs/conformance/stage-07-reference-vectors.json) をsource of truthとします。
 
 ## Test / lint / smoke
 
@@ -495,10 +498,10 @@ QT_QPA_PLATFORM=offscreen .venv/bin/pytest -q
 QT_QPA_PLATFORM=offscreen .venv/bin/python -m symbiotic_sim_v2 --smoke-test --auto-close-ms 6500
 ```
 
-テストはStage 1〜6全回帰に加え、strict light projection、固定preference、一次遅れ連続性、心拍因果性、control同一性、response生理連成、fixed sampling、digest、headless、CSV、8-tab GUI、architecture分離を確認します。
+テストはStage 1〜6全回帰に加え、strict light projection、固定preference、物理signatureと分割matrix、一次遅れ連続性、心拍因果性、control同一性、response生理連成、fixed sampling、digest、headless、CSV、8-tab GUI、architecture分離を確認します。
 
 Stage 5Aの設計境界は [1体のデジタル生命・第1周](docs/stage-05a-single-digital-life-first-round.md)、式と分類は [Digital Life first-round model v0.1](docs/digital-life-first-round-model_v0.1.md) を参照してください。Stage 4の設計境界は [Garden入力層設計](docs/stage-04-garden-input-layer.md)、モデル値は [Garden input model v0.1](docs/relax-with-light-garden-input-model_v0.1.md)、境界所属の仮定は [RRI window membership policy v0.1](docs/rri-window-membership-policy_v0.1.md) にあります。規範との境界は [規範スコープ](docs/normative-scope.md) を参照してください。
 
 Stage 5Bの設計境界は [3生命・資格競争・第2周](docs/stage-05b-three-life-competition-second-round.md)、配送仮定は [tau touch policy](docs/tau-touch-delivery-policy_v0.1.md) にあります。Stage 5B.1の補正は [出力境界・時刻補正](docs/stage-05b1-output-boundary-timing-correction.md)、Garden規則は [Garden output qualification model v0.2](docs/garden-output-qualification-model_v0.2.md)、発行policyは [qualified B emission policy v0.1](docs/qualified-b-emission-policy_v0.1.md) を参照してください。
 
-Stage 6は [光点滅シミュレーター](docs/stage-06-light-blink-simulator.md)、[B→I mapping](docs/b-to-i-light-mapping-model_v0.1.md)、[Virtual Light Device](docs/virtual-light-device-model_v0.1.md)、[continuous phase policy](docs/continuous-phase-policy_v0.1.md) を参照してください。Stage 7は [光応答仮想ユーザー](docs/stage-07-light-responsive-virtual-user.md)、[固定光嗜好](docs/stationary-light-preference-model_v0.1.md)、[一次遅れresponse](docs/first-order-light-response-model_v0.1.md)、[心拍連成](docs/light-response-heartbeat-coupling_v0.1.md) を参照してください。次工程は **Stage 5C: 3 bundle関係記憶探索** です。
+Stage 6は [光点滅シミュレーター](docs/stage-06-light-blink-simulator.md)、[B→I mapping](docs/b-to-i-light-mapping-model_v0.1.md)、[Virtual Light Device](docs/virtual-light-device-model_v0.1.md)、[continuous phase policy](docs/continuous-phase-policy_v0.1.md) を参照してください。Stage 7/7.1は [光応答仮想ユーザー](docs/stage-07-light-responsive-virtual-user.md)、[Stage 7.1監査分離](docs/stage-07-1-physical-audit-response-epochs.md)、[固定光嗜好](docs/stationary-light-preference-model_v0.1.md)、[一次遅れresponse](docs/first-order-light-response-model_v0.1.md)、[心拍連成](docs/light-response-heartbeat-coupling_v0.1.md) を参照してください。次工程は **Stage 5C: 3 bundle関係記憶探索** です。

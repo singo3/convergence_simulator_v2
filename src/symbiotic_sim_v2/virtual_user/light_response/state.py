@@ -29,7 +29,20 @@ class LightResponsiveVirtualUserSnapshot:
     effective_mean_rri_ms: float
     current_mean_rri_increase_ms: float
     light_input_count: int
+    physical_stimulus_change_count: int
     response_target_change_count: int
+    physical_audit_segment_count: int
+    response_dynamics_epoch_count: int
     response_segment_count: int
     clamped_beat_count: int
     completed: bool
+
+    @property
+    def physical_parameter_change_count(self) -> int:
+        """Compatibility spelling for physical-stimulus parameter changes."""
+
+        return self.physical_stimulus_change_count
+
+    @property
+    def audit_segment_count(self) -> int:
+        return self.physical_audit_segment_count

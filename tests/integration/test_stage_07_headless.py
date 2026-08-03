@@ -13,6 +13,8 @@ from typing import Any
 import pytest
 
 from symbiotic_sim_v2.virtual_user.light_response.diagnostics import (
+    LIGHT_RESPONSE_DYNAMICS_EPOCHS_CSV_FIELDS,
+    LIGHT_RESPONSE_DYNAMICS_EPOCHS_CSV_FILENAME,
     LIGHT_RESPONSE_SAMPLES_CSV_FIELDS,
     LIGHT_RESPONSE_SAMPLES_CSV_FILENAME,
     LIGHT_RESPONSE_SEGMENTS_CSV_FIELDS,
@@ -75,6 +77,11 @@ def test_aligned_headless_json_has_required_versions_counts_and_causality(
         "physical_projection_version",
         "preference_model_version",
         "response_dynamics_version",
+        "response_segment_schema_version",
+        "response_dynamics_epoch_schema_version",
+        "physical_stimulus_change_policy_version",
+        "physical_light_parameter_signature_version",
+        "segment_split_policy_version",
         "physiology_coupling_version",
         "heartbeat_causality_policy_version",
         "virtual_user_config",
@@ -87,6 +94,9 @@ def test_aligned_headless_json_has_required_versions_counts_and_causality(
         "active_light_input_count",
         "inactive_light_input_count",
         "response_target_change_count",
+        "physical_stimulus_change_count",
+        "physical_audit_segment_count",
+        "response_dynamics_epoch_count",
         "response_segment_count",
         "response_sample_count",
         "first_active_effective_time_us",
@@ -100,12 +110,14 @@ def test_aligned_headless_json_has_required_versions_counts_and_causality(
         "heartbeat_digest",
         "responsive_diagnostic_digest",
         "light_receipt_digest",
+        "physical_audit_segment_digest",
         "response_segment_digest",
+        "response_dynamics_epoch_digest",
         "response_sample_digest",
         "full_event_digest",
     }
     assert required <= set(aligned_output)
-    assert aligned_output["project_version"] == "0.8.0"
+    assert aligned_output["project_version"] == "0.8.1"
     assert aligned_output["preset"] == "aligned_green_center"
     assert aligned_output["final_virtual_time_us"] == 240_000_000
     assert aligned_output["final_state"] == "completed"
@@ -113,6 +125,9 @@ def test_aligned_headless_json_has_required_versions_counts_and_causality(
     assert aligned_output["active_light_input_count"] == 180
     assert aligned_output["inactive_light_input_count"] == 61
     assert aligned_output["response_target_change_count"] == 2
+    assert aligned_output["physical_stimulus_change_count"] == 2
+    assert aligned_output["physical_audit_segment_count"] == 2
+    assert aligned_output["response_dynamics_epoch_count"] == 2
     assert aligned_output["response_segment_count"] == 2
     assert aligned_output["response_sample_count"] == 2_401
     assert aligned_output["first_active_effective_time_us"] == 60_551_540
@@ -144,10 +159,16 @@ def test_aligned_headless_json_has_required_versions_counts_and_causality(
         "f8240cabbc882ceef81b537c29f907b60c23bad3bc207dac3c4a51b52aaca3cd"
     )
     assert aligned_output["light_receipt_digest"] == (
-        "d99994308b9da2ab11e9e8ff441dbc55a03c6647dea0a7d4313760446524ccf6"
+        "8d46a403067232d1d4532ba878d22881ddc2e5f5b7e429394b5d26b02a03e706"
+    )
+    assert aligned_output["physical_audit_segment_digest"] == (
+        "b09c15e82e25ee42eaaea0d374ac7ba041494f59c742fb953ec178a31f5ffe85"
     )
     assert aligned_output["response_segment_digest"] == (
-        "63d09ba224c101fadb25ac2cc1eb1319faed64d722824ad7e0cbb11f73f916c0"
+        "b09c15e82e25ee42eaaea0d374ac7ba041494f59c742fb953ec178a31f5ffe85"
+    )
+    assert aligned_output["response_dynamics_epoch_digest"] == (
+        "d1be764aa7ffa60a8545e03e7f1fc853a4a95291a95dad09b873d1b9e2a31916"
     )
     assert aligned_output["response_sample_digest"] == (
         "b230c3d38ca3d1f85ba910c5970f667970c8d6e66533c84b3ecca7abe7c30bb7"
@@ -230,6 +251,11 @@ def test_exact_csv_contract_rows_and_export_digest_invariance(
         ),
         (LIGHT_RESPONSE_SEGMENTS_CSV_FILENAME, LIGHT_RESPONSE_SEGMENTS_CSV_FIELDS, 2),
         (
+            LIGHT_RESPONSE_DYNAMICS_EPOCHS_CSV_FILENAME,
+            LIGHT_RESPONSE_DYNAMICS_EPOCHS_CSV_FIELDS,
+            2,
+        ),
+        (
             LIGHT_RESPONSIVE_HEARTBEATS_CSV_FILENAME,
             LIGHT_RESPONSIVE_HEARTBEATS_CSV_FIELDS,
             277,
@@ -250,7 +276,9 @@ def test_exact_csv_contract_rows_and_export_digest_invariance(
         "heartbeat_digest",
         "responsive_diagnostic_digest",
         "light_receipt_digest",
+        "physical_audit_segment_digest",
         "response_segment_digest",
+        "response_dynamics_epoch_digest",
         "response_sample_digest",
         "full_event_digest",
     )

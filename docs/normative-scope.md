@@ -100,7 +100,9 @@ v2.0が定める規範上のuser loopは、feedback deviceが刺激Iをユーザ
 
 `stationary_hue_bpm_gaussian_preference_v0_1` の固定Hue/BPM特性、Gaussian幅、積によるmatch、`first_order_light_response_v0_1` の8秒onset/12秒recovery、平均RRI最大15ms増加、呼吸性RRI変動幅最大30ms増加、heartbeat開始時sampling、priority 40/67の因果policyは、v2.0が具体的な生理式として定めていない **simulation assumption** である。実データ未校正であり、医学的効果量を表さない。
 
-holder ID、source B、signal indexは物理projection・preference・physiologyから除外し、監査receiptのprovenanceだけに保持する。preferenceは1 run中固定で、moving preference、履歴依存、負反応を実装しない。Light receipt、response segment、responsive heartbeat record、100ms sample、GUI chart、CSV、digestは開発診断である。
+holder ID、source B、signal indexは物理projection・preference・physiologyから除外し、監査receiptのprovenanceだけに保持する。preferenceは1 run中固定で、moving preference、履歴依存、負反応を実装しない。Light receipt、physical audit segment、response dynamics epoch、responsive heartbeat record、100ms sample、GUI chart、CSV、digestは開発診断である。
+
+Stage 7.1の物理signature対象field、exact equality、`physical_stimulus_parameter_change_v0_1`、`split_audit_on_physical_change_keep_response_on_same_target_v0_1`、監査segmentとresponse dynamics epochの分離はv2.0にない **simulation implementation assumption** である。formal eventと生理式は変更せず、物理parameterが変わってもtargetが同じなら一次遅れepochを継続する。
 
 光responseが変更するのは将来のheartbeat intervalを生成する平均RRIと呼吸性成分だけである。H10は引き続きheartbeat正式時刻差からraw RRIを測定し、GardenがRRIからRMSSDとNを計算する。光からRMSSD、N、Nd、Wを直接変更しない。予約済みheartbeatをlight receipt時にrescheduleせず、Stage 2と同じroot seed、named random stream、beat-index keyを使用する。gain 0のcontrolはStage 6 formal streamを再現する。
 

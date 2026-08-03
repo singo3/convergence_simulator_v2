@@ -34,6 +34,8 @@ from symbiotic_sim_v2.gui.light_response_chart import (
     LightStimulusResponseChart,
 )
 from symbiotic_sim_v2.gui.light_response_table_model import (
+    LightResponseAuditSegmentTableModel,
+    LightResponseDynamicsEpochTableModel,
     LightResponseReceiptTableModel,
 )
 from symbiotic_sim_v2.gui.responsive_heartbeat_table_model import (
@@ -44,10 +46,12 @@ from symbiotic_sim_v2.simulation.engine import EngineSnapshot
 from symbiotic_sim_v2.simulation.time_utils import us_to_seconds
 from symbiotic_sim_v2.virtual_user.light_response.config import LightResponseConfig
 from symbiotic_sim_v2.virtual_user.light_response.diagnostics import (
+    LIGHT_RESPONSE_DYNAMICS_EPOCHS_CSV_FILENAME,
     LIGHT_RESPONSE_SAMPLES_CSV_FILENAME,
     LIGHT_RESPONSE_SEGMENTS_CSV_FILENAME,
     LIGHT_RESPONSIVE_HEARTBEATS_CSV_FILENAME,
     LIGHT_STIMULUS_RECEIPTS_CSV_FILENAME,
+    export_light_response_dynamics_epochs_csv,
     export_light_response_samples_csv,
     export_light_response_segments_csv,
     export_light_responsive_heartbeats_csv,
@@ -97,7 +101,7 @@ class LightResponseUserPanel(QWidget):
         self._garden_input_component = garden_input_component
         self._preset_name = preset_name
         self._engine_state = ClockState.STOPPED
-        self._record_revision = (-1, -1, -1, -1, -1)
+        self._record_revision = (-1, -1, -1, -1, -1, -1)
         self._build_ui()
         self.set_config(config, preset_name=preset_name)
         self.reset_views()
@@ -464,13 +468,46 @@ class LightResponseUserPanel(QWidget):
         receipt_buttons = QHBoxLayout()
         self.export_receipt_button = QPushButton("light receipt CSVを保存", receipt_page)
         self.export_receipt_button.setObjectName("exportLightResponseReceiptCsvButton")
-        self.export_segment_button = QPushButton("response segment CSVを保存", receipt_page)
-        self.export_segment_button.setObjectName("exportLightResponseSegmentCsvButton")
         receipt_buttons.addWidget(self.export_receipt_button)
-        receipt_buttons.addWidget(self.export_segment_button)
         receipt_buttons.addStretch(1)
         receipt_layout.addLayout(receipt_buttons)
         tabs.addTab(receipt_page, "light receipt")
+
+        audit_page = QWidget(tabs)
+        audit_layout = QVBoxLayout(audit_page)
+        audit_layout.setContentsMargins(4, 4, 4, 4)
+        self.audit_segment_model = LightResponseAuditSegmentTableModel(self)
+        self.audit_segment_table = QTableView(audit_page)
+        self.audit_segment_table.setObjectName("physicalLightAuditSegmentTable")
+        self._configure_table(self.audit_segment_table, self.audit_segment_model)
+        audit_layout.addWidget(self.audit_segment_table)
+        audit_buttons = QHBoxLayout()
+        self.export_segment_button = QPushButton(
+            "physical audit segment CSVを保存", audit_page
+        )
+        self.export_segment_button.setObjectName("exportLightResponseSegmentCsvButton")
+        audit_buttons.addWidget(self.export_segment_button)
+        audit_buttons.addStretch(1)
+        audit_layout.addLayout(audit_buttons)
+        tabs.addTab(audit_page, "physical audit segment")
+
+        epoch_page = QWidget(tabs)
+        epoch_layout = QVBoxLayout(epoch_page)
+        epoch_layout.setContentsMargins(4, 4, 4, 4)
+        self.response_epoch_model = LightResponseDynamicsEpochTableModel(self)
+        self.response_epoch_table = QTableView(epoch_page)
+        self.response_epoch_table.setObjectName("lightResponseDynamicsEpochTable")
+        self._configure_table(self.response_epoch_table, self.response_epoch_model)
+        epoch_layout.addWidget(self.response_epoch_table)
+        epoch_buttons = QHBoxLayout()
+        self.export_epoch_button = QPushButton(
+            "response dynamics epoch CSVを保存", epoch_page
+        )
+        self.export_epoch_button.setObjectName("exportLightResponseEpochCsvButton")
+        epoch_buttons.addWidget(self.export_epoch_button)
+        epoch_buttons.addStretch(1)
+        epoch_layout.addLayout(epoch_buttons)
+        tabs.addTab(epoch_page, "response dynamics epoch")
 
         heartbeat_page = QWidget(tabs)
         heartbeat_layout = QVBoxLayout(heartbeat_page)
@@ -497,6 +534,7 @@ class LightResponseUserPanel(QWidget):
 
         self.export_receipt_button.clicked.connect(self._export_receipts)
         self.export_segment_button.clicked.connect(self._export_segments)
+        self.export_epoch_button.clicked.connect(self._export_epochs)
         self.export_heartbeat_button.clicked.connect(self._export_heartbeats)
         self.export_sample_button.clicked.connect(self._export_samples)
         return tabs
@@ -621,6 +659,7 @@ class LightResponseUserPanel(QWidget):
         component_snapshot = self._component.snapshot()
         receipts = tuple(self._component.light_receipt_records())
         segments = tuple(self._component.response_segments())
+        response_epochs = tuple(self._component.response_dynamics_epoch_records())
         heartbeats = tuple(self._component.responsive_heartbeat_records())
         latest_observed_time_us = max(
             component_snapshot.current_heartbeat_time_us or 0,
@@ -645,19 +684,25 @@ class LightResponseUserPanel(QWidget):
         revision = (
             len(receipts),
             len(segments),
+            len(response_epochs),
             len(heartbeats),
             len(evaluations),
             len(samples),
         )
         if revision != self._record_revision:
             previous_receipts = self.receipt_model.rowCount()
+            previous_segments = self.audit_segment_model.rowCount()
+            previous_epochs = self.response_epoch_model.rowCount()
             previous_heartbeats = self.heartbeat_model.rowCount()
             self.receipt_model.set_records(receipts)
+            self.audit_segment_model.set_records(segments)
+            self.response_epoch_model.set_records(response_epochs)
             self.heartbeat_model.set_records(heartbeats)
             self.light_response_chart.set_records(
                 samples,
                 receipts,
                 segments,
+                response_epochs,
                 engine_snapshot.current_time_us,
             )
             self.physiology_chart.set_records(
@@ -668,6 +713,10 @@ class LightResponseUserPanel(QWidget):
             )
             if self.receipt_model.rowCount() > previous_receipts:
                 self.receipt_table.scrollToBottom()
+            if self.audit_segment_model.rowCount() > previous_segments:
+                self.audit_segment_table.scrollToBottom()
+            if self.response_epoch_model.rowCount() > previous_epochs:
+                self.response_epoch_table.scrollToBottom()
             if self.heartbeat_model.rowCount() > previous_heartbeats:
                 self.heartbeat_table.scrollToBottom()
             self._record_revision = revision
@@ -683,6 +732,7 @@ class LightResponseUserPanel(QWidget):
         self._set_export_enabled(
             receipts,
             segments,
+            response_epochs,
             heartbeats,
             samples,
             completed=engine_snapshot.state is ClockState.COMPLETED,
@@ -719,8 +769,10 @@ class LightResponseUserPanel(QWidget):
 
     def reset_views(self) -> None:
         self._engine_state = ClockState.STOPPED
-        self._record_revision = (-1, -1, -1, -1, -1)
+        self._record_revision = (-1, -1, -1, -1, -1, -1)
         self.receipt_model.clear()
+        self.audit_segment_model.clear()
+        self.response_epoch_model.clear()
         self.heartbeat_model.clear()
         self.light_response_chart.clear()
         self.physiology_chart.clear()
@@ -732,7 +784,7 @@ class LightResponseUserPanel(QWidget):
         self.state_labels["response_level"].setText("0.000000")
         self.state_labels["heartbeat_count"].setText("0 拍")
         self.set_settings_editable(True)
-        self._set_export_enabled((), (), (), (), completed=False)
+        self._set_export_enabled((), (), (), (), (), completed=False)
         self.diagnostics_scroll.verticalScrollBar().setValue(0)
 
     def set_settings_editable(self, editable: bool) -> None:
@@ -768,6 +820,7 @@ class LightResponseUserPanel(QWidget):
         self,
         receipts: tuple[Any, ...],
         segments: tuple[Any, ...],
+        response_epochs: tuple[Any, ...],
         heartbeats: tuple[Any, ...],
         samples: tuple[Any, ...],
         *,
@@ -775,6 +828,7 @@ class LightResponseUserPanel(QWidget):
     ) -> None:
         self.export_receipt_button.setEnabled(bool(receipts))
         self.export_segment_button.setEnabled(completed and bool(segments))
+        self.export_epoch_button.setEnabled(completed and bool(response_epochs))
         self.export_heartbeat_button.setEnabled(bool(heartbeats))
         self.export_sample_button.setEnabled(completed and bool(samples))
 
@@ -788,10 +842,18 @@ class LightResponseUserPanel(QWidget):
 
     def _export_segments(self) -> None:
         self._export(
-            "light response segment診断CSVを保存",
+            "physical light audit segment診断CSVを保存",
             LIGHT_RESPONSE_SEGMENTS_CSV_FILENAME,
             export_light_response_segments_csv,
             self._component.response_segments(),
+        )
+
+    def _export_epochs(self) -> None:
+        self._export(
+            "response dynamics epoch診断CSVを保存",
+            LIGHT_RESPONSE_DYNAMICS_EPOCHS_CSV_FILENAME,
+            export_light_response_dynamics_epochs_csv,
+            self._component.response_dynamics_epoch_records(),
         )
 
     def _export_heartbeats(self) -> None:

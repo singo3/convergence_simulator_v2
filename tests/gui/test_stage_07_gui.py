@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import csv
 from dataclasses import replace
+from types import SimpleNamespace
 
 import pytest
 from PySide6.QtCore import QPoint, QPointF, Qt
@@ -18,6 +19,7 @@ from symbiotic_sim_v2.gui.light_response_chart import (
     LIGHT_RESPONSE_PLOT_MIN_HEIGHT,
     PHYSIOLOGY_CHART_MIN_HEIGHT,
     PHYSIOLOGY_PLOT_MIN_HEIGHT,
+    LightStimulusResponseChart,
 )
 from symbiotic_sim_v2.gui.light_responsive_window import LightResponsiveMainWindow
 from symbiotic_sim_v2.runtime.closed_loop.light_responsive_scenario import (
@@ -25,6 +27,7 @@ from symbiotic_sim_v2.runtime.closed_loop.light_responsive_scenario import (
 )
 from symbiotic_sim_v2.simulation.clock import ClockState
 from symbiotic_sim_v2.virtual_user.light_response.diagnostics import (
+    LIGHT_RESPONSE_DYNAMICS_EPOCHS_CSV_FIELDS,
     LIGHT_RESPONSE_SAMPLES_CSV_FIELDS,
     LIGHT_RESPONSE_SEGMENTS_CSV_FIELDS,
     LIGHT_RESPONSIVE_HEARTBEATS_CSV_FIELDS,
@@ -46,6 +49,54 @@ def stage_7_gui(qtbot):
 
 def click(qtbot, button) -> None:
     qtbot.mouseClick(button, Qt.MouseButton.LeftButton)
+
+
+def test_chart_distinguishes_more_physical_audit_splits_than_response_epochs(
+    qtbot,
+) -> None:
+    chart = LightStimulusResponseChart()
+    qtbot.addWidget(chart)
+    receipts = (
+        SimpleNamespace(
+            event_time_us=10_000_000,
+            active=True,
+            hue_match=1.0,
+            bpm_match=1.0,
+            physical_parameters_changed=True,
+            target_changed=True,
+            audit_segment_index=1,
+            response_dynamics_epoch_index=1,
+        ),
+        SimpleNamespace(
+            event_time_us=20_000_000,
+            active=True,
+            hue_match=1.0,
+            bpm_match=1.0,
+            physical_parameters_changed=True,
+            target_changed=False,
+            audit_segment_index=2,
+            response_dynamics_epoch_index=1,
+        ),
+    )
+    audit_segments = tuple(
+        SimpleNamespace(segment_index=index, start_time_us=start_time_us)
+        for index, start_time_us in enumerate((0,))
+    )
+    response_epochs = tuple(
+        SimpleNamespace(epoch_index=index, start_time_us=start_time_us)
+        for index, start_time_us in enumerate((0,))
+    )
+
+    chart.set_records((), receipts, audit_segments, response_epochs, 20_000_000)
+
+    assert chart.audit_segment_boundary_count == 3
+    assert chart.response_epoch_boundary_count == 2
+    assert len(chart._audit_segment_lines) == 3
+    assert len(chart._response_epoch_lines) == 2
+    assert all(line in chart.physical_plot.items for line in chart._audit_segment_lines)
+    assert all(line in chart.response_plot.items for line in chart._response_epoch_lines)
+    assert "physical audit segment: 3" in chart.boundary_summary_label.text()
+    assert "response dynamics epoch: 2" in chart.boundary_summary_label.text()
 
 
 def test_window_has_exact_tabs_copy_flow_settings_cards_tables_and_boundaries(
@@ -111,10 +162,19 @@ def test_window_has_exact_tabs_copy_flow_settings_cards_tables_and_boundaries(
         "latest_hr",
         "heartbeat_count",
     }
-    assert panel.receipt_model.columnCount() == 12
+    assert panel.receipt_model.columnCount() == 16
+    assert panel.audit_segment_model.columnCount() == 22
+    assert panel.response_epoch_model.columnCount() == 11
     assert panel.heartbeat_model.columnCount() == 13
-    assert panel.table_tabs.tabText(0) == "light receipt"
-    assert panel.table_tabs.tabText(1) == "responsive heartbeat"
+    assert [
+        panel.table_tabs.tabText(index)
+        for index in range(panel.table_tabs.count())
+    ] == [
+        "light receipt",
+        "physical audit segment",
+        "response dynamics epoch",
+        "responsive heartbeat",
+    ]
     assert panel.garden_evaluation_chart.source_is_garden_evaluation_records
     assert window.virtual_user_panel._component is window.simulation.component
     assert window.polar_h10_panel._virtual_user_component is window.simulation.component
@@ -260,6 +320,15 @@ def test_step_and_complete_populate_state_charts_garden_adapter_and_tables(
     assert panel.light_active_label.text() == "inactive"
     assert panel.response_level_label.text() == "0.000000"
 
+    window.simulation.engine.resume()
+    window.simulation.engine.advance_by_us(60_000_000)
+    window.simulation.engine.pause()
+    panel.update_diagnostics(window.simulation.engine.snapshot())
+    assert len(window.simulation.component.response_segments()) == 1
+    assert len(window.simulation.component.response_dynamics_epoch_records()) == 1
+    assert panel.light_response_chart.audit_segment_boundary_count == 2
+    assert panel.light_response_chart.response_epoch_boundary_count == 2
+
     window.simulation.engine.run_until_end()
     controller.set_speed(controller.speed_mode)
     component = window.simulation.component
@@ -270,7 +339,27 @@ def test_step_and_complete_populate_state_charts_garden_adapter_and_tables(
     assert panel.receipt_model.rowCount() == 241
     assert panel.light_response_chart.sample_count == 2_401
     assert panel.light_response_chart.receipt_count == 241
-    assert panel.light_response_chart.segment_boundary_count == 2
+    audit_segments = component.response_segments()
+    response_epochs = component.response_dynamics_epoch_records()
+    assert panel.audit_segment_model.rowCount() == len(audit_segments)
+    assert panel.response_epoch_model.rowCount() == len(response_epochs)
+    assert panel.light_response_chart.audit_segment_boundary_count == len(
+        audit_segments
+    )
+    assert panel.light_response_chart.response_epoch_boundary_count == len(
+        response_epochs
+    )
+    assert panel.light_response_chart.segment_boundary_count == len(audit_segments)
+    assert len(panel.light_response_chart._audit_segment_lines) == len(audit_segments)
+    assert len(panel.light_response_chart._response_epoch_lines) == len(
+        response_epochs
+    )
+    assert "physical audit segment" in (
+        panel.light_response_chart.boundary_summary_label.text()
+    )
+    assert "response dynamics epoch" in (
+        panel.light_response_chart.boundary_summary_label.text()
+    )
     assert len(panel.light_response_chart._first_active_lines) == 1
     assert panel.physiology_chart.record_count == panel.heartbeat_model.rowCount()
     assert panel.garden_evaluation_chart.evaluation_count == 4
@@ -286,7 +375,20 @@ def test_step_and_complete_populate_state_charts_garden_adapter_and_tables(
         "87.500 BPM"
     )
     assert panel.receipt_model.data(panel.receipt_model.index(60, 7)) == "1.000000"
-    assert panel.receipt_model.data(panel.receipt_model.index(60, 11)) == "no"
+    assert panel.receipt_model.data(panel.receipt_model.index(60, 10)) == "yes"
+    assert panel.receipt_model.data(panel.receipt_model.index(60, 11)) == "yes"
+    assert panel.receipt_model.data(panel.receipt_model.index(60, 12)) == "1"
+    assert panel.receipt_model.data(panel.receipt_model.index(60, 13)) == "1"
+    assert "physical_parameters" in panel.receipt_model.data(
+        panel.receipt_model.index(60, 14)
+    )
+    assert panel.receipt_model.data(panel.receipt_model.index(60, 15)) == "no"
+    assert panel.audit_segment_model.data(
+        panel.audit_segment_model.index(1, 17)
+    ) == "1"
+    assert panel.response_epoch_model.data(
+        panel.response_epoch_model.index(1, 4)
+    ) == "1.000000"
     assert panel.state_labels["light_active"].text() == "inactive"
     assert panel.state_labels["response_target"].text() == "0.000000"
     assert float(panel.state_labels["response_level"].text()) > 0.99
@@ -297,8 +399,12 @@ def test_step_and_complete_populate_state_charts_garden_adapter_and_tables(
 
     click(qtbot, window.reset_button)
     assert panel.receipt_model.rowCount() == 0
+    assert panel.audit_segment_model.rowCount() == 0
+    assert panel.response_epoch_model.rowCount() == 0
     assert panel.heartbeat_model.rowCount() == 0
     assert panel.light_response_chart.sample_count == 0
+    assert panel.light_response_chart.audit_segment_boundary_count == 0
+    assert panel.light_response_chart.response_epoch_boundary_count == 0
     assert panel.physiology_chart.record_count == 0
     assert panel.garden_evaluation_chart.evaluation_count == 0
     assert panel.diagnostics_scroll.verticalScrollBar().value() == 0
@@ -320,12 +426,14 @@ def test_all_stage_7_csv_buttons_use_core_exporters_without_mutating_digests(
         component.responsive_diagnostic_digest(),
         component.light_receipt_digest(),
         component.response_segment_digest(),
+        component.response_dynamics_epoch_digest(),
         component.response_sample_digest(),
         window.simulation.engine.deterministic_digest(),
     )
     paths = [
         tmp_path / "receipts.csv",
         tmp_path / "segments.csv",
+        tmp_path / "epochs.csv",
         tmp_path / "heartbeats.csv",
         tmp_path / "samples.csv",
     ]
@@ -339,6 +447,7 @@ def test_all_stage_7_csv_buttons_use_core_exporters_without_mutating_digests(
     for button in (
         panel.export_receipt_button,
         panel.export_segment_button,
+        panel.export_epoch_button,
         panel.export_heartbeat_button,
         panel.export_sample_button,
     ):
@@ -346,6 +455,7 @@ def test_all_stage_7_csv_buttons_use_core_exporters_without_mutating_digests(
     expected_headers = (
         LIGHT_STIMULUS_RECEIPTS_CSV_FIELDS,
         LIGHT_RESPONSE_SEGMENTS_CSV_FIELDS,
+        LIGHT_RESPONSE_DYNAMICS_EPOCHS_CSV_FIELDS,
         LIGHT_RESPONSIVE_HEARTBEATS_CSV_FIELDS,
         LIGHT_RESPONSE_SAMPLES_CSV_FIELDS,
     )
@@ -358,6 +468,7 @@ def test_all_stage_7_csv_buttons_use_core_exporters_without_mutating_digests(
         component.responsive_diagnostic_digest(),
         component.light_receipt_digest(),
         component.response_segment_digest(),
+        component.response_dynamics_epoch_digest(),
         component.response_sample_digest(),
         window.simulation.engine.deterministic_digest(),
     ) == digests_before

@@ -16,8 +16,9 @@ from symbiotic_sim_v2.virtual_user.light_response.config import LightResponseCon
 EXPECTED_DIGESTS = (
     "3392698943c200a9ab08964644ca72d56f50dfc1944c225b8c3e7933c5a229ae",
     "f8240cabbc882ceef81b537c29f907b60c23bad3bc207dac3c4a51b52aaca3cd",
-    "d99994308b9da2ab11e9e8ff441dbc55a03c6647dea0a7d4313760446524ccf6",
-    "63d09ba224c101fadb25ac2cc1eb1319faed64d722824ad7e0cbb11f73f916c0",
+    "8d46a403067232d1d4532ba878d22881ddc2e5f5b7e429394b5d26b02a03e706",
+    "b09c15e82e25ee42eaaea0d374ac7ba041494f59c742fb953ec178a31f5ffe85",
+    "d1be764aa7ffa60a8545e03e7f1fc853a4a95291a95dad09b873d1b9e2a31916",
     "b230c3d38ca3d1f85ba910c5970f667970c8d6e66533c84b3ecca7abe7c30bb7",
     "db9948271c0a664cd990c9954b131ebefc855a553005225241a6f94ac00625bf",
 )
@@ -32,6 +33,7 @@ def result_digests(
         component.responsive_diagnostic_digest(),
         component.light_receipt_digest(),
         component.response_segment_digest(),
+        component.response_dynamics_epoch_digest(),
         component.response_sample_digest(),
         simulation.engine.deterministic_digest(),
     )
@@ -105,6 +107,7 @@ def test_reset_rebuilds_all_response_histories_and_digests() -> None:
     assert component.responsive_heartbeat_records() == ()
     assert component.light_receipt_records() == ()
     assert component.response_segments() == ()
+    assert component.response_dynamics_epoch_records() == ()
     simulation.engine.run_until_end()
     assert result_digests(simulation) == first
 

@@ -13,7 +13,7 @@ Stage 7は、Stage 6の正式な光出力を仮想ユーザーの将来の心拍
 - H10入力: `HeartbeatEvent.scheduled_time_us` だけ
 - Garden入力: H10が正式出力した `RriMeasurementEvent` だけ
 
-responsive heartbeat record、light receipt、response segment、100ms sampleは開発診断であり、H10、Garden、Digital Lifeへ配送しない。
+responsive heartbeat record、light receipt、physical audit segment、response dynamics epoch、100ms sampleは開発診断であり、H10、Garden、Digital Lifeへ配送しない。
 
 ## システム境界
 
@@ -47,7 +47,13 @@ activeかつenabledならtargetはpreference match、その他は0である。ta
 R(t) = target + (R_start - target) * exp(-(t - start) / tau)
 ```
 
-targetが上がるときは8秒のonset、下がるときは12秒のrecoveryを使用する。入力時刻でresponseをjumpさせない。同一targetの再通知ではsegmentを分割せず、GUI timerや高頻度response eventも使わない。
+targetが上がるときは8秒のonset、下がるときは12秒のrecoveryを使用する。入力時刻でresponseをjumpさせない。Stage 7.1では同一targetの再通知や対称なHue変更でresponse dynamics epochを分割せず、物理parameterが変わる場合だけ別の監査segmentを開始する。GUI timerや高頻度response eventは使わない。
+
+## Stage 7.1の分離監査
+
+`physical_light_parameter_signature_v0_1` はactive、render Hue、Saturation、Valueの中心/振幅/下限/上限、BPM、waveformをexact equalityで比較する。effective time、開始phase、holder、source B、signal index、event IDは含めない。
+
+`light_response_segment_v2` は実際の物理parameter変更、または予期外のtarget-only変更で分割する監査recordである。`light_response_dynamics_epoch_v1` はresponse target、境界response、time constantだけを保持し、targetがexactに変わる場合だけ分割する。物理変更とtarget変更はreceiptとGUIで別のflag/markerとして監査する。詳細は [Stage 7.1監査分離](stage-07-1-physical-audit-response-epochs.md) を参照する。
 
 ## 生理連成
 
@@ -84,11 +90,11 @@ headless:
   --light-response-preset aligned_green_center
 ```
 
-診断CSVはreceipt、response segment、responsive heartbeat、100ms fixed-grid sampleの4種類である。CSV exportはsimulation stateやdigestを変更しない。
+診断CSVはreceipt、physical audit segment、response dynamics epoch、responsive heartbeat、100ms fixed-grid sampleの5種類である。CSV exportはsimulation stateやdigestを変更しない。
 
 ## 検証
 
-独立reference vectors、pure function、strict event projection、因果fixture、control比較、240秒integration、execution mode、digest、CSV、architecture、GUIを検証する。Stage 1〜6のdigestとStage 4〜6 CSVは回帰固定する。
+独立reference vectors、pure physical signature、4通りの分割matrix、response連続性、strict event projection、因果fixture、control比較、240秒integration、execution mode、digest、CSV、architecture、GUIを検証する。Stage 1〜6のdigestとStage 4〜6 CSV、Stage 7のformal event/heartbeat/physiology結果は回帰固定する。
 
 ## Stage 5C interface
 

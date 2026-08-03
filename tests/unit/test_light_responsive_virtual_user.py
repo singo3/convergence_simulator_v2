@@ -32,6 +32,7 @@ from symbiotic_sim_v2.virtual_user.light_response.component import (
 )
 from symbiotic_sim_v2.virtual_user.light_response.config import LightResponseConfig
 from symbiotic_sim_v2.virtual_user.light_response.diagnostics import (
+    LIGHT_RESPONSE_DYNAMICS_EPOCHS_CSV_FIELDS,
     LIGHT_RESPONSE_SAMPLES_CSV_FIELDS,
     LIGHT_RESPONSE_SEGMENTS_CSV_FIELDS,
     LIGHT_RESPONSIVE_HEARTBEATS_CSV_FIELDS,
@@ -184,6 +185,7 @@ def test_light_receipts_target_segments_continuity_completion_and_samples() -> N
     engine.run_until_end()
     receipts = component.light_receipt_records()
     segments = component.response_segments()
+    epochs = component.response_dynamics_epoch_records()
     assert len(receipts) == 3
     assert receipts[1].target_changed
     assert receipts[1].response_before == receipts[1].response_after_at_same_time == 0.0
@@ -192,8 +194,12 @@ def test_light_receipts_target_segments_continuity_completion_and_samples() -> N
     assert segments[-1].end_time_us == END_TIME_US
     assert all(
         left.end_time_us == right.start_time_us
-        and left.response_at_end == right.response_at_start
         for left, right in zip(segments, segments[1:], strict=False)
+    )
+    assert all(
+        left.end_time_us == right.start_time_us
+        and left.response_at_end == right.response_at_start
+        for left, right in zip(epochs, epochs[1:], strict=False)
     )
     assert component.response_at(90_000_000) > 0.99
     samples = component.response_samples()
@@ -246,6 +252,7 @@ def test_formal_heartbeat_schema_and_digests_are_stable_across_reset() -> None:
         component.responsive_diagnostic_digest(),
         component.light_receipt_digest(),
         component.response_segment_digest(),
+        component.response_dynamics_epoch_digest(),
         component.response_sample_digest(),
     )
     for event in engine.executed_events():
@@ -265,6 +272,7 @@ def test_formal_heartbeat_schema_and_digests_are_stable_across_reset() -> None:
         component.responsive_diagnostic_digest(),
         component.light_receipt_digest(),
         component.response_segment_digest(),
+        component.response_dynamics_epoch_digest(),
         component.response_sample_digest(),
     ) == digests
 
@@ -277,12 +285,14 @@ def test_csv_schemas_and_export_do_not_mutate_digests(tmp_path) -> None:
         component.responsive_diagnostic_digest(),
         component.light_receipt_digest(),
         component.response_segment_digest(),
+        component.response_dynamics_epoch_digest(),
         component.response_sample_digest(),
     )
     paths = export_light_response_diagnostics(tmp_path, component)
     expected_headers = (
         LIGHT_STIMULUS_RECEIPTS_CSV_FIELDS,
         LIGHT_RESPONSE_SEGMENTS_CSV_FIELDS,
+        LIGHT_RESPONSE_DYNAMICS_EPOCHS_CSV_FIELDS,
         LIGHT_RESPONSIVE_HEARTBEATS_CSV_FIELDS,
         LIGHT_RESPONSE_SAMPLES_CSV_FIELDS,
     )
@@ -294,5 +304,6 @@ def test_csv_schemas_and_export_do_not_mutate_digests(tmp_path) -> None:
         component.responsive_diagnostic_digest(),
         component.light_receipt_digest(),
         component.response_segment_digest(),
+        component.response_dynamics_epoch_digest(),
         component.response_sample_digest(),
     ) == before

@@ -7,14 +7,22 @@ import math
 from dataclasses import asdict, dataclass, fields
 from typing import Any
 
-LIGHT_RESPONSE_MODEL_VERSION = "stationary_light_responsive_virtual_user_v0_1"
+LIGHT_RESPONSE_MODEL_VERSION = "stationary_light_responsive_virtual_user_v0_2"
 PHYSICAL_PROJECTION_VERSION = "physical_light_stimulus_projection_v0_1"
 PREFERENCE_MODEL_VERSION = "stationary_hue_bpm_gaussian_preference_v0_1"
 RESPONSE_DYNAMICS_VERSION = "first_order_light_response_v0_1"
 PHYSIOLOGY_COUPLING_VERSION = "light_response_rsa_mean_rri_coupling_v0_1"
 HEARTBEAT_CAUSALITY_POLICY_VERSION = "sample_light_response_at_heartbeat_start_v0_1"
 LIGHT_RESPONSE_INPUT_SCHEMA_VERSION = "light_stimulus_state_event_v1"
-LIGHT_RESPONSE_SEGMENT_SCHEMA_VERSION = "light_response_segment_v1"
+LIGHT_RESPONSE_SEGMENT_SCHEMA_VERSION = "light_response_segment_v2"
+LIGHT_RESPONSE_DYNAMICS_EPOCH_SCHEMA_VERSION = "light_response_dynamics_epoch_v1"
+PHYSICAL_STIMULUS_CHANGE_POLICY_VERSION = "physical_stimulus_parameter_change_v0_1"
+PHYSICAL_LIGHT_PARAMETER_SIGNATURE_VERSION = (
+    "physical_light_parameter_signature_v0_1"
+)
+SEGMENT_SPLIT_POLICY_VERSION = (
+    "split_audit_on_physical_change_keep_response_on_same_target_v0_1"
+)
 RESPONSIVE_HEARTBEAT_SCHEMA_VERSION = "light_responsive_heartbeat_record_v1"
 DIAGNOSTIC_SAMPLING_POLICY_VERSION = "fixed_virtual_grid_100ms_v0_1"
 RESPONSE_SAMPLING_VERSION = DIAGNOSTIC_SAMPLING_POLICY_VERSION
@@ -50,6 +58,16 @@ class LightResponseConfig:
     heartbeat_causality_policy_version: str = HEARTBEAT_CAUSALITY_POLICY_VERSION
     input_schema_version: str = LIGHT_RESPONSE_INPUT_SCHEMA_VERSION
     response_segment_schema_version: str = LIGHT_RESPONSE_SEGMENT_SCHEMA_VERSION
+    response_dynamics_epoch_schema_version: str = (
+        LIGHT_RESPONSE_DYNAMICS_EPOCH_SCHEMA_VERSION
+    )
+    physical_stimulus_change_policy_version: str = (
+        PHYSICAL_STIMULUS_CHANGE_POLICY_VERSION
+    )
+    physical_light_parameter_signature_version: str = (
+        PHYSICAL_LIGHT_PARAMETER_SIGNATURE_VERSION
+    )
+    segment_split_policy_version: str = SEGMENT_SPLIT_POLICY_VERSION
     responsive_heartbeat_schema_version: str = RESPONSIVE_HEARTBEAT_SCHEMA_VERSION
     enabled: bool = True
     preference_stationary: bool = True
@@ -77,6 +95,16 @@ class LightResponseConfig:
             "heartbeat_causality_policy_version": HEARTBEAT_CAUSALITY_POLICY_VERSION,
             "input_schema_version": LIGHT_RESPONSE_INPUT_SCHEMA_VERSION,
             "response_segment_schema_version": LIGHT_RESPONSE_SEGMENT_SCHEMA_VERSION,
+            "response_dynamics_epoch_schema_version": (
+                LIGHT_RESPONSE_DYNAMICS_EPOCH_SCHEMA_VERSION
+            ),
+            "physical_stimulus_change_policy_version": (
+                PHYSICAL_STIMULUS_CHANGE_POLICY_VERSION
+            ),
+            "physical_light_parameter_signature_version": (
+                PHYSICAL_LIGHT_PARAMETER_SIGNATURE_VERSION
+            ),
+            "segment_split_policy_version": SEGMENT_SPLIT_POLICY_VERSION,
             "responsive_heartbeat_schema_version": RESPONSIVE_HEARTBEAT_SCHEMA_VERSION,
             "match_combination": MATCH_COMBINATION,
         }

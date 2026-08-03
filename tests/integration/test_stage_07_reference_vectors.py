@@ -20,14 +20,18 @@ from symbiotic_sim_v2.virtual_user import physiology as base_physiology
 from symbiotic_sim_v2.virtual_user.config import VirtualUserConfig
 from symbiotic_sim_v2.virtual_user.light_response.config import (
     HEARTBEAT_CAUSALITY_POLICY_VERSION,
+    LIGHT_RESPONSE_DYNAMICS_EPOCH_SCHEMA_VERSION,
     LIGHT_RESPONSE_INPUT_SCHEMA_VERSION,
     LIGHT_RESPONSE_MODEL_VERSION,
     LIGHT_RESPONSE_SEGMENT_SCHEMA_VERSION,
+    PHYSICAL_LIGHT_PARAMETER_SIGNATURE_VERSION,
     PHYSICAL_PROJECTION_VERSION,
+    PHYSICAL_STIMULUS_CHANGE_POLICY_VERSION,
     PHYSIOLOGY_COUPLING_VERSION,
     PREFERENCE_MODEL_VERSION,
     RESPONSE_DYNAMICS_VERSION,
     RESPONSIVE_HEARTBEAT_SCHEMA_VERSION,
+    SEGMENT_SPLIT_POLICY_VERSION,
     LightResponseConfig,
 )
 from symbiotic_sim_v2.virtual_user.light_response.dynamics import (
@@ -75,19 +79,29 @@ def test_stage7_reference_file_is_fresh_and_generator_is_production_independent(
 
 def test_stage7_versions_match_fixed_reference_vectors() -> None:
     assumptions = vectors()["simulation_assumptions"]
-    assert __version__ == assumptions["project_version"] == "0.8.0"
+    assert __version__ == assumptions["project_version"] == "0.8.1"
     assert assumptions == {
         "diagnostic_sampling_policy_version": "fixed_virtual_grid_100ms_v0_1",
         "heartbeat_causality_policy_version": HEARTBEAT_CAUSALITY_POLICY_VERSION,
         "input_schema_version": LIGHT_RESPONSE_INPUT_SCHEMA_VERSION,
         "light_responsive_user_model_version": LIGHT_RESPONSE_MODEL_VERSION,
+        "physical_light_parameter_signature_version": (
+            PHYSICAL_LIGHT_PARAMETER_SIGNATURE_VERSION
+        ),
         "physical_projection_version": PHYSICAL_PROJECTION_VERSION,
+        "physical_stimulus_change_policy_version": (
+            PHYSICAL_STIMULUS_CHANGE_POLICY_VERSION
+        ),
         "physiology_coupling_version": PHYSIOLOGY_COUPLING_VERSION,
         "preference_model_version": PREFERENCE_MODEL_VERSION,
-        "project_version": "0.8.0",
+        "project_version": "0.8.1",
         "response_dynamics_version": RESPONSE_DYNAMICS_VERSION,
+        "response_dynamics_epoch_schema_version": (
+            LIGHT_RESPONSE_DYNAMICS_EPOCH_SCHEMA_VERSION
+        ),
         "response_segment_schema_version": LIGHT_RESPONSE_SEGMENT_SCHEMA_VERSION,
         "responsive_heartbeat_schema_version": RESPONSIVE_HEARTBEAT_SCHEMA_VERSION,
+        "segment_split_policy_version": SEGMENT_SPLIT_POLICY_VERSION,
     }
 
 
@@ -301,14 +315,45 @@ def test_independent_standard_and_control_scenario_vectors_match_production() ->
     )
     assert first_active.preference_match == standard["first_active_preference_match"]
     assert len(component.light_receipt_records()) == standard["light_stimulus_input_count"]
+    assert component.snapshot().physical_stimulus_change_count == standard[
+        "physical_stimulus_change_count"
+    ]
+    assert component.snapshot().response_target_change_count == standard[
+        "response_target_change_count"
+    ]
     assert len(component.response_samples()) == standard["response_sample_count"]
     assert component.response_samples()[1].time_us == standard["response_sample_interval_us"]
     assert simulation.engine.clock.current_time_us == standard["simulation_end_time_us"]
     assert component.light_response_config.preference_stationary is (
         standard["preference_stationary"]
     )
-    assert len(component.response_segments()) == 2
-    assert response_vectors["same_target_continues_without_new_segment"] is True
+    assert len(component.response_segments()) == standard[
+        "physical_audit_segment_count"
+    ]
+    assert len(component.response_dynamics_epoch_records()) == standard[
+        "response_dynamics_epoch_count"
+    ]
+    assert (
+        response_vectors[
+            "same_physical_and_target_retransmission_continues_without_new_audit_segment"
+        ]
+        is True
+    )
+    assert response_vectors[
+        "physical_change_same_target_starts_new_audit_segment"
+    ] is True
+    assert (
+        response_vectors["same_target_continues_without_new_dynamics_epoch"] is True
+    )
+    assert standard["diagnostic_digests"] == {
+        "heartbeat": component.heartbeat_digest(),
+        "responsive_heartbeat": component.responsive_diagnostic_digest(),
+        "light_receipt_v2": component.light_receipt_digest(),
+        "physical_audit_segment_v2": component.physical_audit_segment_digest(),
+        "response_dynamics_epoch_v1": component.response_dynamics_epoch_digest(),
+        "response_sample": component.response_sample_digest(),
+        "full_event": simulation.engine.deterministic_digest(),
+    }
 
     checkpoints = response_vectors["checkpoints"]
     for key, time_us in (

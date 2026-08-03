@@ -104,7 +104,7 @@ def build_reference_vectors() -> dict[str, Any]:
     responsive_fixture_unclamped = sum(responsive_fixture_components.values())
 
     return {
-        "schema_version": "stage_07_reference_vectors_v1",
+        "schema_version": "stage_07_reference_vectors_v2",
         "normative_source": {
             "document_version": "v2.0",
             "profile_version": "symbiotic_signal_loop_reference_v1_0",
@@ -114,9 +114,9 @@ def build_reference_vectors() -> dict[str, Any]:
             "sha256": SPEC_SHA256,
         },
         "simulation_assumptions": {
-            "project_version": "0.8.0",
+            "project_version": "0.8.1",
             "light_responsive_user_model_version": (
-                "stationary_light_responsive_virtual_user_v0_1"
+                "stationary_light_responsive_virtual_user_v0_2"
             ),
             "physical_projection_version": "physical_light_stimulus_projection_v0_1",
             "preference_model_version": (
@@ -130,7 +130,19 @@ def build_reference_vectors() -> dict[str, Any]:
                 "sample_light_response_at_heartbeat_start_v0_1"
             ),
             "input_schema_version": "light_stimulus_state_event_v1",
-            "response_segment_schema_version": "light_response_segment_v1",
+            "response_segment_schema_version": "light_response_segment_v2",
+            "response_dynamics_epoch_schema_version": (
+                "light_response_dynamics_epoch_v1"
+            ),
+            "physical_stimulus_change_policy_version": (
+                "physical_stimulus_parameter_change_v0_1"
+            ),
+            "physical_light_parameter_signature_version": (
+                "physical_light_parameter_signature_v0_1"
+            ),
+            "segment_split_policy_version": (
+                "split_audit_on_physical_change_keep_response_on_same_target_v0_1"
+            ),
             "responsive_heartbeat_schema_version": (
                 "light_responsive_heartbeat_record_v1"
             ),
@@ -180,7 +192,32 @@ def build_reference_vectors() -> dict[str, Any]:
                 "response_before": onset_after_eight_seconds,
                 "response_after_same_time": onset_after_eight_seconds,
             },
-            "same_target_continues_without_new_segment": True,
+            "same_physical_and_target_retransmission_continues_without_new_audit_segment": (
+                True
+            ),
+            "physical_change_same_target_starts_new_audit_segment": True,
+            "same_target_continues_without_new_dynamics_epoch": True,
+            "split_matrix": {
+                "physical_false_target_false": {
+                    "audit_split": False,
+                    "dynamics_epoch_split": False,
+                },
+                "physical_true_target_false": {
+                    "audit_split": True,
+                    "dynamics_epoch_split": False,
+                    "response_reset": False,
+                },
+                "physical_true_target_true": {
+                    "audit_split": True,
+                    "dynamics_epoch_split": True,
+                    "response_continuous": True,
+                },
+                "physical_false_target_true": {
+                    "audit_split": True,
+                    "diagnostic_reason_required": True,
+                    "dynamics_epoch_split": True,
+                },
+            },
             "checkpoints": {
                 "response_at_90s": response_90s,
                 "response_at_120s": response_120s,
@@ -262,6 +299,39 @@ def build_reference_vectors() -> dict[str, Any]:
             ),
             "provenance_used_by_physiology": False,
         },
+        "physical_audit_signature": {
+            "policy": "physical_light_parameter_signature_v0_1",
+            "comparison": "exact_deterministic_equality",
+            "included_fields": [
+                "active",
+                "render_hue_degree",
+                "saturation",
+                "value_center",
+                "value_amplitude",
+                "value_min",
+                "value_max",
+                "blink_bpm",
+                "waveform",
+            ],
+            "excluded_fields": [
+                "effective_time_us",
+                "phase_cycles_at_start",
+                "qualification_holder_id",
+                "source_b",
+                "source_signal_index",
+                "receipt_index",
+                "event_id",
+            ],
+            "symmetric_hue_fixture": {
+                "first_hue_degree": 123.0,
+                "second_hue_degree": 127.0,
+                "preferred_hue_degree": 125.0,
+                "physical_parameters_changed": True,
+                "response_target_changed": False,
+                "audit_split": True,
+                "dynamics_epoch_split": False,
+            },
+        },
         "control": {
             "maximum_respiratory_amplitude_gain_ms": 0.0,
             "maximum_mean_rri_increase_ms": 0.0,
@@ -278,10 +348,37 @@ def build_reference_vectors() -> dict[str, Any]:
             "first_active_blink_bpm": 87.5,
             "first_active_preference_match": 1.0,
             "light_stimulus_input_count": 241,
+            "physical_stimulus_change_count": 2,
+            "response_target_change_count": 2,
+            "physical_audit_segment_count": 2,
+            "response_dynamics_epoch_count": 2,
             "response_sample_interval_us": 100_000,
             "response_sample_count": 2_401,
             "simulation_end_time_us": SIMULATION_END_TIME_US,
             "preference_stationary": True,
+            "diagnostic_digests": {
+                "heartbeat": (
+                    "3392698943c200a9ab08964644ca72d56f50dfc1944c225b8c3e7933c5a229ae"
+                ),
+                "responsive_heartbeat": (
+                    "f8240cabbc882ceef81b537c29f907b60c23bad3bc207dac3c4a51b52aaca3cd"
+                ),
+                "light_receipt_v2": (
+                    "8d46a403067232d1d4532ba878d22881ddc2e5f5b7e429394b5d26b02a03e706"
+                ),
+                "physical_audit_segment_v2": (
+                    "b09c15e82e25ee42eaaea0d374ac7ba041494f59c742fb953ec178a31f5ffe85"
+                ),
+                "response_dynamics_epoch_v1": (
+                    "d1be764aa7ffa60a8545e03e7f1fc853a4a95291a95dad09b873d1b9e2a31916"
+                ),
+                "response_sample": (
+                    "b230c3d38ca3d1f85ba910c5970f667970c8d6e66533c84b3ecca7abe7c30bb7"
+                ),
+                "full_event": (
+                    "db9948271c0a664cd990c9954b131ebefc855a553005225241a6f94ac00625bf"
+                ),
+            },
         },
     }
 

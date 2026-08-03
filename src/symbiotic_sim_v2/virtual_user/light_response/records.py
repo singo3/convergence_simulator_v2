@@ -1,4 +1,4 @@
-"""Immutable Stage 7 receipt, response, heartbeat, and sample diagnostics."""
+"""Immutable Stage 7.1 light audit, response, and heartbeat diagnostics."""
 
 from __future__ import annotations
 
@@ -15,21 +15,57 @@ type SourceBVector = tuple[float, float, float, float]
 
 @dataclass(frozen=True, slots=True)
 class LightResponseSegment:
+    """One physical-stimulus audit interval, independent of response dynamics."""
+
     segment_index: int
     start_time_us: int
     end_time_us: int
     duration_us: int
     light_active: bool
     render_hue_degree: float | None
+    saturation: float
+    value_center: float
+    value_amplitude: float
+    value_min: float
+    value_max: float
     blink_bpm: float | None
+    waveform: str
     hue_match: float | None
     bpm_match: float | None
     preference_match: float
     response_target: float
+    response_dynamics_epoch_index: int
+    physical_parameters_changed_at_start: bool
+    target_changed_at_start: bool
+    split_reason: str
+    physical_stimulus_change_policy_version: str
+    physical_light_parameter_signature_version: str
+    segment_split_policy_version: str
+    preference_model_version: str
+    schema_version: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+# Compatibility and explicit semantic names for the Stage 7.1 v2 audit record.
+PhysicalLightAuditSegmentRecord = LightResponseSegment
+LightResponseAuditSegmentRecord = LightResponseSegment
+
+
+@dataclass(frozen=True, slots=True)
+class LightResponseDynamicsEpochRecord:
+    """One pure first-order response interval, split only when target changes."""
+
+    epoch_index: int
+    start_time_us: int
+    end_time_us: int
+    duration_us: int
+    response_target: float
     response_at_start: float
     response_at_end: float
     time_constant_seconds: float | None
-    preference_model_version: str
+    target_changed_at_start: bool
     response_dynamics_version: str
     schema_version: str
 
@@ -50,12 +86,19 @@ class LightStimulusReceiptRecord:
     bpm_match: float | None
     preference_match: float
     response_target: float
+    physical_parameters_changed: bool
     target_changed: bool
+    audit_segment_index: int | None
+    response_dynamics_epoch_index: int | None
+    audit_split_reason: str | None
     response_before: float
     response_after_at_same_time: float
     provenance_used_by_physiology: bool
     physical_projection_version: str
     preference_model_version: str
+    physical_stimulus_change_policy_version: str
+    physical_light_parameter_signature_version: str
+    segment_split_policy_version: str
     input_schema_version: str
 
     @property

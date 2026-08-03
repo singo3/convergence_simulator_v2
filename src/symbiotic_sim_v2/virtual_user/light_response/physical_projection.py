@@ -28,6 +28,44 @@ class PhysicalLightStimulus:
     phase_cycles_at_start: float | None
 
 
+type PhysicalLightParameterSignature = tuple[
+    bool,
+    float | None,
+    float,
+    float,
+    float,
+    float,
+    float,
+    float | None,
+    str,
+]
+
+
+def physical_light_parameter_signature(
+    stimulus: PhysicalLightStimulus,
+) -> PhysicalLightParameterSignature:
+    """Return only exact, continuous-light physical parameters.
+
+    Effective time, phase-at-command-start, and every provenance value are
+    deliberately absent.  Tuple equality is the versioned deterministic
+    comparison; this helper applies no tolerance or normalization.
+    """
+
+    if not isinstance(stimulus, PhysicalLightStimulus):
+        raise TypeError("stimulus must be a PhysicalLightStimulus")
+    return (
+        stimulus.active,
+        stimulus.render_hue_degree,
+        stimulus.saturation,
+        stimulus.value_center,
+        stimulus.value_amplitude,
+        stimulus.value_min,
+        stimulus.value_max,
+        stimulus.blink_bpm,
+        stimulus.waveform,
+    )
+
+
 def project_physical_light_stimulus(
     state: LightStimulusStateInput,
 ) -> PhysicalLightStimulus:

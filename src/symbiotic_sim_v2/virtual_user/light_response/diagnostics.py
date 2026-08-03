@@ -9,6 +9,7 @@ from typing import Protocol
 
 from symbiotic_sim_v2.simulation.time_utils import us_to_seconds
 from symbiotic_sim_v2.virtual_user.light_response.records import (
+    LightResponseDynamicsEpochRecord,
     LightResponseSample,
     LightResponseSegment,
     LightResponsiveHeartbeatRecord,
@@ -17,6 +18,9 @@ from symbiotic_sim_v2.virtual_user.light_response.records import (
 
 LIGHT_STIMULUS_RECEIPTS_CSV_FILENAME = "stage_07_light_stimulus_receipts.csv"
 LIGHT_RESPONSE_SEGMENTS_CSV_FILENAME = "stage_07_light_response_segments.csv"
+LIGHT_RESPONSE_DYNAMICS_EPOCHS_CSV_FILENAME = (
+    "stage_07_response_dynamics_epochs.csv"
+)
 LIGHT_RESPONSIVE_HEARTBEATS_CSV_FILENAME = "stage_07_light_responsive_heartbeats.csv"
 LIGHT_RESPONSE_SAMPLES_CSV_FILENAME = "stage_07_light_response_samples_100ms.csv"
 
@@ -29,17 +33,27 @@ LIGHT_STIMULUS_RECEIPTS_CSV_FIELDS = (
     "physical_saturation",
     "physical_value_center",
     "physical_value_amplitude",
+    "physical_value_min",
+    "physical_value_max",
     "physical_blink_bpm",
     "physical_waveform",
     "hue_match",
     "bpm_match",
     "preference_match",
     "response_target",
+    "physical_parameters_changed",
     "target_changed",
+    "audit_segment_index",
+    "response_dynamics_epoch_index",
+    "audit_split_reason",
     "response_before",
+    "response_after_at_same_time",
     "provenance_used_by_physiology",
     "projection_version",
     "preference_model_version",
+    "physical_stimulus_change_policy_version",
+    "physical_light_parameter_signature_version",
+    "segment_split_policy_version",
 )
 LIGHT_RESPONSE_SEGMENTS_CSV_FIELDS = (
     "segment_index",
@@ -48,14 +62,37 @@ LIGHT_RESPONSE_SEGMENTS_CSV_FIELDS = (
     "duration_us",
     "light_active",
     "render_hue_degree",
+    "saturation",
+    "value_center",
+    "value_amplitude",
+    "value_min",
+    "value_max",
     "blink_bpm",
+    "waveform",
     "hue_match",
     "bpm_match",
     "preference_match",
     "response_target",
+    "response_dynamics_epoch_index",
+    "physical_parameters_changed_at_start",
+    "target_changed_at_start",
+    "split_reason",
+    "physical_stimulus_change_policy_version",
+    "physical_light_parameter_signature_version",
+    "segment_split_policy_version",
+    "preference_model_version",
+    "schema_version",
+)
+LIGHT_RESPONSE_DYNAMICS_EPOCHS_CSV_FIELDS = (
+    "epoch_index",
+    "start_time_us",
+    "end_time_us",
+    "duration_us",
+    "response_target",
     "response_at_start",
     "response_at_end",
     "time_constant_seconds",
+    "target_changed_at_start",
     "response_dynamics_version",
     "schema_version",
 )
@@ -107,6 +144,10 @@ class LightResponseDiagnosticSource(Protocol):
 
     def response_segments(self) -> tuple[LightResponseSegment, ...]: ...
 
+    def response_dynamics_epoch_records(
+        self,
+    ) -> tuple[LightResponseDynamicsEpochRecord, ...]: ...
+
     def responsive_heartbeat_records(
         self,
     ) -> tuple[LightResponsiveHeartbeatRecord, ...]: ...
@@ -129,17 +170,31 @@ def export_light_stimulus_receipts_csv(
             "physical_saturation": record.physical_stimulus.saturation,
             "physical_value_center": record.physical_stimulus.value_center,
             "physical_value_amplitude": record.physical_stimulus.value_amplitude,
+            "physical_value_min": record.physical_stimulus.value_min,
+            "physical_value_max": record.physical_stimulus.value_max,
             "physical_blink_bpm": record.physical_stimulus.blink_bpm,
             "physical_waveform": record.physical_stimulus.waveform,
             "hue_match": record.hue_match,
             "bpm_match": record.bpm_match,
             "preference_match": record.preference_match,
             "response_target": record.response_target,
+            "physical_parameters_changed": record.physical_parameters_changed,
             "target_changed": record.target_changed,
+            "audit_segment_index": record.audit_segment_index,
+            "response_dynamics_epoch_index": record.response_dynamics_epoch_index,
+            "audit_split_reason": record.audit_split_reason,
             "response_before": record.response_before,
+            "response_after_at_same_time": record.response_after_at_same_time,
             "provenance_used_by_physiology": record.provenance_used_by_physiology,
             "projection_version": record.physical_projection_version,
             "preference_model_version": record.preference_model_version,
+            "physical_stimulus_change_policy_version": (
+                record.physical_stimulus_change_policy_version
+            ),
+            "physical_light_parameter_signature_version": (
+                record.physical_light_parameter_signature_version
+            ),
+            "segment_split_policy_version": record.segment_split_policy_version,
         }
         for record in records
     )
@@ -159,6 +214,21 @@ def export_light_response_segments_csv(
         for record in records
     )
     return _write_rows(path, LIGHT_RESPONSE_SEGMENTS_CSV_FIELDS, rows)
+
+
+def export_light_response_dynamics_epochs_csv(
+    destination: str | Path,
+    records: Sequence[LightResponseDynamicsEpochRecord],
+) -> Path:
+    path = _output_path(destination, LIGHT_RESPONSE_DYNAMICS_EPOCHS_CSV_FILENAME)
+    rows = (
+        {
+            field: getattr(record, field)
+            for field in LIGHT_RESPONSE_DYNAMICS_EPOCHS_CSV_FIELDS
+        }
+        for record in records
+    )
+    return _write_rows(path, LIGHT_RESPONSE_DYNAMICS_EPOCHS_CSV_FIELDS, rows)
 
 
 def export_light_responsive_heartbeats_csv(
@@ -191,14 +261,18 @@ def export_light_response_samples_csv(
 def export_light_response_diagnostics(
     destination: str | Path,
     source: LightResponseDiagnosticSource,
-) -> tuple[Path, Path, Path, Path]:
-    """Export all four files without mutating component state or digests."""
+) -> tuple[Path, Path, Path, Path, Path]:
+    """Export all five files without mutating component state or digests."""
 
     root = Path(destination)
     root.mkdir(parents=True, exist_ok=True)
     return (
         export_light_stimulus_receipts_csv(root, source.light_receipt_records()),
         export_light_response_segments_csv(root, source.response_segments()),
+        export_light_response_dynamics_epochs_csv(
+            root,
+            source.response_dynamics_epoch_records(),
+        ),
         export_light_responsive_heartbeats_csv(
             root,
             source.responsive_heartbeat_records(),
