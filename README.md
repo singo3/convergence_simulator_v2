@@ -15,7 +15,8 @@
 - Stage 5C「3Bundle関係記憶探索・確認型候補採否」: 完成
 - Stage 8A「固定好みユーザー・複数セッション収束ラボ」: 完成
 - Stage 8A.1「固定好み・疲労／探索幅・収束条件ラボ」: 完成
-- 現在のGUI主対象: Stage 8A.1のexperimental fatigue/sigma、構造収束、paired condition grid
+- Stage 8A.2「自動条件探索・堅牢候補抽出」: 完成
+- 現在のGUI主対象: Stage 8A.1、現在のheadless実験主対象: Stage 8A.2
 
 正式な信号経路は次のとおりです。
 
@@ -58,6 +59,8 @@ Stage 5Cは、各生命内部の `adaptive_random_search_confirmed_v1` をこの
 Stage 8AはStage 5C public factoryを1session単位で再利用し、正常終了後の`k_anchor/q/E/trial_count/session_count`を次sessionへ引き継ぎます。baselineと`W_anchor_session`は毎session取り直します。仮想ユーザーのsingle/multi-peak好みはrun中に固定し、生理noiseだけを決定論的なsession seedで変化させます。一次収束は1sessionを独立票とする「同じDigital Life + 近いHue/BPM」の直近4有効session中3sessionです。1sessionの3Bundleを独立票にしません。latest outlierを許容し、収束後もStage 5Cの探索を停止しません。各Bundleの実提示k/B/Hue/BPMはsegment監査として残しますが票にはしません。observed convergenceとhidden landscape truth alignmentは分離され、どちらもDigital Life、Runtime、Gardenへ入力されません。truth分類は`response_gap=max(0, global maximum match - medoid match)`を使い、threshold以下を`correct_convergence`、超過を`stable_suboptimal`、未収束を`not_converged`、flat型を`no_preference_control`とします。nearest peakのsigma正規化距離もsimulation-only診断です。
 
 Stage 8A.1はStage 8Aとv2.0 reference armを変更せず、experimental armだけに「180 active signals後の選出生命疲労target」、正常session終了時の非選出生命E=0全回復、参照sigmaへの共通倍率を注入します。固定user type v2に対し、生命優勢、cross-life BPM共通帯、生命別multi-attractor、temporary outlier/return、機械的rotation、W天井を独立診断します。収束後も探索を続け、診断結果をCoreへ返しません。paired replicateはcondition ID、fatigue、sigmaをseedに含めず、単一の「最良条件スコア」を作りません。experimental manifestは`formal_spec_adoption=false`を明記します。
+
+Stage 8A.2はStage 8A.1 runnerをコピーせず再利用する、完全ローカルCPUのheadless実験オーケストレーションです。coarse→refine→confirmで条件を段階的に絞り、paired seed、condition横断reference cache、atomic checkpoint/resume、95% Wilson区間、Pareto frontier、robust/specialist候補、自己完結型`report.html`を生成します。OpenAI、Codex、ChatGPT、外部LLM、外部API、networkを呼びません。候補をDigital Life、Runtime、Gardenへ返さず、`formal_spec_adoption=false`のままtrade-offを保存します。robust gateを通る候補がない場合は無理に一位を作らず`no_robust_candidate`とblockerを出します。
 
 現在の `ideal_polar_h10_rri_device_v0_1` は、誤差・欠損・遅延なしの理想的な入力デバイスを表すsimulation assumptionです。実機Polar H10のBLE GATT packet、firmware、電波、pairing、Polar SDKを再現するpacket-level emulatorではありません。
 
@@ -214,6 +217,20 @@ Stage 2のRRI、RMSSD、内部変動成分は仮想ユーザー内部の開発�
 - single-condition runner、strict state JSON、paired condition grid、個別trade-off aggregate
 - moving preference、sigma以外の係数tuning、formal adoption、Monte Carloは未実装
 
+### Stage 8A.2
+
+- `fatigue_sigma_auto_search_v0_1`と`coarse_refine_confirm_search_v0_1`
+- smoke / quick / standard / robustの事前budget計算と、上限超過時の非clipエラー
+- Stage 8A.1 `FatigueSigmaSingleConditionRunner`の直接再利用（simulation core再実装なし）
+- conditionを混ぜないpaired replicate seedと、user/session/seed/fingerprint単位のreference cache
+- canonical job ID、checksummed job result、strict code/spec fingerprint
+- atomic checkpoint、exclusive lock、SIGINT/SIGTERM安全境界、completed job skip resume
+- user type横断worst/mean、flat safety、rotation、W ceiling、速度、outlier復帰の同時評価
+- 95% Wilson intervalと連続値のcount/mean/median/min/max/Q1/Q3
+- transparent candidate gate、Pareto rank、lexicographic robust ranking、5種specialist
+- self-contained inline CSS/SVG HTML report、CSV/JSON schema、macOS launcher
+- OpenAI/API/network/Qtなし、formal adoptionなし、moving preferenceなし
+
 ## Requirements / setup
 
 - Python 3.12以上
@@ -222,7 +239,7 @@ Stage 2のRRI、RMSSD、内部変動成分は仮想ユーザー内部の開発�
 - pytest / pytest-qt
 - Ruff
 
-Stage 8A.1固定検証環境はPython 3.13.4、PySide6 6.11.1、PyQtGraph 0.14.0、NumPy 2.5.1、pytest 9.1.1、pytest-qt 4.5.0、Ruff 0.16.1です。
+Stage 8A.2固定検証環境はPython 3.13.4、PySide6 6.11.1、PyQtGraph 0.14.0、NumPy 2.5.1、pytest 9.1.1、pytest-qt 4.5.0、Ruff 0.16.1です。
 
 プロジェクト直下の `.venv` をStage間で再利用します。
 
@@ -380,7 +397,45 @@ Stage 8A.1 paired condition grid:
 
 `--experiment-preset quick|standard|detailed`、`--initial-experiment-state-json`、`--export-final-experiment-state-json`、`--export-experiment-csv`を使えます。`detailed`は明示選択した軸とreplicateを60 sessionsで実行し、30,000 session上限はclipせず拒否します。出力は`stationary_preference=true`、`moving_preference=false`、`unselected_full_recovery=true`、`convergence_is_diagnostic_only=true`、`exploration_continues_after_convergence=true`、`p_explore_modified=false`、`epsilon_accept_modified=false`、`q_coefficients_modified=false`、`v2_reference_arm_available=true`、`formal_spec_adoption=false`、`Monte_Carlo=false`を明示します。
 
-`off_center_green` と `light_insensitive_control` も指定できます。いずれもreal-time待機をせずJSONを標準出力します。package versionは `0.11.0` です。既存JSON contractを変えないため、Stage 3/4/5A/5B.1/6/7.1/8A headlessの `project_version` は各Stageの固定値を意図的に維持します。
+Stage 8A.2 plan-only（simulation実行・directory作成なし）:
+
+```bash
+.venv/bin/python -m symbiotic_sim_v2 \
+  --headless-fatigue-sigma-auto-search \
+  --search-preset standard \
+  --plan-only
+```
+
+実装確認用smoke（32 experimental session runs）:
+
+```bash
+.venv/bin/python -m symbiotic_sim_v2 \
+  --headless-fatigue-sigma-auto-search \
+  --search-preset smoke \
+  --output-directory artifacts/auto_search_smoke
+```
+
+標準探索と堅牢探索はCodex作業中には実行せず、push後に利用者がローカルTerminalまたは`.command`から実行します。
+
+```bash
+.venv/bin/python -m symbiotic_sim_v2 \
+  --headless-fatigue-sigma-auto-search --search-preset standard
+
+.venv/bin/python -m symbiotic_sim_v2 \
+  --headless-fatigue-sigma-auto-search --search-preset robust
+```
+
+中断したrunは、stdoutに表示されたrun directoryを指定してstrictに再開します。code/spec fingerprintまたはschemaが異なる場合は`AUTO_SEARCH_CODE_CHANGED`等で停止し、勝手に続行しません。
+
+```bash
+.venv/bin/python -m symbiotic_sim_v2 \
+  --headless-fatigue-sigma-auto-search \
+  --resume artifacts/auto_search/<run_id>
+```
+
+macOSでは`自動条件探索_計画確認.command`、`自動条件探索_標準.command`、`自動条件探索_堅牢.command`、`自動条件探索_再開.command`を使用できます。成果物はrun directoryの`results/`、`report/report.html`、`checkpoint.json`へ保存されます。詳しくは[ローカル実行ガイド](docs/auto-search-local-execution-guide.md)を参照してください。
+
+`off_center_green` と `light_insensitive_control` も指定できます。いずれもreal-time待機をせずJSONを標準出力します。package versionは `0.12.0` です。既存JSON contractを変えないため、Stage 3/4/5A/5B.1/6/7.1/8A/8A.1 headlessの `project_version` は各Stageの固定値を意図的に維持します。
 
 既存Stage 1〜5A JSONは変更しません。Stage 5B JSONはholder、生命別E/q/G/k、touch/feedback/qualified B件数と分離digestを表示し、探索状態、Hue、BPM、I、光波形を含めません。
 
@@ -695,7 +750,7 @@ QT_QPA_PLATFORM=offscreen .venv/bin/pytest -q
 QT_QPA_PLATFORM=offscreen .venv/bin/python -m symbiotic_sim_v2 --smoke-test --auto-close-ms 15000
 ```
 
-テストは既存1380件以上のStage 1〜8A回帰に加え、session fatigue target、非選出全回復、reference arm、scaled sigma、固定user type v2、paired seed、life/BPM/multi-attractor収束、outlier return、rotation、W天井、single/grid runner、state/digest/CSV、12-tab GUI、architecture非干渉を確認します。
+テストは既存1555件以上のStage 1〜8A.1回帰に加え、Stage 8A.2のplan/job/fingerprint/checkpoint/reference cache、Wilson区間、gate/Pareto/ranking、安全中断・resume、real smoke、HTML/CSV/JSON、CLI、launcher、reference vector、no-network境界を確認します。
 
 Stage 5Aの設計境界は [1体のデジタル生命・第1周](docs/stage-05a-single-digital-life-first-round.md)、式と分類は [Digital Life first-round model v0.1](docs/digital-life-first-round-model_v0.1.md) を参照してください。Stage 4の設計境界は [Garden入力層設計](docs/stage-04-garden-input-layer.md)、モデル値は [Garden input model v0.1](docs/relax-with-light-garden-input-model_v0.1.md)、境界所属の仮定は [RRI window membership policy v0.1](docs/rri-window-membership-policy_v0.1.md) にあります。規範との境界は [規範スコープ](docs/normative-scope.md) を参照してください。
 
@@ -707,4 +762,4 @@ Stage 5Cは [3Bundle関係記憶探索](docs/stage-05c-confirmed-relation-memory
 
 Stage 8Aは [固定好み・複数セッション収束ラボ](docs/stage-08a-fixed-preference-multi-session-convergence.md)、[rolling majority定義](docs/rolling-majority-convergence-definition_v0.1.md)、[固定user landscape](docs/stationary-user-type-landscapes_v0.1.md)、[state handoff](docs/multi-session-state-handoff_v0.1.md)、[session seed policy](docs/session-physiology-seed-policy_v0.1.md) を参照してください。
 
-Stage 8A.1は [疲労・探索幅・収束条件ラボ](docs/stage-08a1-fatigue-exploration-convergence-lab.md)、[experimental fatigue policy](docs/experimental-fatigue-policy_v0.1.md)、[scaled sigma policy](docs/scaled-reference-sigma-policy_v0.1.md)、[構造収束診断](docs/structured-convergence-diagnostics_v0.1.md)、[固定user type v2](docs/stationary-user-type-profiles_v2.md)、[paired seed policy](docs/paired-replicate-seed-policy_v0.1.md)、[出力schema](docs/stage-08a1-experiment-output-schemas.md) を参照してください。次工程は **Stage 8B: 変化する好み・追従性** です。Stage 8Cの追加係数比較とformal Profile採用には進みません。
+Stage 8A.1は [疲労・探索幅・収束条件ラボ](docs/stage-08a1-fatigue-exploration-convergence-lab.md)、[experimental fatigue policy](docs/experimental-fatigue-policy_v0.1.md)、[scaled sigma policy](docs/scaled-reference-sigma-policy_v0.1.md)、[構造収束診断](docs/structured-convergence-diagnostics_v0.1.md)、[固定user type v2](docs/stationary-user-type-profiles_v2.md)、[paired seed policy](docs/paired-replicate-seed-policy_v0.1.md)、[出力schema](docs/stage-08a1-experiment-output-schemas.md) を参照してください。Stage 8A.2は [自動条件探索・堅牢候補抽出](docs/stage-08a2-automatic-condition-search.md) と [ローカル実行ガイド](docs/auto-search-local-execution-guide.md) を参照してください。次はpush後のローカルstandard探索と結果レビューであり、必要な場合だけrobust探索を行い、その後に **Stage 8B: 変化する好み・追従性** へ進みます。Stage 8Cの追加係数比較とformal Profile採用には進みません。

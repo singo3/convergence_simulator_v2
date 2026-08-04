@@ -263,6 +263,11 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="run a Stage 8A.1 paired condition grid",
     )
+    headless_group.add_argument(
+        "--headless-fatigue-sigma-auto-search",
+        action="store_true",
+        help="run the offline Stage 8A.2 coarse-refine-confirm search",
+    )
     parser.add_argument(
         "--life-role",
         choices=("red", "green", "blue"),
@@ -508,6 +513,84 @@ def _build_parser() -> argparse.ArgumentParser:
         "--export-experiment-csv",
         type=Path,
         help="write the Stage 8A.1 single or grid diagnostics to a directory",
+    )
+    parser.add_argument(
+        "--search-preset",
+        choices=("smoke", "quick", "standard", "robust"),
+        default=None,
+        help="select the Stage 8A.2 search volume",
+    )
+    parser.add_argument(
+        "--output-directory",
+        type=Path,
+        default=None,
+        help="base directory for a new Stage 8A.2 run directory",
+    )
+    parser.add_argument(
+        "--base-master-seed",
+        type=int,
+        default=None,
+        help="unsigned 32-bit paired-replicate base seed",
+    )
+    reference_group = parser.add_mutually_exclusive_group()
+    reference_group.add_argument(
+        "--include-reference-arm",
+        action="store_true",
+        dest="include_reference_arm",
+        default=None,
+        help="run and cache the Stage 8A.1 v2 reference arm",
+    )
+    reference_group.add_argument(
+        "--no-reference-arm",
+        action="store_false",
+        dest="include_reference_arm",
+        help="do not run the optional reference arm",
+    )
+    parser.add_argument(
+        "--stop-after-phase",
+        choices=("coarse", "refine", "confirm"),
+        default=None,
+        help="stop the Stage 8A.2 plan after this phase",
+    )
+    parser.add_argument(
+        "--maximum-total-session-runs",
+        type=int,
+        default=None,
+        help="reject plans above this experimental-session budget",
+    )
+    parser.add_argument(
+        "--candidate-gate-config",
+        type=Path,
+        default=None,
+        help="load a strict candidate-gate JSON document",
+    )
+    parser.add_argument(
+        "--search-config",
+        type=Path,
+        default=None,
+        help="load a complete strict Stage 8A.2 search config",
+    )
+    parser.add_argument(
+        "--retain-full-details",
+        choices=("compact_summary", "phase3_full", "all_full"),
+        default=None,
+        help="select the Stage 8A.2 result-retention policy",
+    )
+    parser.add_argument(
+        "--plan-only",
+        action="store_true",
+        help="print the Stage 8A.2 plan without creating state or simulations",
+    )
+    parser.add_argument(
+        "--resume",
+        type=Path,
+        default=None,
+        help="strictly resume an existing Stage 8A.2 run directory",
+    )
+    parser.add_argument(
+        "--allow-dirty-auto-search-code",
+        action="store_true",
+        help=argparse.SUPPRESS,
     )
     return parser
 
@@ -3080,6 +3163,33 @@ def main(argv: list[str] | None = None) -> int:
         raise ValueError(
             "--export-experiment-csv requires a Stage 8A.1 headless command"
         )
+    auto_search_options = (
+        args.search_preset,
+        args.output_directory,
+        args.base_master_seed,
+        args.include_reference_arm,
+        args.stop_after_phase,
+        args.maximum_total_session_runs,
+        args.candidate_gate_config,
+        args.search_config,
+        args.retain_full_details,
+        args.resume,
+    )
+    if (
+        any(value is not None for value in auto_search_options)
+        or args.plan_only
+        or args.allow_dirty_auto_search_code
+    ) and not args.headless_fatigue_sigma_auto_search:
+        raise ValueError(
+            "Stage 8A.2 search options require "
+            "--headless-fatigue-sigma-auto-search"
+        )
+    if args.headless_fatigue_sigma_auto_search:
+        from symbiotic_sim_v2.experiments.fatigue_sigma_auto_search.cli import (
+            run_auto_search_cli,
+        )
+
+        return run_auto_search_cli(args)
     if args.headless_demo or args.headless_time_demo:
         return run_headless_demo()
     if args.headless_virtual_user_demo:

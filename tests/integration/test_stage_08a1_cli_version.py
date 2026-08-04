@@ -14,10 +14,10 @@ from symbiotic_sim_v2.gui.fatigue_sigma_lab_backend import (
 )
 
 
-def test_project_and_packaging_versions_are_stage_08a1() -> None:
+def test_project_and_packaging_versions_include_stage_08a2() -> None:
     root = Path(__file__).parents[2]
-    assert __version__ == "0.11.0"
-    assert 'version = "0.11.0"' in (root / "pyproject.toml").read_text(
+    assert __version__ == "0.12.0"
+    assert 'version = "0.12.0"' in (root / "pyproject.toml").read_text(
         encoding="utf-8"
     )
     assert command.STAGE_8A_HEADLESS_PROJECT_VERSION == "0.10.0"

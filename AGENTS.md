@@ -84,5 +84,14 @@
 - flat controlでholder switch、A→B→A、A→B→C→Aなどの機械的構造を監査し、好み由来の収束と混同しない。
 - paired replicate seedにfatigue target、sigma multiplier、condition ID/hash、convergence結果を入れない。
 - Stage 8A.1でmoving preference、係数のformal adoption、単一最良スコア、大規模Monte Carloを先回りしない。
+- Stage 8A.2 auto searchからDigital Life Core、Runtime、Garden、Stage 8A.1のsimulation coreを変更しない。
+- Stage 8A.2は既存のStage 8A.1 runnerを再利用し、simulation本体をコピー実装しない。
+- auto search、report、launcherからOpenAI、Codex、ChatGPT、外部LLM、外部API、networkを使用しない。
+- paired replicate seedにfatigue target、sigma multiplier、condition ID/hash、phase、収束・候補結果を混ぜない。
+- checkpointはtemp write、flush/fsync、atomic replaceで保存し、resumeではspec、Git HEAD、dirty state、project/package、Python/platform、Stage 8A.1/auto search versionのcode fingerprint一致をstrictに要求する。
+- auto searchは単一の不透明な総合scoreだけで条件を選ばず、Pareto frontier、方向付き指標、gate、弱点、trade-offを保存する。
+- robust gateを通る候補がない場合は`no_robust_candidate`を許容し、代替の一位を捏造しない。
+- Stage 8A.2は`formal_spec_adoption=false`の実験層とし、recommendationをCoreに返さない。
+- Codex作業中に実行してよいauto searchは32 sessionのsmokeだけとし、quick、standard、robustの本探索を実行しない。plan-onlyは実行してよい。
 - Stageごとに独立commitを作り、push前にcompileall、全pytest、Ruff、headless、GUI smoke、digest回帰を検証する。
 - force push、force-with-lease、既存commitのamend/rebaseを行わない。

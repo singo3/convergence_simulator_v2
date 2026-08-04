@@ -1,0 +1,181 @@
+{
+  "atomic_resume_skips_checksum_valid_completed_job": true,
+  "candidate_gate": {
+    "flat_spurious_0_26_fixture": false,
+    "no_candidate_status": "no_robust_candidate",
+    "passing_fixture": true
+  },
+  "checkpoint_transition": [
+    "pending",
+    "running",
+    "completed"
+  ],
+  "code_fingerprint_required_fields": [
+    "git_head_sha",
+    "working_tree_clean",
+    "project_version",
+    "package_version",
+    "stage_08a1_experiment_version",
+    "auto_search_version",
+    "normative_spec_sha256",
+    "python_version",
+    "platform"
+  ],
+  "condition_canonicalization": {
+    "canonical": [
+      0.03,
+      1.0
+    ],
+    "condition_key": "fatigue_0.030000__sigma_1.000000",
+    "input": [
+      0.0300001,
+      1.0000001
+    ]
+  },
+  "duplicate_removal": {
+    "identical_seed": [
+      0.03,
+      1.0
+    ],
+    "input_seed_count": 2,
+    "unique_neighborhood_count": 9
+  },
+  "interrupted_running_recovery": "pending",
+  "job_id": {
+    "body": {
+      "algorithm_version": "adaptive_random_search_confirmed_v1",
+      "arm": "experimental",
+      "code_fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "document_version": "v2.0",
+      "experiment_profile_version": "stage_08a1_fatigue_sigma_experiment_v0_1",
+      "maximum_sessions": 4,
+      "paired_seed_policy_version": "paired_replicate_seed_policy_v0_1",
+      "phase": "coarse",
+      "profile_version": "symbiotic_signal_loop_reference_v1_0",
+      "replicate_index": 0,
+      "replicate_master_seed": 3864136852,
+      "schema_version": "fatigue_sigma_auto_search_job_v1",
+      "selected_session_fatigue_target": 0.03,
+      "sigma_multiplier": 1.0,
+      "stage_08a1_model_version": "fatigue_exploration_convergence_lab_v0_1",
+      "state_schema_version": "relation_memory_state_v2",
+      "user_type_id": "green_hue_dominant_broad_bpm"
+    },
+    "sha256": "4b52e3be593645d4e0aae515091fe531e33d018893b57a0cab3b2bcdaf03c93a"
+  },
+  "paired_seed": {
+    "base_master_seed": 20260802,
+    "condition_in_seed": false,
+    "replicate_index": 0,
+    "replicate_master_seed": 3864136852
+  },
+  "pareto": {
+    "higher_good_lower_bad_dominates": true,
+    "missing_metric_is_disadvantaged": true,
+    "mixed_tradeoff_is_nondominated": true
+  },
+  "phase_2_neighborhood": [
+    {
+      "selected_session_fatigue_target": 0.015,
+      "sigma_multiplier": 0.875
+    },
+    {
+      "selected_session_fatigue_target": 0.015,
+      "sigma_multiplier": 1.0
+    },
+    {
+      "selected_session_fatigue_target": 0.015,
+      "sigma_multiplier": 1.125
+    },
+    {
+      "selected_session_fatigue_target": 0.03,
+      "sigma_multiplier": 0.875
+    },
+    {
+      "selected_session_fatigue_target": 0.03,
+      "sigma_multiplier": 1.0
+    },
+    {
+      "selected_session_fatigue_target": 0.03,
+      "sigma_multiplier": 1.125
+    },
+    {
+      "selected_session_fatigue_target": 0.045,
+      "sigma_multiplier": 0.875
+    },
+    {
+      "selected_session_fatigue_target": 0.045,
+      "sigma_multiplier": 1.0
+    },
+    {
+      "selected_session_fatigue_target": 0.045,
+      "sigma_multiplier": 1.125
+    }
+  ],
+  "plan_session_runs": {
+    "quick": 1296,
+    "robust_maximum": 122400,
+    "smoke": 32,
+    "standard_maximum": 32400,
+    "standard_phase_1": 12960
+  },
+  "production_implementation_imported": false,
+  "ranking_tie_break": {
+    "lower_fatigue_first": true,
+    "sigma_nearer_one_first": true,
+    "single_opaque_score_used": false
+  },
+  "reference_cache_key": {
+    "body": {
+      "algorithm_version": "adaptive_random_search_confirmed_v1",
+      "code_fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "maximum_sessions": 4,
+      "profile_version": "symbiotic_signal_loop_reference_v1_0",
+      "replicate_master_seed": 3864136852,
+      "schema_version": "fatigue_sigma_reference_cache_v1",
+      "stage_08a1_model_version": "fatigue_exploration_convergence_lab_v0_1",
+      "state_schema_version": "relation_memory_state_v2",
+      "user_type_id": "green_hue_dominant_broad_bpm"
+    },
+    "sha256": "0d624a398917c75702a843b62acac0888cd063d33369beb8d8ac283ce11a6edd"
+  },
+  "reference_vector_digest": "f4223cfd4464dc65451915d40f9a961cde4e4f19e6440aa6757c076ac1e4b16c",
+  "report_recommendation_fixture": {
+    "external_resource_count": 0,
+    "formal_spec_adoption": false,
+    "smoke_status": "smoke_diagnostic_only"
+  },
+  "schema_version": "stage_08a2_reference_vectors_v1",
+  "specialist_categories": [
+    "life_dominance_specialist",
+    "bpm_common_specialist",
+    "multi_attractor_specialist",
+    "low_rotation_specialist",
+    "conservative_compromise"
+  ],
+  "versions": {
+    "auto_search_model": "fatigue_sigma_auto_search_v0_1",
+    "candidate_gate": "balanced_robust_candidate_gate_v0_1",
+    "pareto": "multi_objective_pareto_frontier_v0_1",
+    "project_version": "0.12.0",
+    "ranking": "uncertainty_aware_robust_candidate_ranking_v0_1",
+    "search_strategy": "coarse_refine_confirm_search_v0_1"
+  },
+  "wilson": {
+    "five_of_ten": {
+      "lower95": 0.236593090512564,
+      "rate": 0.5,
+      "upper95": 0.7634069094874361
+    },
+    "ten_of_ten": {
+      "lower95": 0.7224672001371107,
+      "rate": 1.0,
+      "upper95": 0.9999999999999999
+    },
+    "zero_of_ten": {
+      "lower95": 0.0,
+      "rate": 0.0,
+      "upper95": 0.2775327998628892
+    }
+  }
+}

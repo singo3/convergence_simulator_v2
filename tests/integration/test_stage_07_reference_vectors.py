@@ -79,7 +79,7 @@ def test_stage7_reference_file_is_fresh_and_generator_is_production_independent(
 
 def test_stage7_versions_match_fixed_reference_vectors() -> None:
     assumptions = vectors()["simulation_assumptions"]
-    assert __version__ == "0.11.0"
+    assert __version__ == "0.12.0"
     assert assumptions["project_version"] == "0.8.1"
     assert assumptions == {
         "diagnostic_sampling_policy_version": "fixed_virtual_grid_100ms_v0_1",

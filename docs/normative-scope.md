@@ -155,3 +155,11 @@ selected fatigueのE式の構造と`rho_E=1-0.90^(1/180)`は維持する。全�
 fixed user type v2、paired replicate、structured convergence、mechanical rotation、W-ceiling、condition grid、truth alignment v2、GUI/CSV/JSON/digestはStage 8A.1の **simulation diagnostic assumption** である。observed evaluatorはhidden peakを読まず、診断結果をDigital Life、Runtime、Garden、fatigue/sigma policyへ返さない。condition/fatigue/sigma/convergence値をpaired random seedへ入れない。
 
 preferenceはrun中に固定する。moving/time/context/fatigue-dependent preference、`p_explore`倍率、収束による探索停止や係数変更、単一最良スコア、大規模Monte Carlo、formal Profile採用は未実装である。
+
+## Stage 8A.2の自動条件探索・堅牢候補抽出との境界
+
+Stage 8A.2はStage 8A.1の`FatigueSigmaSingleConditionRunner`をそのまま呼び出す **simulation-onlyの実験orchestration層** である。coarse→refine→confirm、paired replicate、reference cache、checkpoint/resume、Wilson区間、Pareto frontier、robust/specialist ranking、CSV/JSON/HTML reportはすべて検証・観測用の実装上の選択である。Digital Life Core、Runtime、Garden、v2.0 reference Profileは変更せず、候補・収束・診断結果をシミュレーションへ返さない。
+
+`formal_spec_adoption=false`を全runで維持する。探索条件はpaired random seedに混入せず、`p_explore`、`epsilon_accept`、q係数、P/V/tau、RMSSD→N、`delta_N`を変更しない。hidden preference/truthはpost-hocのsimulation-only評価に限り、Digital Life、Runtime、Gardenの入力にしない。moving preferenceはStage 8Bまで未実装である。
+
+条件の比較は不透明な単一総合スコアで潰さず、方向付きの複数目的、Pareto支配関係、gate判定、弱点とtrade-offを保存する。balanced robust gateを通る候補がないときは、代替の「最良」を捏造せず`no_robust_candidate`とblockerを報告する。OpenAI、Codex、ChatGPT、外部LLM、外部API、networkは使用しない。
