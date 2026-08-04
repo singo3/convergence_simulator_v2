@@ -75,5 +75,14 @@
 - 各sessionでbaselineを再取得し、N/Nd/W、`W_anchor_session`、trial評価、adaptation phase、holder、touch order、light/response session-local stateをresetする。異なるbaselineのWを直接比較しない。
 - baseline無効などのinvalid sessionは監査historyへ残すが、一次rolling convergence windowの票から除外する。
 - Stage 8Aでmoving preference、context依存peak、係数tuning、Monte Carloを先回り実装しない。
+- Stage 8A.1のv2.0 reference profileとexperimental fatigue/sigma policyを明確に分離し、experimentは`formal_spec_adoption=false`のまま管理する。
+- 非選出生命のE=0全回復は正常closingの状態系policy内で行い、multi-session runnerがfinal stateを後処理で書き換えない。
+- 選出生命の疲労設定は180 active signals後のsession targetとし、`eta_selected = 1 - (1-f_selected)^(1/180)`へ変換する。参照rhoとE式のその他の構造を変更しない。
+- Stage 8A.1の探索係数で変更してよいのは参照sigmaへの共通multiplierだけとし、`p_explore`、`epsilon_accept`、q、P/V/tau、Hash方向、F/Tのみ探索・A/D固定を維持する。
+- structured convergenceは診断のみとし、Digital Life、Runtime、Garden、fatigue/sigma policy、探索、session停止に介入させない。
+- life dominanceは生命IDを第一条件としてHue一致を要求せず、BPM commonは異なる生命を横断し、生命別multi-attractorを単一clusterへ潰さない。
+- flat controlでholder switch、A→B→A、A→B→C→Aなどの機械的構造を監査し、好み由来の収束と混同しない。
+- paired replicate seedにfatigue target、sigma multiplier、condition ID/hash、convergence結果を入れない。
+- Stage 8A.1でmoving preference、係数のformal adoption、単一最良スコア、大規模Monte Carloを先回りしない。
 - Stageごとに独立commitを作り、push前にcompileall、全pytest、Ruff、headless、GUI smoke、digest回帰を検証する。
 - force push、force-with-lease、既存commitのamend/rebaseを行わない。

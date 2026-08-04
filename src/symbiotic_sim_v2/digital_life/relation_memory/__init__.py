@@ -51,6 +51,7 @@ from .transitions import (
     RelationMemoryTransitionInput,
     RelationMemoryTransitionResult,
     apply_relation_memory_transition,
+    apply_relation_memory_transition_with_sigma_multiplier,
     current_relation_k,
 )
 
@@ -82,6 +83,7 @@ __all__ = [
     "RelationMemoryTransitionRecord",
     "RelationMemoryTransitionResult",
     "apply_relation_memory_transition",
+    "apply_relation_memory_transition_with_sigma_multiplier",
     "canonical_digest",
     "current_relation_k",
     "derive_relation_memory_intrinsic_profile",

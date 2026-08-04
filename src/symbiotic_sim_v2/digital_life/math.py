@@ -132,17 +132,38 @@ def calculate_tau(
     return clip01(activity_p / (activity_p + activity_v + epsilon) + phase)
 
 
-def calculate_e_next(e: object, s: object, g: object) -> float:
-    """Pure reference E update reserved for a later connected stage."""
+def calculate_e_next_with_coefficients(
+    e: object,
+    s: object,
+    g: object,
+    *,
+    eta_e: object,
+    rho_e: object,
+) -> float:
+    """Apply the unchanged saturating E structure with explicit coefficients."""
 
     experience = _unit("e", e)
     binary_s = _binary("s", s)
     binary_g = _binary("g", g)
+    accumulation = _unit("eta_e", eta_e)
+    recovery = _unit("rho_e", rho_e)
     sg = binary_s * binary_g
     return clip01(
         experience
-        + ETA_E * sg * (1.0 - experience)
-        - RHO_E * (1.0 - sg) * experience
+        + accumulation * sg * (1.0 - experience)
+        - recovery * (1.0 - sg) * experience
+    )
+
+
+def calculate_e_next(e: object, s: object, g: object) -> float:
+    """Apply the v2.0 reference E coefficients through the shared pure mapping."""
+
+    return calculate_e_next_with_coefficients(
+        e,
+        s,
+        g,
+        eta_e=ETA_E,
+        rho_e=RHO_E,
     )
 
 

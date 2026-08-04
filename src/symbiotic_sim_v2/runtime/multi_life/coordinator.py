@@ -350,6 +350,23 @@ class MultiLifeRuntimeCoordinator:
                     raise RuntimeError("a Digital Life did not finish its second round")
             closing = pending.closing_signal
             closing_identity = (pending.signal_index, pending.signal_time_us)
+            if closing:
+                # This is the sole cross-life closing barrier: every second round
+                # has returned, while holder release has not yet been scheduled.
+                # The Runtime invokes component-owned policy but never reads or
+                # rewrites E, q, k, counters, or candidate state itself.
+                for life_id in self._life_ids:
+                    hook = getattr(
+                        self._components[life_id],
+                        "finalize_session_end_state_policy",
+                        None,
+                    )
+                    if hook is not None:
+                        if not callable(hook):
+                            raise TypeError(
+                                "Digital Life session-end state policy hook must be callable"
+                            )
+                        hook()
             self._completed_round_count += 1
             self._pending_round = None
             if closing:

@@ -139,3 +139,19 @@ Stage 8Aがv2.0から引き継ぐ規範範囲は、第20.6節、第25.4節、第
 1session内の3Bundleは同じ資格holderを共有するため、一次収束の独立票にはしない。session代表patternはclosing後に正式保存されたholderの`k_anchor`から算出し、trial中の一時光は監査だけへ残す。convergence evaluatorとtruth diagnosticはDigital Life、Runtime、Garden、candidate、holder、k、q、E、`p_explore`、sigma、session停止条件へ値を返さない。収束後も現行v2.0の探索をmaximum sessionsまで継続する。
 
 user preferenceはrun中に完全固定する。moving preference、時間・気温・疲労依存、context別anchorはStage 8Bまで未実装である。v2.0の探索係数は変更せず、係数tuningとMonte CarloもStage 8Aでは実装しない。固定preset、heatmap、truth classification、CSV、GUI chart、digestはsimulation-only診断であり、隠れたpeakを探索入力へ用いない。
+
+## Stage 8A.1の疲労・探索幅・収束条件実験との境界
+
+Stage 8A.1は、v2.0参照Profileに対して正式採用する係数変更ではない。`formal_spec_adoption=false`、`base_profile_version=symbiotic_signal_loop_reference_v1_0`、`experiment_profile_version=stage_08a1_fatigue_sigma_experiment_v0_1`をmanifestに固定する。v2.0 reference armはStage 8Aの参照eta/rho、生命固有`sigma_min/max`、sigma multiplier 1.0、session終了時の非選出全回復なしを完全に維持する。
+
+Stage 8A.1 experimental armが変更するのは次の3項目だけである。
+
+- 180 active signals後の目標値から1signalの`eta_selected`を導出する選出生命疲労
+- 正常sessionのclosing第2周完了後、final state確定前に非選出生命だけをE=0にするcomponent-owned policy
+- v2.0参照sigmaへの0.25〜1.50の共通倍率
+
+selected fatigueのE式の構造と`rho_E=1-0.90^(1/180)`は維持する。全回復はmulti-session runnerがfinal Eを後処理で改変する方式ではない。error/未完了sessionでは回復を含むstateをcommitしない。`p_explore`、`epsilon_accept`、q係数、P/V/tau mapping、RMSSD→N、`delta_N`、3Bundle構造、candidate確認規則、Hash方向、F/Tのみ探索・A/D固定は変更しない。規範仕様第30章にある疲労蓄積・回復率とsigma範囲の残る検証事項を実験するための層であり、係数の正式採用を意味しない。
+
+fixed user type v2、paired replicate、structured convergence、mechanical rotation、W-ceiling、condition grid、truth alignment v2、GUI/CSV/JSON/digestはStage 8A.1の **simulation diagnostic assumption** である。observed evaluatorはhidden peakを読まず、診断結果をDigital Life、Runtime、Garden、fatigue/sigma policyへ返さない。condition/fatigue/sigma/convergence値をpaired random seedへ入れない。
+
+preferenceはrun中に固定する。moving/time/context/fatigue-dependent preference、`p_explore`倍率、収束による探索停止や係数変更、単一最良スコア、大規模Monte Carlo、formal Profile採用は未実装である。

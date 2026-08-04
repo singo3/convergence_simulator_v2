@@ -1,4 +1,4 @@
-"""Command entry point for Stage 1-7.1/5C compatibility and the Stage 8A app."""
+"""Command entry point for Stage 1-8A compatibility and the Stage 8A.1 app."""
 
 from __future__ import annotations
 
@@ -9,7 +9,6 @@ import statistics
 import sys
 from pathlib import Path
 
-from symbiotic_sim_v2 import __version__
 from symbiotic_sim_v2.devices.polar_h10.config import (
     POLAR_H10_MODEL_VERSION,
     RRI_EVENT_SCHEMA_VERSION,
@@ -167,6 +166,7 @@ STAGE_5B1_HEADLESS_PROJECT_VERSION = "0.6.1"
 STAGE_6_HEADLESS_PROJECT_VERSION = "0.7.0"
 STAGE_7_1_HEADLESS_PROJECT_VERSION = "0.8.1"
 STAGE_5C_HEADLESS_PROJECT_VERSION = "0.9.0"
+STAGE_8A_HEADLESS_PROJECT_VERSION = "0.10.0"
 DEFAULT_RELATION_MEMORY_PRESET = "off_center_green"
 STATIONARY_USER_TYPE_IDS = (
     "green_broad_strong",
@@ -179,6 +179,14 @@ STATIONARY_USER_TYPE_IDS = (
 SESSION_SEED_POLICIES = (
     "deterministic_per_session_physiology_seed_v0_1",
     "repeat_same_physiology_seed_v0_1",
+)
+STATIONARY_USER_TYPE_V2_IDS = (
+    "green_hue_dominant_broad_bpm",
+    "bpm_common_100_hue_neutral",
+    "three_life_bpm_equal",
+    "three_life_bpm_green_dominant",
+    "green_single_peak_narrow",
+    "flat_control",
 )
 
 
@@ -245,6 +253,16 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="run the Stage 8A fixed-preference multi-session convergence lab",
     )
+    headless_group.add_argument(
+        "--headless-fatigue-sigma-lab-demo",
+        action="store_true",
+        help="run one Stage 8A.1 fixed-preference fatigue/sigma condition",
+    )
+    headless_group.add_argument(
+        "--headless-fatigue-sigma-grid-demo",
+        action="store_true",
+        help="run a Stage 8A.1 paired condition grid",
+    )
     parser.add_argument(
         "--life-role",
         choices=("red", "green", "blue"),
@@ -288,9 +306,14 @@ def _build_parser() -> argparse.ArgumentParser:
             "stage-08a-holder-pattern-trajectory",
             "stage-08a-stationary-user-types",
             "stage-08a-convergence-truth-comparison",
+            "stage-08a1-fatigue-sigma-lab-overview",
+            "stage-08a1-session-bpm-hue-trajectory",
+            "stage-08a1-structured-convergence-types",
+            "stage-08a1-fatigue-and-sigma-trajectories",
+            "stage-08a1-condition-grid-heatmap",
         ),
         default="window",
-        help="capture the selected Stage 5A–8A diagnostic view",
+        help="capture the selected Stage 5A–8A.1 diagnostic view",
     )
     parser.add_argument(
         "--export-virtual-user-csv",
@@ -362,7 +385,7 @@ def _build_parser() -> argparse.ArgumentParser:
         "--maximum-sessions",
         type=int,
         default=24,
-        help="maximum independent Stage 8A sessions",
+        help="maximum independent Stage 8A or Stage 8A.1 sessions",
     )
     parser.add_argument(
         "--convergence-window",
@@ -398,7 +421,7 @@ def _build_parser() -> argparse.ArgumentParser:
         "--master-seed",
         type=int,
         default=20260802,
-        help="unsigned 32-bit Stage 8A session-seed master value",
+        help="unsigned 32-bit Stage 8A or Stage 8A.1 session-seed master value",
     )
     parser.add_argument(
         "--session-seed-policy",
@@ -425,6 +448,66 @@ def _build_parser() -> argparse.ArgumentParser:
         "--compare-all-stationary-user-types",
         action="store_true",
         help="also run all six fixed profiles independently under one config",
+    )
+    parser.add_argument(
+        "--stationary-user-type-v2",
+        choices=STATIONARY_USER_TYPE_V2_IDS,
+        default="green_hue_dominant_broad_bpm",
+        help="select the fixed Stage 8A.1 stationary user profile",
+    )
+    parser.add_argument(
+        "--selected-session-fatigue-target",
+        type=float,
+        default=0.05,
+        help="selected-life E target after 180 active signals",
+    )
+    parser.add_argument(
+        "--sigma-multiplier",
+        type=float,
+        default=1.0,
+        help="common multiplier applied only to the reference sigma",
+    )
+    parser.add_argument(
+        "--fatigue-targets",
+        default="0.03,0.05,0.08,0.10,0.15",
+        help="comma-separated Stage 8A.1 grid fatigue targets",
+    )
+    parser.add_argument(
+        "--sigma-multipliers",
+        default="0.50,0.75,1.00,1.25,1.50",
+        help="comma-separated Stage 8A.1 grid sigma multipliers",
+    )
+    parser.add_argument(
+        "--replicates",
+        type=int,
+        default=5,
+        help="paired replicate count for the Stage 8A.1 grid",
+    )
+    parser.add_argument(
+        "--experiment-preset",
+        choices=("quick", "standard", "detailed"),
+        default=None,
+        help="select a Stage 8A.1 grid volume preset",
+    )
+    parser.add_argument(
+        "--compare-reference-arm",
+        action="store_true",
+        help="run the separately identified v2 coefficient reference arm",
+    )
+    parser.add_argument(
+        "--initial-experiment-state-json",
+        type=Path,
+        help="resume a strict Stage 8A.1 single-condition state JSON",
+    )
+    parser.add_argument(
+        "--export-final-experiment-state-json",
+        type=Path,
+        help="write the final strict Stage 8A.1 single-condition state JSON",
+    )
+    parser.add_argument(
+        "--export-experiment-csv",
+        type=Path,
+        help="write the Stage 8A.1 single or grid diagnostics to a directory",
     )
     return parser
 
@@ -1437,7 +1520,9 @@ def run_headless_multi_session_convergence_demo(
         "state_schema_version": STATE_SCHEMA_VERSION,
     }
     result = {
-        "project_version": __version__,
+        # Stage 8A is a frozen public diagnostic projection.  The package now
+        # advances independently for Stage 8A.1, so this field remains pinned.
+        "project_version": STAGE_8A_HEADLESS_PROJECT_VERSION,
         **normative_tuple,
         "normative_version_tuple": normative_tuple,
         "runner_version": runner.config.runner_version,
@@ -1559,6 +1644,159 @@ def run_headless_multi_session_convergence_demo(
             path.name: str(path) for path in csv_paths
         }
     print(json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True))
+    return 0
+
+
+def _comma_separated_floats(value: str, *, option_name: str) -> tuple[float, ...]:
+    """Parse one explicit numeric CLI list without silently dropping entries."""
+
+    if not isinstance(value, str):
+        raise TypeError(f"{option_name} must be a comma-separated string")
+    parts = value.split(",")
+    if not parts or any(not part.strip() for part in parts):
+        raise ValueError(f"{option_name} must contain only comma-separated numbers")
+    try:
+        return tuple(float(part.strip()) for part in parts)
+    except ValueError as exc:
+        raise ValueError(f"{option_name} must contain only numbers") from exc
+
+
+def run_headless_fatigue_sigma_lab_demo(
+    *,
+    stationary_user_type_v2: str = "green_hue_dominant_broad_bpm",
+    selected_session_fatigue_target: float = 0.05,
+    sigma_multiplier: float = 1.0,
+    maximum_sessions: int = 24,
+    master_seed: int = 20260802,
+    compare_reference_arm: bool = False,
+    initial_state_json: Path | None = None,
+    export_final_state_json: Path | None = None,
+    export_csv: Path | None = None,
+) -> int:
+    """Run one Stage 8A.1 condition without importing Qt."""
+
+    from symbiotic_sim_v2.experiments.fatigue_sigma.condition import (
+        FatigueSigmaCondition,
+    )
+    from symbiotic_sim_v2.runtime.experimental_multi_session.runner import (
+        FatigueSigmaSingleConditionRunner,
+    )
+    from symbiotic_sim_v2.runtime.experimental_multi_session.state import (
+        export_experiment_state_file,
+        load_experiment_state_file,
+    )
+
+    if initial_state_json is None:
+        condition = FatigueSigmaCondition.create(
+            user_type_id=stationary_user_type_v2,
+            selected_session_fatigue_target=selected_session_fatigue_target,
+            sigma_multiplier=sigma_multiplier,
+            maximum_sessions=maximum_sessions,
+            master_seed=master_seed,
+        )
+        runner = FatigueSigmaSingleConditionRunner(
+            condition,
+            compare_reference_arm=compare_reference_arm,
+        )
+    else:
+        resume_state = load_experiment_state_file(initial_state_json)
+        runner = FatigueSigmaSingleConditionRunner(
+            resume_state=resume_state,
+            compare_reference_arm=resume_state.reference_arm_enabled,
+        )
+    state = runner.run_all()
+    result = runner.result()
+    if export_final_state_json is not None:
+        export_experiment_state_file(export_final_state_json, state)
+    written_csvs: tuple[Path, ...] | None = None
+    if export_csv is not None:
+        from symbiotic_sim_v2.experiments.fatigue_sigma.exports import (
+            export_single_condition_csv,
+        )
+
+        written_csvs = tuple(export_single_condition_csv(export_csv, result).values())
+    projection = result.to_dict()
+    if export_final_state_json is not None:
+        projection["final_experiment_state_json"] = str(export_final_state_json)
+    if written_csvs is not None:
+        projection["diagnostic_exports"] = {
+            path.name: str(path) for path in written_csvs
+        }
+    print(
+        json.dumps(
+            projection,
+            allow_nan=False,
+            ensure_ascii=False,
+            indent=2,
+            sort_keys=True,
+        )
+    )
+    return 0
+
+
+def run_headless_fatigue_sigma_grid_demo(
+    *,
+    stationary_user_type_v2: str = "green_hue_dominant_broad_bpm",
+    fatigue_targets: tuple[float, ...] = (0.03, 0.05, 0.08, 0.10, 0.15),
+    sigma_multipliers: tuple[float, ...] = (0.50, 0.75, 1.00, 1.25, 1.50),
+    maximum_sessions: int = 24,
+    replicates: int = 5,
+    master_seed: int = 20260802,
+    experiment_preset: str | None = None,
+    export_csv: Path | None = None,
+) -> int:
+    """Run a deterministic CPU-sequential Stage 8A.1 paired grid."""
+
+    from symbiotic_sim_v2.experiments.fatigue_sigma.condition import (
+        FatigueSigmaGridConfig,
+    )
+    from symbiotic_sim_v2.experiments.fatigue_sigma.grid_runner import (
+        FatigueSigmaGridRunner,
+    )
+
+    if experiment_preset == "quick":
+        config = FatigueSigmaGridConfig.quick(
+            user_type_id=stationary_user_type_v2,
+            base_master_seed=master_seed,
+        )
+    elif experiment_preset == "standard":
+        config = FatigueSigmaGridConfig(
+            user_type_id=stationary_user_type_v2,
+            base_master_seed=master_seed,
+        )
+    elif experiment_preset in {None, "detailed"}:
+        config = FatigueSigmaGridConfig(
+            user_type_id=stationary_user_type_v2,
+            fatigue_targets=fatigue_targets,
+            sigma_multipliers=sigma_multipliers,
+            maximum_sessions=(60 if experiment_preset == "detailed" else maximum_sessions),
+            replicate_count=replicates,
+            base_master_seed=master_seed,
+        )
+    else:  # defensive for direct public-function callers outside argparse
+        raise ValueError("experiment_preset must be quick, standard, detailed, or null")
+    summary = FatigueSigmaGridRunner(config).run()
+    written_csvs: tuple[Path, ...] | None = None
+    if export_csv is not None:
+        from symbiotic_sim_v2.experiments.fatigue_sigma.exports import (
+            export_grid_csv,
+        )
+
+        written_csvs = tuple(export_grid_csv(export_csv, summary).values())
+    projection = summary.to_dict()
+    if written_csvs is not None:
+        projection["diagnostic_exports"] = {
+            path.name: str(path) for path in written_csvs
+        }
+    print(
+        json.dumps(
+            projection,
+            allow_nan=False,
+            ensure_ascii=False,
+            indent=2,
+            sort_keys=True,
+        )
+    )
     return 0
 
 
@@ -2347,8 +2585,12 @@ def run_gui(
     session_seed_policy: str = (
         "deterministic_per_session_physiology_seed_v0_1"
     ),
+    stationary_user_type_v2: str = "green_hue_dominant_broad_bpm",
+    selected_session_fatigue_target: float = 0.05,
+    sigma_multiplier: float = 1.0,
+    compare_reference_arm: bool = False,
 ) -> int:
-    """Start the Stage 8A eleven-tab fixed-preference convergence lab."""
+    """Start the Stage 8A.1 tab-first fatigue/sigma convergence lab."""
 
     if auto_close_ms <= 0:
         raise ValueError("--auto-close-ms must be positive")
@@ -2357,27 +2599,39 @@ def run_gui(
     if os.environ.get("LANG", "") in {"", "C", "C.UTF-8", "POSIX"}:
         os.environ["LANG"] = "en_US.UTF-8"
 
-    from PySide6.QtCore import QTimer
+    from PySide6.QtCore import QEventLoop, QTimer
     from PySide6.QtGui import QFont, QFontDatabase
     from PySide6.QtWidgets import QApplication
 
     from symbiotic_sim_v2.convergence import RollingConvergenceConfig
     from symbiotic_sim_v2.gui.controller import SimulationController
-    from symbiotic_sim_v2.gui.multi_session_convergence_window import (
+    from symbiotic_sim_v2.gui.fatigue_sigma_lab_backend import (
+        CoreFatigueSigmaLabBackend,
+    )
+    from symbiotic_sim_v2.gui.fatigue_sigma_lab_window import (
         TAB_TITLES,
-        MultiSessionConvergenceMainWindow,
+        FatigueSigmaLabMainWindow,
+    )
+    from symbiotic_sim_v2.gui.multi_session_convergence_window import (
         create_stage8a_preview_simulation,
     )
     from symbiotic_sim_v2.runtime.multi_session import (
         MultiSessionRelationMemoryRunner,
         MultiSessionRunnerConfig,
-        compare_stationary_user_types,
+    )
+    from symbiotic_sim_v2.virtual_user.stationary_landscape_v2 import (
+        project_stationary_preference_heatmap_v2,
+        stationary_user_type_profile_v2,
+        stationary_user_type_v2_ids,
     )
 
+    lab_maximum_sessions = maximum_sessions
+    retained_stage8a_maximum_sessions = maximum_sessions
     if smoke_test:
-        # The smoke contract exercises both incremental and batch paths inside
-        # 12 seconds; production defaults remain 24 sessions.
-        maximum_sessions = 4
+        # Keep the visible Stage 8A.1 default at 24 sessions and exercise its
+        # complete single-condition path.  Only the retained Stage 8A v1 panel
+        # uses a bounded four-session fixture during the 15-second smoke.
+        retained_stage8a_maximum_sessions = 4
         convergence_window = 4
         convergence_required = 3
     convergence_config = RollingConvergenceConfig(
@@ -2386,7 +2640,7 @@ def run_gui(
         hue_tolerance_degree=hue_tolerance_degree,
         blink_bpm_tolerance=blink_bpm_tolerance,
         truth_response_gap_threshold=truth_response_gap_threshold,
-        maximum_sessions=maximum_sessions,
+        maximum_sessions=retained_stage8a_maximum_sessions,
     )
     runner = MultiSessionRelationMemoryRunner(
         MultiSessionRunnerConfig(
@@ -2405,93 +2659,235 @@ def run_gui(
             app.setFont(QFont(family))
             break
     controller = SimulationController(preview.engine)
-    window = MultiSessionConvergenceMainWindow(
+    lab_backend = CoreFatigueSigmaLabBackend()
+    profiles_v2 = {
+        user_type_id: stationary_user_type_profile_v2(user_type_id)
+        for user_type_id in stationary_user_type_v2_ids()
+    }
+    user_types_v2 = {
+        user_type_id: profile.to_dict()
+        for user_type_id, profile in profiles_v2.items()
+    }
+    user_type_heatmaps_v2 = {
+        user_type_id: project_stationary_preference_heatmap_v2(
+            profile
+        ).to_dict()
+        for user_type_id, profile in profiles_v2.items()
+    }
+    window = FatigueSigmaLabMainWindow(
         controller,
         preview,
         runner,
+        lab_backend=lab_backend,
+        user_types_v2=user_types_v2,
+        user_type_heatmaps_v2=user_type_heatmaps_v2,
     )
+    single_panel = window.fatigue_sigma_lab_panel.single_panel
+    selected_index = single_panel.user_type_combo.findData(
+        stationary_user_type_v2
+    )
+    if selected_index < 0:
+        raise ValueError("--stationary-user-type-v2 is not recognized")
+    single_panel.user_type_combo.setCurrentIndex(selected_index)
+    single_panel.fatigue_target_spin.setValue(selected_session_fatigue_target)
+    single_panel.sigma_multiplier_spin.setValue(sigma_multiplier)
+    single_panel.maximum_sessions_spin.setValue(lab_maximum_sessions)
+    single_panel.master_seed_spin.setValue(master_seed)
+    single_panel.compare_reference_checkbox.setChecked(compare_reference_arm)
     app.aboutToQuit.connect(controller.shutdown)
     window.show()
 
     smoke_failures: list[str] = []
     if smoke_test:
-        canonical_smoke = (
-            stationary_user_type == "green_narrow_moderate"
-            and master_seed == 20_260_802
-            and session_seed_policy
-            == "deterministic_per_session_physiology_seed_v0_1"
-            and hue_tolerance_degree == 2.0
-            and blink_bpm_tolerance == 20.0
-            and truth_response_gap_threshold == 0.05
-        )
-
         def smoke_workflow() -> None:
             try:
-                # Incremental execution and handoff: one session through the
-                # window, then three through the same runner with one final GUI
-                # rebind to keep this offscreen check bounded.
-                window._run_one_session()
-                first_outcome = window.runner.session_outcomes()[0]
-                while window.runner.can_run_next_session:
-                    window.runner.run_next_session()
-                latest_simulation = window.runner.current_simulation
-                if latest_simulation is not None:
-                    window._install_session_simulation(latest_simulation)
-                window._refresh_aggregate_views()
-                first_pass = window.runner.state()
+                def await_lab_operation(
+                    label: str,
+                    *,
+                    timeout_ms: int = 5_000,
+                    cancel_grid_after: int | None = None,
+                ) -> object | None:
+                    """Process GUI events while one real production worker runs."""
 
-                if first_pass.completed_session_count != 4:
-                    smoke_failures.append(
-                        f"incremental completed={first_pass.completed_session_count}"
-                    )
-                if first_pass.valid_session_count != 4:
-                    smoke_failures.append(
-                        f"incremental valid={first_pass.valid_session_count}"
-                    )
-                if first_outcome.session_count_before_by_life != {
-                    life_id: 0 for life_id in window.runner.digital_life_ids
-                }:
-                    smoke_failures.append("session 0 persistent-state boundary")
-                if any(
-                    outcome.baseline_evaluation is None
-                    or not outcome.baseline_evaluation.is_valid
-                    or outcome.holder_W_anchor_session is None
-                    for outcome in first_pass.session_outcomes
-                ):
-                    smoke_failures.append("per-session baseline/W anchor")
+                    thread = window._lab_thread
+                    if thread is None:
+                        smoke_failures.append(f"{label}: worker did not start")
+                        return None
+                    if not thread.isRunning():
+                        app.processEvents()
+                        return window.last_lab_result
+                    loop = QEventLoop()
+                    pulse_count = 0
+                    timed_out = False
+                    cancel_sent = False
+                    pulse = QTimer()
+                    pulse.setInterval(10)
+
+                    def record_pulse() -> None:
+                        nonlocal cancel_sent, pulse_count
+                        pulse_count += 1
+                        if (
+                            cancel_grid_after is not None
+                            and not cancel_sent
+                            and window.fatigue_sigma_lab_panel.grid_panel.progress_bar.value()
+                            >= cancel_grid_after
+                        ):
+                            cancel_sent = True
+                            window._request_lab_cancel()
+
+                    def request_timeout_cancel() -> None:
+                        nonlocal timed_out
+                        timed_out = True
+                        window._request_lab_cancel()
+
+                    timeout = QTimer()
+                    timeout.setSingleShot(True)
+                    timeout.timeout.connect(request_timeout_cancel)
+                    pulse.timeout.connect(record_pulse)
+                    thread.finished.connect(loop.quit)
+                    pulse.start()
+                    timeout.start(timeout_ms)
+                    loop.exec()
+                    pulse.stop()
+                    timeout.stop()
+                    app.processEvents()
+                    if timed_out:
+                        smoke_failures.append(f"{label}: worker timeout")
+                    if pulse_count == 0:
+                        smoke_failures.append(f"{label}: GUI event loop did not pulse")
+                    if window._lab_thread is not None:
+                        smoke_failures.append(f"{label}: worker did not finalize")
+                    return window.last_lab_result
+
+                # Exercise every non-trivial Stage 8A.1 action through the same
+                # production QThread seam used by the visible controls.
+                lab_settings = (
+                    window.fatigue_sigma_lab_panel.single_panel.settings_values()
+                )
+                window._start_single_operation("next_session", lab_settings)
+                await_lab_operation("Stage 8A.1 next-session worker")
+                window._start_single_operation("run_all", lab_settings)
+                full_lab_result = await_lab_operation(
+                    "Stage 8A.1 run-all worker",
+                    timeout_ms=10_000,
+                )
+                if full_lab_result is None:
+                    raise RuntimeError("Stage 8A.1 run-all produced no result")
+                full_lab_simulation = lab_backend.current_simulation()
+                first_lab_outcome = full_lab_result.session_outcomes[0]
+                holder_id = first_lab_outcome["holder_id"]
+                fatigue_by_life = first_lab_outcome[
+                    "fatigue_trajectory_by_life"
+                ]
+                for life_id, fatigue in fatigue_by_life.items():
+                    if life_id == holder_id:
+                        if (
+                            fatigue["selected_active_signal_count"] != 180
+                            or fatigue["full_recovery_applied"]
+                            or fatigue["e_after_session_end_policy"] <= 0.0
+                        ):
+                            smoke_failures.append("selected fatigue retention")
+                    elif (
+                        fatigue["selected_active_signal_count"] != 0
+                        or not fatigue["full_recovery_applied"]
+                        or fatigue["e_after_session_end_policy"] != 0.0
+                    ):
+                        smoke_failures.append("unselected full recovery")
+
+                if full_lab_result.sessions_completed != lab_maximum_sessions:
+                    smoke_failures.append("Stage 8A.1 run-all completion")
+                single_panel = window.fatigue_sigma_lab_panel.single_panel
                 if (
-                    session_seed_policy == "repeat_same_physiology_seed_v0_1"
-                    and len(
-                        {
-                            outcome.physiology_root_seed
-                            for outcome in first_pass.session_outcomes
-                        }
-                    )
-                    != 1
+                    single_panel.progress_bar.value() != lab_maximum_sessions
+                    or single_panel.cancel_button.isEnabled()
+                    or not single_panel.reset_button.isEnabled()
+                    or not single_panel.save_state_button.isEnabled()
+                    or not single_panel.export_csv_button.isEnabled()
                 ):
-                    smoke_failures.append("repeat seed policy")
+                    smoke_failures.append("Stage 8A.1 progress/control recovery")
+                if (
+                    len(full_lab_result.structured_convergence_history)
+                    != lab_maximum_sessions
+                ):
+                    smoke_failures.append("structured convergence history")
+                if (
+                    full_lab_result.session_outcomes[0][
+                        "final_persistent_state_by_life"
+                    ]
+                    != full_lab_result.session_outcomes[1][
+                        "initial_persistent_state_by_life"
+                    ]
+                ):
+                    smoke_failures.append("Stage 8A.1 state handoff")
+                window.fatigue_sigma_lab_panel.set_single_result(full_lab_result)
+                if (
+                    window.fatigue_sigma_lab_panel.single_panel.session_chart.trial_point_count
+                    == 0
+                ):
+                    smoke_failures.append("Stage 8A.1 candidate trial scatter")
 
-                # Reset and batch execution must reconstruct the same run.
-                first_digests = tuple(
-                    outcome.session_digest for outcome in first_pass.session_outcomes
-                )
-                window._reset_multi_session_run()
-                batch_state = window.runner.run_all()
-                batch_simulation = window.runner.current_simulation
-                if batch_simulation is not None:
-                    window._install_session_simulation(batch_simulation)
-                window._refresh_aggregate_views()
-                if tuple(
-                    outcome.session_digest for outcome in batch_state.session_outcomes
-                ) != first_digests:
-                    smoke_failures.append("incremental/batch digests")
+                window._reset_lab_single()
+                reset_lab_result = window.last_lab_result
+                if reset_lab_result is None:
+                    raise RuntimeError("Stage 8A.1 reset produced no result")
+                if reset_lab_result.sessions_completed != 0:
+                    smoke_failures.append("Stage 8A.1 reset boundary")
 
-                window._comparison = compare_stationary_user_types(
-                    window.runner.config
+                single_panel.maximum_sessions_spin.setValue(4)
+                single_panel.compare_reference_checkbox.setChecked(True)
+                reference_settings = single_panel.settings_values()
+                window._reset_lab_single()
+                window._start_single_operation("next_session", reference_settings)
+                reference_result = await_lab_operation(
+                    "Stage 8A.1 reference worker"
                 )
-                window.multi_session_panel.set_comparison_records(
-                    window._comparison.rows
+                if reference_result is None:
+                    raise RuntimeError("Stage 8A.1 reference produced no result")
+                if (
+                    reference_result.sessions_completed != 1
+                    or reference_result.reference_arm_result is None
+                ):
+                    smoke_failures.append("Stage 8A.1 reference comparison")
+
+                # The first of two bounded cells completes and is rendered;
+                # cancellation then stops the second cell at a session boundary.
+                grid_settings = {
+                    "experiment_preset": "quick-smoke-boundary-fixture",
+                    "user_type_id": lab_settings["user_type_id"],
+                    "fatigue_targets": (0.03, 0.05, 0.08, 0.10, 0.15),
+                    "sigma_multipliers": (1.0,),
+                    "maximum_sessions": 4,
+                    "replicate_count": 1,
+                    "base_master_seed": lab_settings["master_seed"],
+                    "total_planned_session_runs": 20,
+                }
+                window._start_grid_operation(grid_settings)
+                grid_result = await_lab_operation(
+                    "Stage 8A.1 production grid cancel",
+                    cancel_grid_after=4,
                 )
+                if "cancelled" not in (
+                    window.fatigue_sigma_lab_panel.grid_panel.progress_label.text()
+                ):
+                    smoke_failures.append("Stage 8A.1 grid cancel boundary")
+                if (
+                    grid_result is None
+                    or not grid_result.cancelled
+                    or not 1 <= grid_result.completed_conditions < 5
+                    or grid_result.failed_conditions != 0
+                    or not 4 <= grid_result.completed_session_runs < 20
+                    or window.fatigue_sigma_lab_panel.grid_panel.result_model.rowCount()
+                    != grid_result.completed_conditions
+                ):
+                    smoke_failures.append("Stage 8A.1 grid progress/cancel/heatmap")
+
+                # Leave the 24-session condition visible so screenshot smoke
+                # captures actual candidate points and established structure.
+                single_panel.apply_loaded_result_settings(full_lab_result)
+                window.fatigue_sigma_lab_panel.set_single_result(full_lab_result)
+                if full_lab_simulation is not None:
+                    window._install_session_simulation(full_lab_simulation)
+
                 for index in range(window.tabs.count()):
                     window.tabs.setCurrentIndex(index)
                     app.processEvents()
@@ -2502,32 +2898,10 @@ def run_gui(
                 )
                 if actual_tabs != TAB_TITLES:
                     smoke_failures.append(f"tabs={actual_tabs!r}")
-                if window.multi_session_panel.session_history_model.rowCount() != 4:
-                    smoke_failures.append("session history rows")
-                if window.multi_session_panel.convergence_history_model.rowCount() != 4:
-                    smoke_failures.append("convergence history rows")
-                if window.multi_session_panel.comparison_model.rowCount() != 6:
-                    smoke_failures.append("type comparison rows")
-                if window.multi_session_panel.chart.session_count != 4:
-                    smoke_failures.append("multi-session charts")
-                if window.relation_memory_panel.transition_model.rowCount() != 12:
-                    smoke_failures.append("retained Stage 5C diagnostics")
                 if window.light_output_panel.preview_checkbox.isChecked():
                     smoke_failures.append("real-light preview unexpectedly enabled")
-                latest = batch_state.convergence_records[-1]
-                truth_records = window.runner.truth_alignment_records()
-                if len(truth_records) != len(batch_state.session_outcomes):
-                    smoke_failures.append("truth/session alignment")
-                if canonical_smoke:
-                    if (
-                        latest.support_count != 3
-                        or latest.member_session_indices != (0, 1, 3)
-                        or latest.outlier_session_indices != (2,)
-                        or not latest.currently_converged
-                    ):
-                        smoke_failures.append("canonical 3/4 convergence")
-                    if truth_records[-1].truth_classification != "stable_suboptimal":
-                        smoke_failures.append("truth alignment")
+                if screenshot is None and not smoke_failures:
+                    QTimer.singleShot(0, app.quit)
             except Exception as exc:  # pragma: no cover - smoke failure path
                 smoke_failures.append(f"exception={type(exc).__name__}:{exc}")
             if smoke_failures:
@@ -2537,8 +2911,15 @@ def run_gui(
                 )
                 app.quit()
 
+        def request_smoke_auto_close() -> None:
+            if window.lab_operation_active:
+                window._request_lab_cancel()
+                QTimer.singleShot(25, request_smoke_auto_close)
+                return
+            app.quit()
+
         QTimer.singleShot(50, smoke_workflow)
-        QTimer.singleShot(auto_close_ms, app.quit)
+        QTimer.singleShot(auto_close_ms, request_smoke_auto_close)
 
     if screenshot is not None:
         screenshot.parent.mkdir(parents=True, exist_ok=True)
@@ -2583,7 +2964,12 @@ def run_gui(
                     window.light_output_panel.chart_table_splitter
                 ),
             }
-            if screenshot_target in {
+            if screenshot_target.startswith("stage-08a1-"):
+                window.prepare_screenshot_target(screenshot_target)
+                targets[screenshot_target] = window.screenshot_widget(
+                    screenshot_target
+                )
+            elif screenshot_target in {
                 "stage-08a-multi-session-convergence-overview",
                 "stage-08a-holder-pattern-trajectory",
                 "stage-08a-convergence-truth-comparison",
@@ -2677,6 +3063,23 @@ def main(argv: list[str] | None = None) -> int:
             "Stage 8A state/CSV/comparison options require "
             "--headless-multi-session-convergence-demo"
         )
+    experiment_state_options = (
+        args.initial_experiment_state_json,
+        args.export_final_experiment_state_json,
+    )
+    if any(value is not None for value in experiment_state_options) and not (
+        args.headless_fatigue_sigma_lab_demo
+    ):
+        raise ValueError(
+            "Stage 8A.1 state options require --headless-fatigue-sigma-lab-demo"
+        )
+    if args.export_experiment_csv is not None and not (
+        args.headless_fatigue_sigma_lab_demo
+        or args.headless_fatigue_sigma_grid_demo
+    ):
+        raise ValueError(
+            "--export-experiment-csv requires a Stage 8A.1 headless command"
+        )
     if args.headless_demo or args.headless_time_demo:
         return run_headless_demo()
     if args.headless_virtual_user_demo:
@@ -2726,6 +3129,37 @@ def main(argv: list[str] | None = None) -> int:
                 args.compare_all_stationary_user_types
             ),
         )
+    if args.headless_fatigue_sigma_lab_demo:
+        return run_headless_fatigue_sigma_lab_demo(
+            stationary_user_type_v2=args.stationary_user_type_v2,
+            selected_session_fatigue_target=(
+                args.selected_session_fatigue_target
+            ),
+            sigma_multiplier=args.sigma_multiplier,
+            maximum_sessions=args.maximum_sessions,
+            master_seed=args.master_seed,
+            compare_reference_arm=args.compare_reference_arm,
+            initial_state_json=args.initial_experiment_state_json,
+            export_final_state_json=args.export_final_experiment_state_json,
+            export_csv=args.export_experiment_csv,
+        )
+    if args.headless_fatigue_sigma_grid_demo:
+        return run_headless_fatigue_sigma_grid_demo(
+            stationary_user_type_v2=args.stationary_user_type_v2,
+            fatigue_targets=_comma_separated_floats(
+                args.fatigue_targets,
+                option_name="--fatigue-targets",
+            ),
+            sigma_multipliers=_comma_separated_floats(
+                args.sigma_multipliers,
+                option_name="--sigma-multipliers",
+            ),
+            maximum_sessions=args.maximum_sessions,
+            replicates=args.replicates,
+            master_seed=args.master_seed,
+            experiment_preset=args.experiment_preset,
+            export_csv=args.export_experiment_csv,
+        )
     if args.life_role is not None or args.screenshot_target == "digital-life-graphs":
         return run_single_life_gui(
             smoke_test=args.smoke_test,
@@ -2773,6 +3207,12 @@ def main(argv: list[str] | None = None) -> int:
         truth_response_gap_threshold=args.truth_response_gap_threshold,
         master_seed=args.master_seed,
         session_seed_policy=args.session_seed_policy,
+        stationary_user_type_v2=args.stationary_user_type_v2,
+        selected_session_fatigue_target=(
+            args.selected_session_fatigue_target
+        ),
+        sigma_multiplier=args.sigma_multiplier,
+        compare_reference_arm=args.compare_reference_arm,
     )
 
 

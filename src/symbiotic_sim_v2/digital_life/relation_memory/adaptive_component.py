@@ -32,6 +32,7 @@ from .records import (
 from .session_state import RelationMemorySessionState
 from .transitions import (
     RelationMemoryTransitionInput,
+    RelationMemoryTransitionResult,
     apply_relation_memory_transition,
     current_relation_k,
 )
@@ -150,7 +151,7 @@ class AdaptiveConnectedDigitalLifeComponent(ConnectedDigitalLifeComponent):
             w=pending.first_round.w,
             closing=feedback.closing_evaluation_attribution,
         )
-        relation_result = apply_relation_memory_transition(
+        relation_result = self._transition_relation_memory(
             self._working_persistent_state,
             self._relation_session_state,
             transition_input,
@@ -274,10 +275,46 @@ class AdaptiveConnectedDigitalLifeComponent(ConnectedDigitalLifeComponent):
         if relation_result.session_finalized:
             if not feedback.closing_evaluation_attribution:
                 raise RuntimeError("relation session finalized outside closing feedback")
-            self._final_persistent_state = working_after
-            self._persistent_state_records.append(
-                self._persistent_state_record("final", working_after)
-            )
+            self._handle_finalized_relation_state(working_after)
+
+    def _transition_relation_memory(
+        self,
+        persistent_state: RelationMemoryPersistentState,
+        session_state: RelationMemorySessionState,
+        transition_input: RelationMemoryTransitionInput,
+    ) -> RelationMemoryTransitionResult:
+        """Use the exact reference transition unless an experimental life overrides it."""
+
+        return apply_relation_memory_transition(
+            persistent_state,
+            session_state,
+            transition_input,
+        )
+
+    def _handle_finalized_relation_state(
+        self,
+        state: RelationMemoryPersistentState,
+    ) -> None:
+        """Commit the reference final state immediately at its closing feedback."""
+
+        self._commit_final_persistent_state(state)
+
+    def _commit_final_persistent_state(
+        self,
+        state: RelationMemoryPersistentState,
+    ) -> None:
+        """Publish one validated final state and exactly one final audit record."""
+
+        if self._final_persistent_state is not None:
+            raise RuntimeError("relation-memory final state was already committed")
+        if not self._relation_session_state.session_finalized:
+            raise RuntimeError("cannot commit state before relation session finalization")
+        if state != self._working_persistent_state:
+            raise RuntimeError("final state must equal the component working state")
+        self._final_persistent_state = state
+        self._persistent_state_records.append(
+            self._persistent_state_record("final", state)
+        )
 
     def relation_memory_intrinsic_profile(self) -> RelationMemoryIntrinsicProfile:
         return self._relation_intrinsic_profile

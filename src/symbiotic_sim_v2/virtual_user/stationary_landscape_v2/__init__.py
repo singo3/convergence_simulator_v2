@@ -1,0 +1,91 @@
+"""Stage 8A.1 fixed preference landscapes with neutral/Gaussian axes."""
+
+from .component_factory import (
+    StationaryLandscapeV2LightResponseConfig,
+    StationaryV2Stage7PreferenceEvaluator,
+    stationary_light_response_config_v2,
+    stationary_preference_evaluator_v2,
+)
+from .config import (
+    AXIS_MODES,
+    EXPECTED_STRUCTURES,
+    MAXIMUM_WEIGHTED_PEAK_RESPONSE_VERSION,
+    STATIONARY_AXIS_MODE_PEAK_VERSION,
+    STATIONARY_PREFERENCE_LANDSCAPE_V2_VERSION,
+    STATIONARY_PREFERENCE_LANDSCAPE_VERSION,
+    STATIONARY_USER_TYPE_PROFILE_SCHEMA_VERSION,
+    STATIONARY_USER_TYPE_PROFILE_V2_SCHEMA_VERSION,
+    StationaryPreferencePeakV2,
+    StationaryUserTypeProfileV2,
+)
+from .evaluator import evaluate_stationary_preference, evaluate_stationary_preference_v2
+from .heatmap_projection import (
+    DEFAULT_BPM_GRID_STEP,
+    DEFAULT_HUE_GRID_STEP_DEGREE,
+    STANDARD_LIFE_HUE_BANDS,
+    STATIONARY_PREFERENCE_HEATMAP_SCHEMA_VERSION,
+    StationaryPreferenceHeatmapProjectionV2,
+    project_stationary_preference_heatmap_v2,
+)
+from .peak import (
+    circular_hue_distance,
+    evaluate_peak_match,
+    gaussian_match,
+    normalized_peak_distance,
+)
+from .presets import (
+    BPM_COMMON_100_HUE_NEUTRAL,
+    DEFAULT_STATIONARY_USER_TYPE,
+    DEFAULT_STATIONARY_USER_TYPE_V2,
+    FLAT_CONTROL,
+    GREEN_HUE_DOMINANT_BROAD_BPM,
+    GREEN_SINGLE_PEAK_NARROW,
+    STATIONARY_USER_TYPE_V2_IDS,
+    THREE_LIFE_BPM_EQUAL,
+    THREE_LIFE_BPM_GREEN_DOMINANT,
+    stationary_user_type_profile_v2,
+    stationary_user_type_v2_ids,
+)
+from .records import StationaryPeakMatchV2, StationaryPreferenceMatchV2
+
+__all__ = [
+    "AXIS_MODES",
+    "BPM_COMMON_100_HUE_NEUTRAL",
+    "DEFAULT_STATIONARY_USER_TYPE_V2",
+    "DEFAULT_STATIONARY_USER_TYPE",
+    "DEFAULT_BPM_GRID_STEP",
+    "DEFAULT_HUE_GRID_STEP_DEGREE",
+    "EXPECTED_STRUCTURES",
+    "FLAT_CONTROL",
+    "GREEN_HUE_DOMINANT_BROAD_BPM",
+    "GREEN_SINGLE_PEAK_NARROW",
+    "MAXIMUM_WEIGHTED_PEAK_RESPONSE_VERSION",
+    "STATIONARY_AXIS_MODE_PEAK_VERSION",
+    "STANDARD_LIFE_HUE_BANDS",
+    "STATIONARY_PREFERENCE_HEATMAP_SCHEMA_VERSION",
+    "STATIONARY_PREFERENCE_LANDSCAPE_V2_VERSION",
+    "STATIONARY_PREFERENCE_LANDSCAPE_VERSION",
+    "STATIONARY_USER_TYPE_PROFILE_V2_SCHEMA_VERSION",
+    "STATIONARY_USER_TYPE_PROFILE_SCHEMA_VERSION",
+    "STATIONARY_USER_TYPE_V2_IDS",
+    "StationaryLandscapeV2LightResponseConfig",
+    "StationaryPeakMatchV2",
+    "StationaryPreferenceMatchV2",
+    "StationaryPreferencePeakV2",
+    "StationaryPreferenceHeatmapProjectionV2",
+    "StationaryUserTypeProfileV2",
+    "StationaryV2Stage7PreferenceEvaluator",
+    "THREE_LIFE_BPM_EQUAL",
+    "THREE_LIFE_BPM_GREEN_DOMINANT",
+    "circular_hue_distance",
+    "evaluate_peak_match",
+    "evaluate_stationary_preference",
+    "evaluate_stationary_preference_v2",
+    "gaussian_match",
+    "normalized_peak_distance",
+    "project_stationary_preference_heatmap_v2",
+    "stationary_light_response_config_v2",
+    "stationary_preference_evaluator_v2",
+    "stationary_user_type_profile_v2",
+    "stationary_user_type_v2_ids",
+]

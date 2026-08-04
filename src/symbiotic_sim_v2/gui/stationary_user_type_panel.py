@@ -21,6 +21,7 @@ from PySide6.QtWidgets import (
     QSizePolicy,
     QSplitter,
     QTableView,
+    QTabWidget,
     QVBoxLayout,
     QWidget,
 )
@@ -96,6 +97,8 @@ class StationaryUserTypePanel(QWidget):
         self._role_hue_bands = dict(role_hue_bands or ROLE_HUE_BANDS)
         self._heatmap_cache: dict[str, np.ndarray] = {}
         self._settings_editable = True
+        self.stage8a1_profile_tabs: QTabWidget | None = None
+        self.stage8a1_user_type_panel: QWidget | None = None
         self._build_ui()
         self.set_profiles(
             self._profiles,
@@ -337,6 +340,26 @@ class StationaryUserTypePanel(QWidget):
             raise TypeError("editable must be boolean")
         self._settings_editable = editable
         self.user_type_combo.setEnabled(editable)
+
+    def install_stage8a1_profile_panel(self, panel: QWidget) -> None:
+        """Nest the v2 inspector while retaining this Stage 8A v1 control seam."""
+
+        if not isinstance(panel, QWidget):
+            raise TypeError("Stage 8A.1 profile panel must be a QWidget")
+        if self.stage8a1_profile_tabs is not None:
+            raise RuntimeError("Stage 8A.1 profile panel is already installed")
+        root = self.layout()
+        if root is None:
+            raise RuntimeError("stationary user type panel has no layout")
+        root.removeWidget(self.diagnostics_scroll)
+        nested = QTabWidget(self)
+        nested.setObjectName("stage8a1StationaryProfileGenerationTabs")
+        nested.addTab(panel, "Stage 8A.1 固定user type v2")
+        nested.addTab(self.diagnostics_scroll, "Stage 8A 固定user type v1")
+        nested.setCurrentWidget(panel)
+        root.addWidget(nested, stretch=1)
+        self.stage8a1_profile_tabs = nested
+        self.stage8a1_user_type_panel = panel
 
     def _selection_changed(self, _index: int) -> None:
         self._refresh_selected_profile()

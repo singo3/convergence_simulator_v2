@@ -202,7 +202,7 @@ class ConnectedDigitalLifeComponent(SingleDigitalLifeComponent):
         e_before = self._state.e
         q_before = self._state.q
         k_before = self._state.k_current
-        e_after = calculate_e_next(e_before, feedback.s, g)
+        e_after = self._calculate_e_after_feedback(e_before, feedback.s, g)
         q_after, q_applied, q_reason = self._calculate_q_update(pending, q_before, g)
         record = DigitalLifeSecondRoundRecord(
             signal_index=pending.signal.signal_index,
@@ -257,6 +257,16 @@ class ConnectedDigitalLifeComponent(SingleDigitalLifeComponent):
             self._q_update_count += 1
         self._second_round_records.append(record)
         self._pending_second_round = None
+
+    def finalize_session_end_state_policy(self) -> None:
+        """No-op seam used only after all closing second rounds have completed.
+
+        Existing Stage 5B through Stage 8A components have no session-end E policy,
+        so the reference path deliberately performs no mutation here. Experimental
+        components may override this method while keeping the Runtime free of E math.
+        """
+
+        return None
 
     def mark_holder_released(self) -> None:
         """Reflect the post-closing state after the priority-90 release event."""
@@ -390,6 +400,11 @@ class ConnectedDigitalLifeComponent(SingleDigitalLifeComponent):
             evaluation_is_valid=None if metadata is None else metadata.is_valid,
         )
         return decision.q_after, decision.applied, decision.skip_reason
+
+    def _calculate_e_after_feedback(self, e: object, s: object, g: object) -> float:
+        """Return the reference fatigue update; experimental lives override this seam."""
+
+        return calculate_e_next(e, s, g)
 
     def _require_pending(self, signal_index: int) -> _PendingSecondRound:
         index = _non_negative_int("signal_index", signal_index)

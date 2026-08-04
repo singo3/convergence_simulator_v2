@@ -69,7 +69,7 @@ def test_stage5b1_versions_priorities_and_arbitrary_roster_match_fixed_vectors()
     boundaries = data["formal_boundaries"]
     roster = data["runtime_roster"]
 
-    assert __version__ == "0.10.0"
+    assert __version__ == "0.11.0"
     assert assumptions["project_version"] == "0.6.1"
     assert assumptions["runtime_model_version"] == THREE_DIGITAL_LIFE_RUNTIME_MODEL_VERSION
     assert assumptions["garden_output_model_version"] == GARDEN_OUTPUT_MODEL_VERSION

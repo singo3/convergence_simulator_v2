@@ -8,7 +8,6 @@ import json
 from collections.abc import Iterable, Mapping, Sequence
 from pathlib import Path
 
-from symbiotic_sim_v2 import __version__
 from symbiotic_sim_v2.convergence import (
     RollingConvergenceRecord,
     TruthAlignmentRecord,
@@ -37,6 +36,7 @@ PERSISTENT_STATE_TRAJECTORY_CSV_FILENAME = (
     "stage_08a_persistent_state_trajectory.csv"
 )
 USER_TYPE_COMPARISON_CSV_FILENAME = "stage_08a_user_type_comparison.csv"
+STAGE_8A_PROJECT_VERSION = "0.10.0"
 
 STATIONARY_USER_TYPES_CSV_FIELDS = (
     "user_type_id",
@@ -278,7 +278,7 @@ def multi_session_summary(
         + latest_convergence.post_convergence_outlier_count
     )
     return {
-        "project_version": __version__,
+        "project_version": STAGE_8A_PROJECT_VERSION,
         **dict(state.versions),
         "runner_version": state.runner_version,
         "stationary_user_type_profile": profile.to_dict(),

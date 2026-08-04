@@ -40,6 +40,17 @@ def _unit(name: str, value: object) -> float:
     return converted
 
 
+def _experimental_sigma_multiplier(value: object) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise TypeError("sigma_multiplier must be a number")
+    converted = float(value)
+    if not math.isfinite(converted):
+        raise ValueError("sigma_multiplier must be finite")
+    if not 0.25 <= converted <= 1.50:
+        raise ValueError("sigma_multiplier must be between 0.25 and 1.50")
+    return converted
+
+
 def _optional_non_empty(name: str, value: object | None) -> str | None:
     if value is None:
         return None
@@ -170,6 +181,40 @@ def apply_relation_memory_transition(
     session_state: RelationMemorySessionState,
     transition_input: RelationMemoryTransitionInput,
 ) -> RelationMemoryTransitionResult:
+    """Apply the unchanged v2.0 reference transition with sigma multiplier 1.0."""
+
+    return _apply_relation_memory_transition(
+        persistent_state,
+        session_state,
+        transition_input,
+        sigma_multiplier=1.0,
+    )
+
+
+def apply_relation_memory_transition_with_sigma_multiplier(
+    persistent_state: RelationMemoryPersistentState,
+    session_state: RelationMemorySessionState,
+    transition_input: RelationMemoryTransitionInput,
+    *,
+    sigma_multiplier: object,
+) -> RelationMemoryTransitionResult:
+    """Apply the Stage 8A.1 experimental scale only to reference sigma."""
+
+    return _apply_relation_memory_transition(
+        persistent_state,
+        session_state,
+        transition_input,
+        sigma_multiplier=_experimental_sigma_multiplier(sigma_multiplier),
+    )
+
+
+def _apply_relation_memory_transition(
+    persistent_state: RelationMemoryPersistentState,
+    session_state: RelationMemorySessionState,
+    transition_input: RelationMemoryTransitionInput,
+    *,
+    sigma_multiplier: float,
+) -> RelationMemoryTransitionResult:
     """Return new immutable states; mutate neither input nor any external component."""
 
     _validate_state_identity(persistent_state, session_state, transition_input)
@@ -215,6 +260,7 @@ def apply_relation_memory_transition(
                 session_after,
                 transition_input,
                 profile,
+                sigma_multiplier,
             )
         elif transition_input.bundle_index == 1:
             (
@@ -322,6 +368,7 @@ def _apply_bundle_zero(
     session: RelationMemorySessionState,
     item: RelationMemoryTransitionInput,
     profile: RelationMemoryIntrinsicProfile,
+    sigma_multiplier: float,
 ) -> tuple[RelationMemoryPersistentState, RelationMemorySessionState, bool]:
     if session.adaptation_phase != "anchor_evaluation":
         raise RuntimeError(
@@ -349,7 +396,8 @@ def _apply_bundle_zero(
             False,
         )
 
-    sigma = exploration_sigma(item.w, profile.sigma_min, profile.sigma_max)
+    sigma_reference = exploration_sigma(item.w, profile.sigma_min, profile.sigma_max)
+    sigma = sigma_multiplier * sigma_reference
     probability = exploration_probability(item.w, profile.p_explore_min)
     u_explore = hash01(
         item.digital_life_id,
@@ -621,5 +669,6 @@ __all__ = [
     "RelationMemoryTransitionInput",
     "RelationMemoryTransitionResult",
     "apply_relation_memory_transition",
+    "apply_relation_memory_transition_with_sigma_multiplier",
     "current_relation_k",
 ]
