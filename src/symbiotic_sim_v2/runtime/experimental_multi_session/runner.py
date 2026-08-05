@@ -39,6 +39,7 @@ from symbiotic_sim_v2.runtime.multi_session.session_seed import (
 )
 from symbiotic_sim_v2.virtual_user.config import VirtualUserConfig
 from symbiotic_sim_v2.virtual_user.stationary_landscape_v2 import (
+    StationaryUserTypeProfileV2,
     stationary_light_response_config_v2,
     stationary_user_type_profile_v2,
 )
@@ -111,6 +112,8 @@ class FatigueSigmaSingleConditionRunner:
         reference_simulation_factory: SimulationFactory = (
             create_adaptive_relation_memory_closed_loop_simulation
         ),
+        stationary_user_type_profile_override: StationaryUserTypeProfileV2 | None = None,
+        primary_reference_arm: bool = False,
     ) -> None:
         if not callable(experimental_simulation_factory):
             raise TypeError("experimental_simulation_factory must be callable")
@@ -118,6 +121,22 @@ class FatigueSigmaSingleConditionRunner:
             raise TypeError("reference_simulation_factory must be callable")
         if resume_state is not None and initial_persistent_state_by_life is not None:
             raise ValueError("resume_state and initial persistent states are exclusive")
+        if not isinstance(primary_reference_arm, bool):
+            raise TypeError("primary_reference_arm must be boolean")
+        if stationary_user_type_profile_override is not None and not isinstance(
+            stationary_user_type_profile_override,
+            StationaryUserTypeProfileV2,
+        ):
+            raise TypeError(
+                "stationary_user_type_profile_override must be a "
+                "StationaryUserTypeProfileV2 or null"
+            )
+        if resume_state is not None and (
+            stationary_user_type_profile_override is not None or primary_reference_arm
+        ):
+            raise ValueError("Stage 8A.1 resume cannot use a Stage 8A.3 injection seam")
+        if primary_reference_arm and compare_reference_arm:
+            raise ValueError("a primary reference arm cannot request a second reference arm")
         if resume_state is not None and not isinstance(
             resume_state, FatigueSigmaExperimentState
         ):
@@ -174,7 +193,13 @@ class FatigueSigmaSingleConditionRunner:
             self._reference_outcomes = list(resume_state.reference_session_outcomes)
             self._next_session_index = resume_state.next_session_index
             self._stopped_on_error = resume_state.stopped_on_error
-        self._profile = stationary_user_type_profile_v2(self._condition.user_type_id)
+        self._primary_reference_arm = primary_reference_arm
+        self._profile = (
+            stationary_user_type_profile_v2(self._condition.user_type_id)
+            if stationary_user_type_profile_override is None
+            else stationary_user_type_profile_override
+        )
+        self._effective_user_type_id = self._profile.user_type_id
         self._light_response_config = stationary_light_response_config_v2(self._profile)
         self._virtual_user_template = VirtualUserConfig(
             duration_seconds=SESSION_DURATION_US // 1_000_000
@@ -247,14 +272,14 @@ class FatigueSigmaSingleConditionRunner:
         index = self._next_session_index
         seed = physiology_root_seed_for_session(
             master_seed=self._condition.master_seed,
-            stationary_user_type_id=self._condition.user_type_id,
+            stationary_user_type_id=self._effective_user_type_id,
             session_index=index,
             policy=self._condition.session_seed_policy,
         )
         experimental, simulation = self._execute_arm(
             index=index,
             seed=seed,
-            reference_arm=False,
+            reference_arm=self._primary_reference_arm,
             states=self._states,
         )
         reference: ExperimentalSessionOutcome | None = None
@@ -281,7 +306,11 @@ class FatigueSigmaSingleConditionRunner:
             )
         if pair_failure_reason is None:
             try:
-                self._validate_handoff(experimental, self._states, experimental=True)
+                self._validate_handoff(
+                    experimental,
+                    self._states,
+                    experimental=not self._primary_reference_arm,
+                )
                 if reference is not None:
                     self._validate_handoff(
                         reference,
@@ -440,7 +469,7 @@ class FatigueSigmaSingleConditionRunner:
                 simulation,
                 session_index=index,
                 physiology_root_seed=seed,
-                user_type_id=self._condition.user_type_id,
+                user_type_id=self._effective_user_type_id,
                 reference_arm=reference_arm,
                 execution_error=execution_error,
             )
@@ -497,13 +526,13 @@ class FatigueSigmaSingleConditionRunner:
             raise RuntimeError("invalid session cannot commit persistent state")
         expected_seed = physiology_root_seed_for_session(
             master_seed=self._condition.master_seed,
-            stationary_user_type_id=self._condition.user_type_id,
+            stationary_user_type_id=self._effective_user_type_id,
             session_index=outcome.session_index,
             policy=self._condition.session_seed_policy,
         )
         if outcome.physiology_root_seed != expected_seed:
             raise RuntimeError("outcome root seed differs from the condition policy")
-        if outcome.user_type_id != self._condition.user_type_id:
+        if outcome.user_type_id != self._effective_user_type_id:
             raise RuntimeError("outcome user type differs from the condition")
         if outcome.reference_arm == experimental:
             raise RuntimeError("outcome arm metadata differs from the handoff target")
@@ -572,7 +601,7 @@ class FatigueSigmaSingleConditionRunner:
             invalid_reason=reason,
             engine_completed=False,
             physiology_root_seed=seed,
-            user_type_id=self._condition.user_type_id,
+            user_type_id=self._effective_user_type_id,
             reference_arm=reference_arm,
             holder_id=None,
             holder_role=None,

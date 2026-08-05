@@ -268,6 +268,11 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="run the offline Stage 8A.2 coarse-refine-confirm search",
     )
+    headless_group.add_argument(
+        "--headless-adaptive-placebo-validation",
+        action="store_true",
+        help="run the offline Stage 8A.3 autonomous/yoked/random RMSSD validation",
+    )
     parser.add_argument(
         "--life-role",
         choices=("red", "green", "blue"),
@@ -389,8 +394,8 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--maximum-sessions",
         type=int,
-        default=24,
-        help="maximum independent Stage 8A or Stage 8A.1 sessions",
+        default=None,
+        help="maximum independent Stage 8A, Stage 8A.1, or Stage 8A.3 sessions",
     )
     parser.add_argument(
         "--convergence-window",
@@ -524,13 +529,13 @@ def _build_parser() -> argparse.ArgumentParser:
         "--output-directory",
         type=Path,
         default=None,
-        help="base directory for a new Stage 8A.2 run directory",
+        help="base directory for a new Stage 8A.2 or Stage 8A.3 run directory",
     )
     parser.add_argument(
         "--base-master-seed",
         type=int,
         default=None,
-        help="unsigned 32-bit paired-replicate base seed",
+        help="unsigned 32-bit paired-replicate or validation base seed",
     )
     reference_group = parser.add_mutually_exclusive_group()
     reference_group.add_argument(
@@ -579,16 +584,57 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--plan-only",
         action="store_true",
-        help="print the Stage 8A.2 plan without creating state or simulations",
+        help="print the Stage 8A.2 or Stage 8A.3 plan without creating state",
     )
     parser.add_argument(
         "--resume",
         type=Path,
         default=None,
-        help="strictly resume an existing Stage 8A.2 run directory",
+        help="strictly resume an existing Stage 8A.2 or Stage 8A.3 run directory",
     )
     parser.add_argument(
         "--allow-dirty-auto-search-code",
+        action="store_true",
+        help=argparse.SUPPRESS,
+    )
+    parser.add_argument(
+        "--validation-preset",
+        choices=("smoke", "quick", "standard", "robust"),
+        default=None,
+        help="select the Stage 8A.3 validation volume",
+    )
+    parser.add_argument(
+        "--conditions-json",
+        type=Path,
+        default=None,
+        help="load explicit Stage 8A.3 validation conditions",
+    )
+    parser.add_argument(
+        "--validation-config",
+        type=Path,
+        default=None,
+        help="load a complete strict Stage 8A.3 validation config",
+    )
+    parser.add_argument(
+        "--participants-per-type",
+        type=int,
+        default=None,
+        help="override Stage 8A.3 participants per fixed user type",
+    )
+    parser.add_argument(
+        "--permutation-count",
+        type=int,
+        default=None,
+        help="override deterministic within-participant permutation count",
+    )
+    parser.add_argument(
+        "--retain-details",
+        choices=("compact", "representative", "all"),
+        default=None,
+        help="select Stage 8A.3 compact/detail retention policy",
+    )
+    parser.add_argument(
+        "--allow-dirty-adaptive-placebo-code",
         action="store_true",
         help=argparse.SUPPRESS,
     )
@@ -3163,6 +3209,46 @@ def main(argv: list[str] | None = None) -> int:
         raise ValueError(
             "--export-experiment-csv requires a Stage 8A.1 headless command"
         )
+    validation_specific_options = (
+        args.validation_preset,
+        args.conditions_json,
+        args.validation_config,
+        args.participants_per_type,
+        args.permutation_count,
+        args.retain_details,
+    )
+    if any(value is not None for value in validation_specific_options) and not (
+        args.headless_adaptive_placebo_validation
+    ):
+        raise ValueError(
+            "Stage 8A.3 validation options require "
+            "--headless-adaptive-placebo-validation"
+        )
+    if args.allow_dirty_adaptive_placebo_code and not (
+        args.headless_adaptive_placebo_validation
+    ):
+        raise ValueError(
+            "--allow-dirty-adaptive-placebo-code requires "
+            "--headless-adaptive-placebo-validation"
+        )
+    if args.headless_adaptive_placebo_validation:
+        incompatible = (
+            args.search_preset,
+            args.include_reference_arm,
+            args.stop_after_phase,
+            args.maximum_total_session_runs,
+            args.candidate_gate_config,
+            args.search_config,
+            args.retain_full_details,
+            args.allow_dirty_auto_search_code,
+        )
+        if any(value is not None and value is not False for value in incompatible):
+            raise ValueError("Stage 8A.2 search options cannot be mixed with Stage 8A.3")
+        from symbiotic_sim_v2.experiments.adaptive_placebo_validation.cli import (
+            run_validation_cli,
+        )
+
+        return run_validation_cli(args)
     auto_search_options = (
         args.search_preset,
         args.output_directory,
@@ -3222,7 +3308,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.headless_multi_session_convergence_demo:
         return run_headless_multi_session_convergence_demo(
             stationary_user_type=args.stationary_user_type,
-            maximum_sessions=args.maximum_sessions,
+            maximum_sessions=(24 if args.maximum_sessions is None else args.maximum_sessions),
             convergence_window=args.convergence_window,
             convergence_required=args.convergence_required,
             hue_tolerance_degree=args.hue_tolerance_degree,
@@ -3246,7 +3332,7 @@ def main(argv: list[str] | None = None) -> int:
                 args.selected_session_fatigue_target
             ),
             sigma_multiplier=args.sigma_multiplier,
-            maximum_sessions=args.maximum_sessions,
+            maximum_sessions=(24 if args.maximum_sessions is None else args.maximum_sessions),
             master_seed=args.master_seed,
             compare_reference_arm=args.compare_reference_arm,
             initial_state_json=args.initial_experiment_state_json,
@@ -3264,7 +3350,7 @@ def main(argv: list[str] | None = None) -> int:
                 args.sigma_multipliers,
                 option_name="--sigma-multipliers",
             ),
-            maximum_sessions=args.maximum_sessions,
+            maximum_sessions=(24 if args.maximum_sessions is None else args.maximum_sessions),
             replicates=args.replicates,
             master_seed=args.master_seed,
             experiment_preset=args.experiment_preset,
@@ -3309,7 +3395,7 @@ def main(argv: list[str] | None = None) -> int:
         screenshot=args.screenshot,
         screenshot_target=args.screenshot_target,
         stationary_user_type=args.stationary_user_type,
-        maximum_sessions=args.maximum_sessions,
+        maximum_sessions=(24 if args.maximum_sessions is None else args.maximum_sessions),
         convergence_window=args.convergence_window,
         convergence_required=args.convergence_required,
         hue_tolerance_degree=args.hue_tolerance_degree,

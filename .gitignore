@@ -8,3 +8,6 @@ __pycache__/
 artifacts/auto_search/
 artifacts/auto_search_*/
 artifacts/auto_search-launcher-logs/
+artifacts/adaptive_placebo_validation/
+artifacts/adaptive_placebo_validation_*/
+artifacts/adaptive_placebo_validation-launcher-logs/

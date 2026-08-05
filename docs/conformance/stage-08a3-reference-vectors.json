@@ -1,0 +1,416 @@
+{
+  "bpm_kernel": {
+    "bandwidth": 15.0,
+    "history": [
+      [
+        80.0,
+        1.0
+      ],
+      [
+        100.0,
+        3.0
+      ],
+      [
+        120.0,
+        1.0
+      ]
+    ],
+    "query_bpm": 100.0,
+    "score": 2.0975595548637935
+  },
+  "circular_hue": {
+    "concentration": 0.9998984634375941,
+    "low_concentration_fixture": [
+      null,
+      0.0
+    ],
+    "mean_degree": 360.0,
+    "values": [
+      359.0,
+      1.0,
+      0.0
+    ]
+  },
+  "circular_hue_distance": {
+    "distance": 2.0,
+    "first": 359.0,
+    "second": 1.0
+  },
+  "counterfactual": {
+    "actual": 4.0,
+    "candidate_count": 165,
+    "percentile": 70.0,
+    "selection_enrichment": 1.0,
+    "values": [
+      1.0,
+      2.0,
+      3.0,
+      4.0,
+      5.0
+    ]
+  },
+  "cyclic_yoke_map": {
+    "all_donor_differ": true,
+    "assignments": [
+      [
+        "p001",
+        "p002"
+      ],
+      [
+        "p002",
+        "p003"
+      ],
+      [
+        "p003",
+        "p001"
+      ]
+    ],
+    "participants": [
+      "p001",
+      "p002",
+      "p003"
+    ],
+    "single_participant": [
+      "p001",
+      "p001__hidden_donor"
+    ]
+  },
+  "delta_rmssd": {
+    "baseline_rmssd_ms": 22.5,
+    "bundle_rmssd_ms": 27.75,
+    "delta_rmssd_ms": 5.25
+  },
+  "flat_null_fixture": {
+    "expected_effect_center": 0.0,
+    "life_selection_structure_may_exist": true,
+    "response_strength_scale": 0.0
+  },
+  "lag1_same_life_correlation": 0.8944271909999159,
+  "life_history_score": {
+    "mean": 3.0,
+    "values": [
+      2.0,
+      4.0,
+      3.0
+    ]
+  },
+  "participant_bootstrap": {
+    "lower95": 0.75,
+    "replicates": 1000,
+    "upper95": 1.75,
+    "values": [
+      0.5,
+      1.0,
+      1.5,
+      2.0
+    ]
+  },
+  "participant_classification": {
+    "binary_is_primary": false,
+    "clear_positive": "clear_positive_adaptation",
+    "insufficient": "insufficient_data",
+    "negative": "negative_or_unstable",
+    "no_clear": "no_clear_effect",
+    "partial": "partial_adaptation_signal"
+  },
+  "past_only_history": {
+    "current_session_index": 4,
+    "excluded_sessions": [
+      4,
+      5
+    ],
+    "included_sessions": [
+      0,
+      1,
+      2,
+      3
+    ]
+  },
+  "pattern_closeness": {
+    "bpm_distance": 3.0,
+    "closeness": 0.625,
+    "different_life_closeness": 0.0,
+    "hue_distance": 2.0,
+    "same_life": true
+  },
+  "production_implementation_imported": false,
+  "random_output": {
+    "bpm_range": [
+      10.0,
+      165.0
+    ],
+    "condition_in_key": false,
+    "holder_fixed_within_session": true,
+    "hue_ranges_degree": {
+      "blue": [
+        245.0,
+        255.0
+      ],
+      "green": [
+        120.0,
+        130.0
+      ],
+      "red": [
+        0.0,
+        10.0
+      ]
+    },
+    "master_seed": 20260806,
+    "participant_id": "fixture__p001",
+    "rmssd_in_key": false,
+    "sessions": [
+      {
+        "outputs": [
+          {
+            "blink_bpm": 32.355443526918506,
+            "bundle_index": 0,
+            "f": 0.008149716178689682,
+            "hue_degree": 2.9338978243282856,
+            "life_id": "life-red",
+            "output_seed": 1931492683,
+            "role": "red",
+            "t": 0.1442286679156033
+          },
+          {
+            "blink_bpm": 139.34705211118302,
+            "bundle_index": 1,
+            "f": 0.023672097072815895,
+            "hue_degree": 8.521954946213722,
+            "life_id": "life-red",
+            "output_seed": 2370594203,
+            "role": "red",
+            "t": 0.8344971103947292
+          },
+          {
+            "blink_bpm": 74.6254989877916,
+            "bundle_index": 2,
+            "f": 0.02017641000654337,
+            "hue_degree": 7.263507602355613,
+            "life_id": "life-red",
+            "output_seed": 2315372045,
+            "role": "red",
+            "t": 0.41693870314704257
+          }
+        ],
+        "session_index": 0
+      },
+      {
+        "outputs": [
+          {
+            "blink_bpm": 149.21649802819147,
+            "bundle_index": 0,
+            "f": 0.6878486360807047,
+            "hue_degree": 247.62550898905369,
+            "life_id": "life-blue",
+            "output_seed": 4071958351,
+            "role": "blue",
+            "t": 0.8981709550205901
+          },
+          {
+            "blink_bpm": 112.77290207629952,
+            "bundle_index": 1,
+            "f": 0.7072569673841065,
+            "hue_degree": 254.61250825827833,
+            "life_id": "life-blue",
+            "output_seed": 79891714,
+            "role": "blue",
+            "t": 0.6630509811374162
+          },
+          {
+            "blink_bpm": 11.854874301274434,
+            "bundle_index": 2,
+            "f": 0.6912858241341135,
+            "hue_degree": 248.86289668828087,
+            "life_id": "life-blue",
+            "output_seed": 4059785822,
+            "role": "blue",
+            "t": 0.011966930975964086
+          }
+        ],
+        "session_index": 1
+      },
+      {
+        "outputs": [
+          {
+            "blink_bpm": 159.9498633864536,
+            "bundle_index": 0,
+            "f": 0.3578957598267888,
+            "hue_degree": 128.84247353764397,
+            "life_id": "life-green",
+            "output_seed": 1869871231,
+            "role": "green",
+            "t": 0.967418473460991
+          },
+          {
+            "blink_bpm": 149.84655888921725,
+            "bundle_index": 1,
+            "f": 0.35641584719927066,
+            "hue_degree": 128.30970499173745,
+            "life_id": "life-green",
+            "output_seed": 3836397439,
+            "role": "green",
+            "t": 0.9022358638014016
+          },
+          {
+            "blink_bpm": 28.876179517926953,
+            "bundle_index": 2,
+            "f": 0.35092093387465956,
+            "hue_degree": 126.33153619487744,
+            "life_id": "life-green",
+            "output_seed": 3595250742,
+            "role": "green",
+            "t": 0.12178180334146421
+          }
+        ],
+        "session_index": 2
+      },
+      {
+        "outputs": [
+          {
+            "blink_bpm": 86.07745182503416,
+            "bundle_index": 0,
+            "f": 0.34673383162439925,
+            "hue_degree": 124.82417938478373,
+            "life_id": "life-green",
+            "output_seed": 3214949443,
+            "role": "green",
+            "t": 0.49082226983893007
+          },
+          {
+            "blink_bpm": 49.40283522523961,
+            "bundle_index": 1,
+            "f": 0.3503451408700338,
+            "hue_degree": 126.12425071321218,
+            "life_id": "life-green",
+            "output_seed": 2304435686,
+            "role": "green",
+            "t": 0.2542118401628362
+          },
+          {
+            "blink_bpm": 121.26537256186978,
+            "bundle_index": 2,
+            "f": 0.35178551839990896,
+            "hue_degree": 126.64278662396723,
+            "life_id": "life-green",
+            "output_seed": 725910825,
+            "role": "green",
+            "t": 0.7178411133023856
+          }
+        ],
+        "session_index": 3
+      },
+      {
+        "outputs": [
+          {
+            "blink_bpm": 18.838869847877547,
+            "bundle_index": 0,
+            "f": 0.6812746705648176,
+            "hue_degree": 245.25888140333433,
+            "life_id": "life-blue",
+            "output_seed": 2155855997,
+            "role": "blue",
+            "t": 0.057024966760500305
+          },
+          {
+            "blink_bpm": 67.84438368156546,
+            "bundle_index": 1,
+            "f": 0.6908328187109884,
+            "hue_degree": 248.69981473595584,
+            "life_id": "life-blue",
+            "output_seed": 3754448057,
+            "role": "blue",
+            "t": 0.37318957213913206
+          },
+          {
+            "blink_bpm": 47.070855820976114,
+            "bundle_index": 2,
+            "f": 0.7003425463701324,
+            "hue_degree": 252.12331669324766,
+            "life_id": "life-blue",
+            "output_seed": 2828279395,
+            "role": "blue",
+            "t": 0.23916681174823298
+          }
+        ],
+        "session_index": 4
+      },
+      {
+        "outputs": [
+          {
+            "blink_bpm": 138.4873060719388,
+            "bundle_index": 0,
+            "f": 0.013918063105718555,
+            "hue_degree": 5.01050271805868,
+            "life_id": "life-red",
+            "output_seed": 862141989,
+            "role": "red",
+            "t": 0.8289503617544439
+          },
+          {
+            "blink_bpm": 72.80319357813363,
+            "bundle_index": 1,
+            "f": 0.0010286456730579856,
+            "hue_degree": 0.3703124423008748,
+            "life_id": "life-red",
+            "output_seed": 2176339971,
+            "role": "red",
+            "t": 0.40518189405247507
+          },
+          {
+            "blink_bpm": 135.0621270849796,
+            "bundle_index": 2,
+            "f": 0.024664081132633683,
+            "hue_degree": 8.879069207748126,
+            "life_id": "life-red",
+            "output_seed": 2188193096,
+            "role": "red",
+            "t": 0.80685243280632
+          }
+        ],
+        "session_index": 5
+      }
+    ]
+  },
+  "reference_vector_digest": "3fe0935a9406231f398de9aa31dce55f53c0fc52de73384c8b8981229059d12e",
+  "report_trajectory_fixture": {
+    "bundle_x_offsets": [
+      -0.2,
+      0.0,
+      0.2
+    ],
+    "fill": "actual_hue_hsv",
+    "invalid_marker": "x",
+    "shapes": {
+      "life-blue": "square",
+      "life-green": "triangle",
+      "life-red": "circle"
+    },
+    "trial_is_translucent": true,
+    "x": "session_index",
+    "y": "displayed_blink_bpm"
+  },
+  "rmssd_effect": {
+    "autonomous_late": 4.5,
+    "early": [
+      1.0,
+      2.0
+    ],
+    "late": [
+      4.0,
+      5.0
+    ],
+    "late_minus_early": 3.0,
+    "middle": [
+      2.5,
+      3.0
+    ],
+    "paired_difference": 2.0,
+    "yoked_late": 2.5
+  },
+  "schema_version": "stage_08a3_reference_vectors_v1",
+  "versions": {
+    "arm_contract": "adaptive_placebo_arm_contract_v0_1",
+    "project_version": "0.13.0",
+    "validation_model": "adaptive_placebo_rmssd_validation_v0_1"
+  }
+}

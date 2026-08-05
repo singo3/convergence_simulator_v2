@@ -93,5 +93,13 @@
 - robust gateを通る候補がない場合は`no_robust_candidate`を許容し、代替の一位を捏造しない。
 - Stage 8A.2は`formal_spec_adoption=false`の実験層とし、recommendationをCoreに返さない。
 - Codex作業中に実行してよいauto searchは32 sessionのsmokeだけとし、quick、standard、robustの本探索を実行しない。plan-onlyは実行してよい。
+- Stage 8A.3のplacebo/random出力へtarget本人のRMSSD、N、W、q、k、Eを渡さない。
+- autonomous donorをtarget自身へyokeせず、participantが1人の場合は別seedの集計対象外hidden donorを使う。
+- Stage 8A.3のhistory response modelはcurrentsessionとfuture sessionを学習に使わず、過去sessionだけを使う。future leakageを行わない。
+- セッションを跨ぐ主要生理尺度はΔRMSSDとし、異なるbaselineのWを主尺度として直接比較しない。
+- contemporaneous light−RMSSD correlationと、過去RMSSD→将来選択のlagged adaptationを分離する。
+- Stage 8A.3の集計はparticipantを単位にし、Bundle行を独立participantとしてpoolしない。
+- hidden preference truthをobserved coupling、history model、selectionに使わない。
+- Codex作業中に実行してよいStage 8A.3 validationは48 target sessionのsmokeだけとし、quick、standard、robustの本検証を実行しない。plan-onlyは実行してよい。
 - Stageごとに独立commitを作り、push前にcompileall、全pytest、Ruff、headless、GUI smoke、digest回帰を検証する。
 - force push、force-with-lease、既存commitのamend/rebaseを行わない。

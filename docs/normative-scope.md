@@ -163,3 +163,15 @@ Stage 8A.2はStage 8A.1の`FatigueSigmaSingleConditionRunner`をそのまま呼�
 `formal_spec_adoption=false`を全runで維持する。探索条件はpaired random seedに混入せず、`p_explore`、`epsilon_accept`、q係数、P/V/tau、RMSSD→N、`delta_N`を変更しない。hidden preference/truthはpost-hocのsimulation-only評価に限り、Digital Life、Runtime、Gardenの入力にしない。moving preferenceはStage 8Bまで未実装である。
 
 条件の比較は不透明な単一総合スコアで潰さず、方向付きの複数目的、Pareto支配関係、gate判定、弱点とtrade-offを保存する。balanced robust gateを通る候補がないときは、代替の「最良」を捏造せず`no_robust_candidate`とblockerを報告する。OpenAI、Codex、ChatGPT、外部LLM、外部API、networkは使用しない。
+
+## Stage 8A.3の自律・プラセボRMSSD適応検証との境界
+
+Stage 8A.3は規範仕様v2.0のCoreを変更しない **post-hoc simulation validation層** である。本人の生理結果に依存しないplacebo方式が第30章の残る検証事項であることを受け、yoked replayとpure randomという交換可能なsimulation assumptionをversion管理する。これらのarm contract、participant cohort、response-strength個人差、history model、counterfactual、permutation/bootstrap、分類、CSV/HTMLは規範式ではない。
+
+autonomous armだけがtarget本人のRMSSD/N由来のWをq/kと資格競争を介してfuture outputへ反映する。yoked armは同typeの別participantがautonomous armで正式に出力した`LightStimulusStateEvent`系列だけを出力sourceにし、random armはRMSSDを含まない決定論的keyからexisting Mapper/DeviceへBを入れる。target RMSSD、N、W、q、k、Eをopen-loop出力へ渡さない。
+
+v2.0に従い、`W_anchor_session`は毎session resetされる。Wは各sessionのbaselineに対するalgorithm audit値であり、異なるbaselineのWを長期尺度として直接比較しない。Stage 8A.3の跨session主要生理尺度は各sessionの`bundle RMSSD - baseline RMSSD`であるΔRMSSDとする。
+
+contemporaneous light−RMSSD correlationはplaceboでも生じ得るため、過去session反応→将来選択のlagged couplingと分ける。history modelはcurrentsession/futureを学習に使わず、hidden preference truthをobserved couplingに入れない。participantを集計単位にし、`no_clear_effect`を正当な結果とする。
+
+preferenceはrun中固定である。moving/time/context/fatigue-dependent preferenceはStage 8Bまで未実装で、人間の有効性、医療効果、臨床的有意差を主張しない。
