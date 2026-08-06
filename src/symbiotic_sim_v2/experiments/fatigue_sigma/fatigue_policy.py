@@ -12,6 +12,7 @@ from symbiotic_sim_v2.digital_life.math import (
 )
 
 from .config import (
+    GRADUAL_REFERENCE_ONLY_SESSION_END_POLICY_VERSION,
     SELECTED_SESSION_FATIGUE_POLICY_VERSION,
     UNSELECTED_FULL_RECOVERY_POLICY_VERSION,
 )
@@ -20,6 +21,7 @@ ACTIVE_SIGNAL_COUNT = 180
 MIN_SELECTED_SESSION_FATIGUE_TARGET = 0.0
 MAX_SELECTED_SESSION_FATIGUE_TARGET = 0.20
 FULL_UNSELECTED_RECOVERY_FRACTION = 1.0
+NO_SESSION_END_RECOVERY_FRACTION = 0.0
 
 
 def _finite(name: str, value: object) -> float:
@@ -40,9 +42,7 @@ def _unit(name: str, value: object) -> float:
 
 def _selected_target(value: object) -> float:
     target = _finite("selected_session_fatigue_target", value)
-    if not MIN_SELECTED_SESSION_FATIGUE_TARGET <= target <= (
-        MAX_SELECTED_SESSION_FATIGUE_TARGET
-    ):
+    if not MIN_SELECTED_SESSION_FATIGUE_TARGET <= target <= (MAX_SELECTED_SESSION_FATIGUE_TARGET):
         raise ValueError("selected_session_fatigue_target must be between 0 and 0.20")
     return target
 
@@ -80,21 +80,23 @@ class SessionEndFatigueDecision:
         after = _unit("e_after_policy", self.e_after_policy)
         count = _selected_count(self.selected_active_signal_count)
         fraction = _unit("recovery_fraction", self.recovery_fraction)
-        if fraction != FULL_UNSELECTED_RECOVERY_FRACTION:
-            raise ValueError("Stage 8A.1 unselected recovery fraction must equal 1.0")
         if not isinstance(self.full_recovery_applied, bool):
             raise TypeError("full_recovery_applied must be boolean")
-        expected_applied = count == 0
+        if self.policy_version == UNSELECTED_FULL_RECOVERY_POLICY_VERSION:
+            if fraction != FULL_UNSELECTED_RECOVERY_FRACTION:
+                raise ValueError("unselected-full-recovery fraction must equal 1.0")
+            expected_applied = count == 0
+        elif self.policy_version == GRADUAL_REFERENCE_ONLY_SESSION_END_POLICY_VERSION:
+            if fraction != NO_SESSION_END_RECOVERY_FRACTION:
+                raise ValueError("gradual-reference-only recovery fraction must equal 0.0")
+            expected_applied = False
+        else:
+            raise ValueError("policy_version is not a supported session-end policy")
         if self.full_recovery_applied != expected_applied:
-            raise ValueError("full recovery must be applied exactly when selected count is zero")
+            raise ValueError("full recovery flag differs from the session-end policy")
         expected_after = 0.0 if expected_applied else before
         if after != expected_after:
             raise ValueError("e_after_policy differs from the session-end fatigue policy")
-        if self.policy_version != UNSELECTED_FULL_RECOVERY_POLICY_VERSION:
-            raise ValueError(
-                "policy_version must be "
-                f"{UNSELECTED_FULL_RECOVERY_POLICY_VERSION}"
-            )
         object.__setattr__(self, "e_before_policy", before)
         object.__setattr__(self, "e_after_policy", after)
         object.__setattr__(self, "selected_active_signal_count", count)
@@ -109,9 +111,7 @@ class SelectedSessionFatiguePolicy:
     """Experimental saturating accumulation with reference recovery unchanged."""
 
     selected_session_fatigue_target: float
-    unselected_session_end_recovery_fraction: float = (
-        FULL_UNSELECTED_RECOVERY_FRACTION
-    )
+    unselected_session_end_recovery_fraction: float = FULL_UNSELECTED_RECOVERY_FRACTION
     selected_policy_version: str = SELECTED_SESSION_FATIGUE_POLICY_VERSION
     session_end_policy_version: str = UNSELECTED_FULL_RECOVERY_POLICY_VERSION
 
@@ -121,18 +121,20 @@ class SelectedSessionFatiguePolicy:
             "unselected_session_end_recovery_fraction",
             self.unselected_session_end_recovery_fraction,
         )
-        if recovery != FULL_UNSELECTED_RECOVERY_FRACTION:
-            raise ValueError("Stage 8A.1 unselected recovery fraction must equal 1.0")
         if self.selected_policy_version != SELECTED_SESSION_FATIGUE_POLICY_VERSION:
             raise ValueError(
-                "selected_policy_version must be "
-                f"{SELECTED_SESSION_FATIGUE_POLICY_VERSION}"
+                f"selected_policy_version must be {SELECTED_SESSION_FATIGUE_POLICY_VERSION}"
             )
-        if self.session_end_policy_version != UNSELECTED_FULL_RECOVERY_POLICY_VERSION:
-            raise ValueError(
-                "session_end_policy_version must be "
-                f"{UNSELECTED_FULL_RECOVERY_POLICY_VERSION}"
-            )
+        expected_recovery = {
+            UNSELECTED_FULL_RECOVERY_POLICY_VERSION: (FULL_UNSELECTED_RECOVERY_FRACTION),
+            GRADUAL_REFERENCE_ONLY_SESSION_END_POLICY_VERSION: (NO_SESSION_END_RECOVERY_FRACTION),
+        }.get(self.session_end_policy_version)
+        if expected_recovery is None:
+            raise ValueError("session_end_policy_version is not supported")
+        if recovery != expected_recovery:
+            if self.session_end_policy_version == UNSELECTED_FULL_RECOVERY_POLICY_VERSION:
+                raise ValueError("Stage 8A.1 unselected recovery fraction must equal 1.0")
+            raise ValueError("gradual-reference-only recovery fraction must equal 0.0")
         object.__setattr__(self, "selected_session_fatigue_target", target)
         object.__setattr__(
             self,
@@ -164,13 +166,17 @@ class SelectedSessionFatiguePolicy:
     ) -> SessionEndFatigueDecision:
         before = _unit("e_before_policy", e_before_policy)
         count = _selected_count(selected_active_signal_count)
-        applied = count == 0
+        applied = (
+            self.session_end_policy_version == UNSELECTED_FULL_RECOVERY_POLICY_VERSION
+            and count == 0
+        )
         return SessionEndFatigueDecision(
             e_before_policy=before,
             e_after_policy=0.0 if applied else before,
             selected_active_signal_count=count,
             full_recovery_applied=applied,
             recovery_fraction=self.unselected_session_end_recovery_fraction,
+            policy_version=self.session_end_policy_version,
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -186,6 +192,7 @@ __all__ = [
     "FULL_UNSELECTED_RECOVERY_FRACTION",
     "MAX_SELECTED_SESSION_FATIGUE_TARGET",
     "MIN_SELECTED_SESSION_FATIGUE_TARGET",
+    "NO_SESSION_END_RECOVERY_FRACTION",
     "SelectedSessionFatiguePolicy",
     "SessionEndFatigueDecision",
     "selected_session_eta",

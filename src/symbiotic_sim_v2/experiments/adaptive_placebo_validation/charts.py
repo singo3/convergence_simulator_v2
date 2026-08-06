@@ -111,7 +111,14 @@ def participant_trajectory_svg(
     condition_id: str,
     bundles: Sequence[BundleOutcome],
     sessions: Sequence[SessionOutcome],
+    *,
+    arms: Sequence[str] = ARM_IDS,
 ) -> str:
+    selected_arms = tuple(arms)
+    if not selected_arms or any(arm not in ARM_IDS for arm in selected_arms):
+        raise ValueError("arms must be a non-empty subset of Stage 8A.3 arms")
+    if len(set(selected_arms)) != len(selected_arms):
+        raise ValueError("arms must be unique")
     selected_bundles = [
         item
         for item in bundles
@@ -128,7 +135,7 @@ def participant_trajectory_svg(
     gap = 38.0
     left = 50.0
     top = 48.0
-    total_width = left + len(ARM_IDS) * panel_width + (len(ARM_IDS) - 1) * gap + 20
+    total_width = left + len(selected_arms) * panel_width + (len(selected_arms) - 1) * gap + 20
     total_height = top + panel_height + 48
     parts = [
         f"<svg class='trajectory participant-trajectory' viewBox='0 0 {total_width:.0f} {total_height:.0f}' "
@@ -137,7 +144,7 @@ def participant_trajectory_svg(
         f"<text x='{left}' y='18' font-size='13' font-weight='700'>{html.escape(participant_id)} · {html.escape(condition_id)}</text>",
         f"<text x='12' y='{top + panel_height / 2}' transform='rotate(-90 12 {top + panel_height / 2})'>blink BPM</text>",
     ]
-    for panel_index, arm in enumerate(ARM_IDS):
+    for panel_index, arm in enumerate(selected_arms):
         x0 = left + panel_index * (panel_width + gap)
         parts.extend(
             _axes(
@@ -152,9 +159,12 @@ def participant_trajectory_svg(
         for row in selected_bundles:
             if row.arm != arm or row.displayed_blink_bpm is None:
                 continue
-            x = x0 + (
-                row.session_index + 0.5 + (-0.20, 0.0, 0.20)[row.bundle_index]
-            ) / maximum_session * panel_width
+            x = (
+                x0
+                + (row.session_index + 0.5 + (-0.20, 0.0, 0.20)[row.bundle_index])
+                / maximum_session
+                * panel_width
+            )
             y = top + panel_height - (row.displayed_blink_bpm - 10.0) / 155.0 * panel_height
             is_trial = row.anchor_or_trial is not None and "trial" in row.anchor_or_trial
             stroke = "#16885e" if row.adoption_result == "accepted" else "#17212b"
@@ -188,9 +198,7 @@ def participant_trajectory_svg(
                     "stroke='#b62f3d' stroke-width='2'><title>invalid session</title></path>"
                 )
                 continue
-            y = top + panel_height - (
-                row.representative_blink_bpm - 10.0
-            ) / 155.0 * panel_height
+            y = top + panel_height - (row.representative_blink_bpm - 10.0) / 155.0 * panel_height
             parts.append(
                 _marker(
                     row.representative_life_id,
@@ -219,7 +227,17 @@ def participant_trajectory_svg(
     return "".join(parts)
 
 
-def user_type_average_svg(rows: Sequence[Mapping[str, Any]], condition_id: str) -> str:
+def user_type_average_svg(
+    rows: Sequence[Mapping[str, Any]],
+    condition_id: str,
+    *,
+    arms: Sequence[str] = ARM_IDS,
+) -> str:
+    selected_arms = tuple(arms)
+    if not selected_arms or any(arm not in ARM_IDS for arm in selected_arms):
+        raise ValueError("arms must be a non-empty subset of Stage 8A.3 arms")
+    if len(set(selected_arms)) != len(selected_arms):
+        raise ValueError("arms must be unique")
     selected = [item for item in rows if item.get("condition_id") == condition_id]
     types = sorted({str(item["user_type_id"]) for item in selected})
     max_session = max((int(item["session_index"]) for item in selected), default=0) + 1
@@ -237,7 +255,7 @@ def user_type_average_svg(rows: Sequence[Mapping[str, Any]], condition_id: str) 
         parts.append(
             f"<text x='4' y='{y0 + 16:.2f}' font-weight='700'>{html.escape(user_type_id)}</text>"
         )
-        for arm_index, arm in enumerate(ARM_IDS):
+        for arm_index, arm in enumerate(selected_arms):
             y_base = y0 + 30 + arm_index * 34
             parts.append(
                 f"<text x='{left - 8}' y='{y_base + 5:.2f}' text-anchor='end'>{html.escape(ARM_LABELS[arm])}</text>"
@@ -308,7 +326,17 @@ def user_type_average_svg(rows: Sequence[Mapping[str, Any]], condition_id: str) 
     return "".join(parts)
 
 
-def overall_delta_svg(sessions: Sequence[SessionOutcome], condition_id: str) -> str:
+def overall_delta_svg(
+    sessions: Sequence[SessionOutcome],
+    condition_id: str,
+    *,
+    arms: Sequence[str] = ARM_IDS,
+) -> str:
+    selected_arms = tuple(arms)
+    if not selected_arms or any(arm not in ARM_IDS for arm in selected_arms):
+        raise ValueError("arms must be a non-empty subset of Stage 8A.3 arms")
+    if len(set(selected_arms)) != len(selected_arms):
+        raise ValueError("arms must be unique")
     selected = [item for item in sessions if item.condition_id == condition_id]
     max_session = max((item.session_index for item in selected), default=0) + 1
     width, height, left, top = 760.0, 300.0, 58.0, 25.0
@@ -316,9 +344,7 @@ def overall_delta_svg(sessions: Sequence[SessionOutcome], condition_id: str) -> 
     groups: dict[tuple[str, int], list[float]] = defaultdict(list)
     for item in selected:
         if item.mean_valid_bundle_delta_rmssd_ms is not None:
-            groups[(item.arm, item.session_index)].append(
-                item.mean_valid_bundle_delta_rmssd_ms
-            )
+            groups[(item.arm, item.session_index)].append(item.mean_valid_bundle_delta_rmssd_ms)
     all_values = [value for values in groups.values() for value in values]
     y_min = min(all_values, default=-1.0)
     y_max = max(all_values, default=1.0)
@@ -345,7 +371,7 @@ def overall_delta_svg(sessions: Sequence[SessionOutcome], condition_id: str) -> 
         parts.append(
             f"<line x1='{left}' y1='{y_zero:.2f}' x2='{left + plot_width}' y2='{y_zero:.2f}' stroke='#c9d0d5' stroke-dasharray='3 3'/>"
         )
-    for arm in ARM_IDS:
+    for arm in selected_arms:
         points = [point(arm, index) for index in range(max_session)]
         path = " ".join(
             ("M" if first else "L") + f"{value[0]:.2f},{value[1]:.2f}"
@@ -376,7 +402,7 @@ def overall_delta_svg(sessions: Sequence[SessionOutcome], condition_id: str) -> 
             parts.append(
                 f"<line x1='{x:.2f}' y1='{y_lower:.2f}' x2='{x:.2f}' y2='{y_upper:.2f}' stroke='{ARM_COLORS[arm]}' stroke-opacity='.35' stroke-width='3'/>"
             )
-    for index, arm in enumerate(ARM_IDS):
+    for index, arm in enumerate(selected_arms):
         parts.append(
             f"<rect x='{left + index * 150}' y='{height - 18}' width='10' height='3' fill='{ARM_COLORS[arm]}'/>"
             f"<text x='{left + index * 150 + 15}' y='{height - 13}'>{html.escape(ARM_LABELS[arm])}</text>"
@@ -395,14 +421,13 @@ def overall_adaptation_metrics_svg(
     """Show selection percentile, enrichment, and cumulative paired benefit."""
 
     selected = [item for item in prospective if item.get("condition_id") == condition_id]
-    max_session = max(
-        (
-            item.session_index
-            for item in sessions
-            if item.condition_id == condition_id
-        ),
-        default=0,
-    ) + 1
+    max_session = (
+        max(
+            (item.session_index for item in sessions if item.condition_id == condition_id),
+            default=0,
+        )
+        + 1
+    )
     late_start = math.floor(2 * max_session / 3)
     session_lookup = {
         (item.participant_id, item.arm, item.session_index): item
@@ -410,7 +435,9 @@ def overall_adaptation_metrics_svg(
         if item.condition_id == condition_id
     }
     cumulative: dict[tuple[str, int], list[float]] = defaultdict(list)
-    participants = sorted({item.participant_id for item in sessions if item.condition_id == condition_id})
+    participants = sorted(
+        {item.participant_id for item in sessions if item.condition_id == condition_id}
+    )
     for comparator in ("response_decoupled_yoked_replay", "pure_random_open_loop"):
         for participant_id in participants:
             running: list[float] = []
@@ -446,14 +473,24 @@ def overall_adaptation_metrics_svg(
         for row in selected:
             value = row.get(field)
             if value is not None:
-                values_by_arm_index[(str(row["arm"]), int(row["session_index"]))].append(float(value))
+                values_by_arm_index[(str(row["arm"]), int(row["session_index"]))].append(
+                    float(value)
+                )
         finite = [value for values in values_by_arm_index.values() for value in values]
-        y_min, y_max = (0.0, 100.0) if field.endswith("percentile") else (min(finite, default=-1.0), max(finite, default=1.0))
+        y_min, y_max = (
+            (0.0, 100.0)
+            if field.endswith("percentile")
+            else (min(finite, default=-1.0), max(finite, default=1.0))
+        )
         if math.isclose(y_min, y_max):
             y_min -= 0.5
             y_max += 0.5
-        parts.append(f"<text x='{left}' y='{top - 8}' font-weight='700'>{html.escape(label)}</text>")
-        parts.append(f"<line x1='{left}' y1='{top + panel_height}' x2='{left + plot_width}' y2='{top + panel_height}' stroke='#52616e'/>")
+        parts.append(
+            f"<text x='{left}' y='{top - 8}' font-weight='700'>{html.escape(label)}</text>"
+        )
+        parts.append(
+            f"<line x1='{left}' y1='{top + panel_height}' x2='{left + plot_width}' y2='{top + panel_height}' stroke='#52616e'/>"
+        )
         for arm in ARM_IDS:
             coordinates: list[tuple[float, float]] = []
             for index in range(max_session):
@@ -465,26 +502,45 @@ def overall_adaptation_metrics_svg(
                 y = top + panel_height - (mean - y_min) / (y_max - y_min) * panel_height
                 coordinates.append((x, y))
             if coordinates:
-                path = " ".join(("M" if index == 0 else "L") + f"{x:.2f},{y:.2f}" for index, (x, y) in enumerate(coordinates))
-                parts.append(f"<path d='{path}' fill='none' stroke='{ARM_COLORS[arm]}' stroke-width='2'/>")
+                path = " ".join(
+                    ("M" if index == 0 else "L") + f"{x:.2f},{y:.2f}"
+                    for index, (x, y) in enumerate(coordinates)
+                )
+                parts.append(
+                    f"<path d='{path}' fill='none' stroke='{ARM_COLORS[arm]}' stroke-width='2'/>"
+                )
     top = 305.0
-    parts.append(f"<text x='{left}' y='{top - 8}' font-weight='700'>cumulative late autonomous advantage (participant mean)</text>")
-    parts.append(f"<line x1='{left}' y1='{top + panel_height}' x2='{left + plot_width}' y2='{top + panel_height}' stroke='#52616e'/>")
+    parts.append(
+        f"<text x='{left}' y='{top - 8}' font-weight='700'>cumulative late autonomous advantage (participant mean)</text>"
+    )
+    parts.append(
+        f"<line x1='{left}' y1='{top + panel_height}' x2='{left + plot_width}' y2='{top + panel_height}' stroke='#52616e'/>"
+    )
     finite_cumulative = [value for values in cumulative.values() for value in values]
     y_min, y_max = min(finite_cumulative, default=-1.0), max(finite_cumulative, default=1.0)
     if math.isclose(y_min, y_max):
         y_min -= 0.5
         y_max += 0.5
-    for comparator, color in (("response_decoupled_yoked_replay", "#8b5a2b"), ("pure_random_open_loop", "#555f78")):
+    for comparator, color in (
+        ("response_decoupled_yoked_replay", "#8b5a2b"),
+        ("pure_random_open_loop", "#555f78"),
+    ):
         coordinates = []
         for index in range(max_session):
             values = cumulative.get((comparator, index), [])
             if values:
                 x = left + (index + 0.5) / max_session * plot_width
-                y = top + panel_height - (statistics.fmean(values) - y_min) / (y_max - y_min) * panel_height
+                y = (
+                    top
+                    + panel_height
+                    - (statistics.fmean(values) - y_min) / (y_max - y_min) * panel_height
+                )
                 coordinates.append((x, y))
         if coordinates:
-            path = " ".join(("M" if index == 0 else "L") + f"{x:.2f},{y:.2f}" for index, (x, y) in enumerate(coordinates))
+            path = " ".join(
+                ("M" if index == 0 else "L") + f"{x:.2f},{y:.2f}"
+                for index, (x, y) in enumerate(coordinates)
+            )
             parts.append(f"<path d='{path}' fill='none' stroke='{color}' stroke-width='2'/>")
     parts.append(
         f"<text x='{left}' y='{height - 14}' fill='#8b5a2b'>vs yoked replay</text>"

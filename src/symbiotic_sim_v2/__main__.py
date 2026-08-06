@@ -273,6 +273,14 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="run the offline Stage 8A.3 autonomous/yoked/random RMSSD validation",
     )
+    headless_group.add_argument(
+        "--headless-fatigue-recovery-sigma-factorial-validation",
+        action="store_true",
+        help=(
+            "run the Stage 8A.3.1 recovery-policy by exploration-width "
+            "factorial validation"
+        ),
+    )
     parser.add_argument(
         "--life-role",
         choices=("red", "green", "blue"),
@@ -635,6 +643,11 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--allow-dirty-adaptive-placebo-code",
+        action="store_true",
+        help=argparse.SUPPRESS,
+    )
+    parser.add_argument(
+        "--allow-dirty-factorial-code",
         action="store_true",
         help=argparse.SUPPRESS,
     )
@@ -2898,7 +2911,7 @@ def run_gui(
                 window._start_single_operation("run_all", lab_settings)
                 full_lab_result = await_lab_operation(
                     "Stage 8A.1 run-all worker",
-                    timeout_ms=10_000,
+                    timeout_ms=20_000,
                 )
                 if full_lab_result is None:
                     raise RuntimeError("Stage 8A.1 run-all produced no result")
@@ -2978,8 +2991,9 @@ def run_gui(
                 ):
                     smoke_failures.append("Stage 8A.1 reference comparison")
 
-                # The first of two bounded cells completes and is rendered;
-                # cancellation then stops the second cell at a session boundary.
+                # The first bounded cell completes and is rendered; request
+                # cancellation after the second cell's first session so the
+                # GUI timer cannot race the first condition-finalize boundary.
                 grid_settings = {
                     "experiment_preset": "quick-smoke-boundary-fixture",
                     "user_type_id": lab_settings["user_type_id"],
@@ -2993,7 +3007,7 @@ def run_gui(
                 window._start_grid_operation(grid_settings)
                 grid_result = await_lab_operation(
                     "Stage 8A.1 production grid cancel",
-                    cancel_grid_after=4,
+                    cancel_grid_after=5,
                 )
                 if "cancelled" not in (
                     window.fatigue_sigma_lab_panel.grid_panel.progress_label.text()
@@ -3219,10 +3233,11 @@ def main(argv: list[str] | None = None) -> int:
     )
     if any(value is not None for value in validation_specific_options) and not (
         args.headless_adaptive_placebo_validation
+        or args.headless_fatigue_recovery_sigma_factorial_validation
     ):
         raise ValueError(
-            "Stage 8A.3 validation options require "
-            "--headless-adaptive-placebo-validation"
+            "validation options require a Stage 8A.3 or Stage 8A.3.1 "
+            "headless validation command"
         )
     if args.allow_dirty_adaptive_placebo_code and not (
         args.headless_adaptive_placebo_validation
@@ -3231,6 +3246,34 @@ def main(argv: list[str] | None = None) -> int:
             "--allow-dirty-adaptive-placebo-code requires "
             "--headless-adaptive-placebo-validation"
         )
+    if args.allow_dirty_factorial_code and not (
+        args.headless_fatigue_recovery_sigma_factorial_validation
+    ):
+        raise ValueError(
+            "--allow-dirty-factorial-code requires "
+            "--headless-fatigue-recovery-sigma-factorial-validation"
+        )
+    if args.headless_fatigue_recovery_sigma_factorial_validation:
+        incompatible = (
+            args.search_preset,
+            args.include_reference_arm,
+            args.stop_after_phase,
+            args.maximum_total_session_runs,
+            args.candidate_gate_config,
+            args.search_config,
+            args.retain_full_details,
+            args.allow_dirty_auto_search_code,
+            args.allow_dirty_adaptive_placebo_code,
+        )
+        if any(value is not None and value is not False for value in incompatible):
+            raise ValueError(
+                "Stage 8A.2/8A.3-only options cannot be mixed with Stage 8A.3.1"
+            )
+        from symbiotic_sim_v2.experiments.fatigue_recovery_sigma_factorial.cli import (
+            run_factorial_validation_cli,
+        )
+
+        return run_factorial_validation_cli(args)
     if args.headless_adaptive_placebo_validation:
         incompatible = (
             args.search_preset,

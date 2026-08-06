@@ -11,3 +11,6 @@ artifacts/auto_search-launcher-logs/
 artifacts/adaptive_placebo_validation/
 artifacts/adaptive_placebo_validation_*/
 artifacts/adaptive_placebo_validation-launcher-logs/
+artifacts/fatigue_recovery_sigma_factorial/
+artifacts/fatigue_recovery_sigma_factorial_*/
+artifacts/fatigue_recovery_sigma_factorial-launcher-logs/

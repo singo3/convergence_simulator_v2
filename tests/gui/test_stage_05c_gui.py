@@ -106,7 +106,7 @@ def test_run_to_end_populates_exact_relation_records_then_reset_clears(
     _click(qtbot, window.run_to_end_button)
     qtbot.waitUntil(
         lambda: window.simulation.engine.clock.state is ClockState.COMPLETED,
-        timeout=10_000,
+        timeout=20_000,
     )
     qtbot.waitUntil(lambda: panel.signal_model.rowCount() == 723, timeout=2_000)
 

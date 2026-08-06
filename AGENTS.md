@@ -101,5 +101,10 @@
 - Stage 8A.3の集計はparticipantを単位にし、Bundle行を独立participantとしてpoolしない。
 - hidden preference truthをobserved coupling、history model、selectionに使わない。
 - Codex作業中に実行してよいStage 8A.3 validationは48 target sessionのsmokeだけとし、quick、standard、robustの本検証を実行しない。plan-onlyは実行してよい。
+- Stage 8A.3.1は4条件のselected fatigue etaとsession中rhoを同一にし、比較要因を非選出session-end全回復の有無とsigma 1.0/0.5だけに限定する。
+- Stage 8A.3.1のrandom comparatorはcondition間で共有し、condition/recovery/sigmaをphysiology seedまたはrandom output seedに混入させない。
+- Stage 8A.3.1標準比較にStage 8A.3のyoked armを含めず、participant単位の2×2主効果とinteractionを保存する。
+- Stage 8A.3.1の結果を正式仕様へ自動採用せず、`formal_spec_adoption=false`を維持する。
+- Codex作業中に実行してよいStage 8A.3.1 validationは120 actual sessionのsmokeだけとし、standard、robustの本検証を実行しない。plan-onlyは実行してよい。
 - Stageごとに独立commitを作り、push前にcompileall、全pytest、Ruff、headless、GUI smoke、digest回帰を検証する。
 - force push、force-with-lease、既存commitのamend/rebaseを行わない。

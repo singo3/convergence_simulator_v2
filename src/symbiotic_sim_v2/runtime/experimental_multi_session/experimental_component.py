@@ -23,6 +23,10 @@ from symbiotic_sim_v2.digital_life.relation_memory.transitions import (
     apply_relation_memory_transition_with_sigma_multiplier,
 )
 from symbiotic_sim_v2.domain.events import SimulationEvent
+from symbiotic_sim_v2.experiments.fatigue_sigma.config import (
+    GRADUAL_REFERENCE_ONLY_SESSION_END_POLICY_VERSION,
+    UNSELECTED_FULL_RECOVERY_POLICY_VERSION,
+)
 from symbiotic_sim_v2.experiments.fatigue_sigma.fatigue_policy import (
     SelectedSessionFatiguePolicy,
 )
@@ -88,23 +92,30 @@ class ExperimentalFatigueSessionRecord:
             "rho_reference",
         ):
             object.__setattr__(self, name, _unit(name, getattr(self, name)))
-        if (
-            isinstance(self.selected_active_signal_count, bool)
-            or not isinstance(self.selected_active_signal_count, int)
+        if isinstance(self.selected_active_signal_count, bool) or not isinstance(
+            self.selected_active_signal_count, int
         ):
             raise TypeError("selected_active_signal_count must be an integer")
         if not 0 <= self.selected_active_signal_count <= 180:
             raise ValueError("selected_active_signal_count must be between 0 and 180")
         if not isinstance(self.full_recovery_applied, bool):
             raise TypeError("full_recovery_applied must be boolean")
-        if self.full_recovery_applied != (self.selected_active_signal_count == 0):
-            raise ValueError("full recovery flag differs from the selected signal count")
+        expected_full_recovery = (
+            self.session_end_policy_version == UNSELECTED_FULL_RECOVERY_POLICY_VERSION
+            and self.selected_active_signal_count == 0
+        )
+        if self.session_end_policy_version not in {
+            UNSELECTED_FULL_RECOVERY_POLICY_VERSION,
+            GRADUAL_REFERENCE_ONLY_SESSION_END_POLICY_VERSION,
+        }:
+            raise ValueError("session_end_policy_version is not supported")
+        if self.full_recovery_applied != expected_full_recovery:
+            raise ValueError("full recovery flag differs from the session-end policy")
         if self.full_recovery_applied and self.e_after_session_end_policy != 0.0:
             raise ValueError("full recovery must set E to zero")
         if (
             not self.full_recovery_applied
-            and self.e_after_session_end_policy
-            != self.e_before_session_end_policy
+            and self.e_after_session_end_policy != self.e_before_session_end_policy
         ):
             raise ValueError("selected life E must remain at the post-closing value")
         for name in ("selected_policy_version", "session_end_policy_version"):
@@ -112,9 +123,7 @@ class ExperimentalFatigueSessionRecord:
             if not isinstance(value, str) or not value.strip():
                 raise ValueError(f"{name} must be a non-empty string")
         if self.schema_version != FATIGUE_SESSION_RECORD_SCHEMA_VERSION:
-            raise ValueError(
-                f"schema_version must be {FATIGUE_SESSION_RECORD_SCHEMA_VERSION}"
-            )
+            raise ValueError(f"schema_version must be {FATIGUE_SESSION_RECORD_SCHEMA_VERSION}")
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -188,17 +197,13 @@ class ExperimentalSigmaSessionRecord:
         if not isinstance(self.policy_version, str) or not self.policy_version.strip():
             raise ValueError("policy_version must be a non-empty string")
         if self.schema_version != SIGMA_SESSION_RECORD_SCHEMA_VERSION:
-            raise ValueError(
-                f"schema_version must be {SIGMA_SESSION_RECORD_SCHEMA_VERSION}"
-            )
+            raise ValueError(f"schema_version must be {SIGMA_SESSION_RECORD_SCHEMA_VERSION}")
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
 
-class ExperimentalAdaptiveConnectedDigitalLifeComponent(
-    AdaptiveConnectedDigitalLifeComponent
-):
+class ExperimentalAdaptiveConnectedDigitalLifeComponent(AdaptiveConnectedDigitalLifeComponent):
     """Apply Stage 8A.1 policy inside each life, never in its runner."""
 
     def __init__(
@@ -318,9 +323,7 @@ class ExperimentalAdaptiveConnectedDigitalLifeComponent(
             e_after_session_end_policy=state_after_policy.e,
             selected_active_signal_count=self._selected_active_signal_count,
             full_recovery_applied=decision.full_recovery_applied,
-            selected_session_fatigue_target=(
-                self._fatigue_policy.selected_session_fatigue_target
-            ),
+            selected_session_fatigue_target=(self._fatigue_policy.selected_session_fatigue_target),
             eta_selected=self._fatigue_policy.eta_selected,
             rho_reference=self._fatigue_policy.rho_reference,
             selected_policy_version=self._fatigue_policy.selected_policy_version,
@@ -384,9 +387,7 @@ class ExperimentalAdaptiveConnectedDigitalLifeComponent(
             sigma_multiplier=scaled.multiplier,
             effective_sigma=scaled.effective_sigma,
             candidate_generated=trial is not None,
-            candidate_accepted=(
-                self._relation_session_state.adoption_result == "accepted"
-            ),
+            candidate_accepted=(self._relation_session_state.adoption_result == "accepted"),
             candidate_delta_f=delta_f,
             candidate_delta_t=delta_t,
             resulting_delta_hue_degree=delta_hue,

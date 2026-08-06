@@ -175,3 +175,13 @@ v2.0に従い、`W_anchor_session`は毎session resetされる。Wは各session�
 contemporaneous light−RMSSD correlationはplaceboでも生じ得るため、過去session反応→将来選択のlagged couplingと分ける。history modelはcurrentsession/futureを学習に使わず、hidden preference truthをobserved couplingに入れない。participantを集計単位にし、`no_clear_effect`を正当な結果とする。
 
 preferenceはrun中固定である。moving/time/context/fatigue-dependent preferenceはStage 8Bまで未実装で、人間の有効性、医療効果、臨床的有意差を主張しない。
+
+## Stage 8A.3.1の疲労回復 × sigma追加検証との境界
+
+Stage 8A.3.1は規範仕様v2.0の第30章に残された疲労蓄積・回復量とsigmaの検証を行う **simulation-onlyの追加検証層** である。v2.0 reference、Digital Life Core、Runtime、Garden、Stage 8A.3 arm contractは変更しない。Aの`v2_reference`とDの`provisional_f15_sigma050`は既存Stage 8A.3経路をそのまま再利用する。
+
+4条件は選出生命の`eta_selected=1-0.85^(1/180)`とsession中回復`rho_E=1-0.90^(1/180)`を共有する。実験要因は非選出生命の正常session-end全回復の有無と、参照sigmaの1.0/0.5倍だけである。B/Cはexperimental conditionsであり、参照Profileの変更や係数の正式採用ではない。`p_explore`、`epsilon_accept`、q、P/V/tau、RMSSD→N、Hash方向、F/Tのみ探索・A/D固定は変更しない。
+
+全回復は正常closing第2周のcomponent-owned policyであり、runnerのfinal-state後処理でEを書き換えない。error/未完了sessionはstateをcommitしない。random comparatorはcondition-independentに一度だけ実行し、condition/recovery/sigmaをphysiology seedまたはrandom output seedに入れない。Stage 8A.3のyokedは維持するが、この標準2×2には含めない。
+
+factorial主効果、interaction、human-MVP recommendation、chart、CSV/JSON/HTMLは観測専用のsimulation assumptionsである。participantを集計単位とし、ΔRMSSDを跨session主尺度とする。条件判定をCore、探索、session停止に返さず、`formal_spec_adoption=false`を維持する。moving preferenceは未実装である。

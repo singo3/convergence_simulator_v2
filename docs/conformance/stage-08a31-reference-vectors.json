@@ -1,0 +1,182 @@
+{
+  "conditions": [
+    {
+      "condition_id": "v2_reference",
+      "effective_selected_session_fatigue_target": 0.15,
+      "eta_selected": 0.000902475465494823,
+      "formal_spec_adoption": false,
+      "rho": 0.0005851649222862187,
+      "session_end_recovery_policy": "gradual_reference_only",
+      "sigma_multiplier": 1.0
+    },
+    {
+      "condition_id": "v2_recovery_sigma050",
+      "effective_selected_session_fatigue_target": 0.15,
+      "eta_selected": 0.000902475465494823,
+      "formal_spec_adoption": false,
+      "rho": 0.0005851649222862187,
+      "session_end_recovery_policy": "gradual_reference_only",
+      "sigma_multiplier": 0.5
+    },
+    {
+      "condition_id": "full_recovery_sigma100",
+      "effective_selected_session_fatigue_target": 0.15,
+      "eta_selected": 0.000902475465494823,
+      "formal_spec_adoption": false,
+      "rho": 0.0005851649222862187,
+      "session_end_recovery_policy": "unselected_full_recovery",
+      "sigma_multiplier": 1.0
+    },
+    {
+      "condition_id": "provisional_f15_sigma050",
+      "effective_selected_session_fatigue_target": 0.15,
+      "eta_selected": 0.000902475465494823,
+      "formal_spec_adoption": false,
+      "rho": 0.0005851649222862187,
+      "session_end_recovery_policy": "unselected_full_recovery",
+      "sigma_multiplier": 0.5
+    }
+  ],
+  "eta_equivalence": {
+    "active_signal_count": 180,
+    "equal": true,
+    "hex": "0x1.d92834e0c0c00p-11",
+    "rho_hex": "0x1.32cb81a1c3400p-11",
+    "rho_reference": 0.0005851649222862187,
+    "target": 0.15,
+    "target_derived_eta": 0.000902475465494823,
+    "v2_reference_eta": 0.000902475465494823
+  },
+  "factorial_effect_fixture": {
+    "interaction": 3.0,
+    "interaction_alt": 3.0,
+    "interaction_identity": true,
+    "recovery_effect_sigma050_D_minus_B": 6.0,
+    "recovery_effect_sigma100_C_minus_A": 3.0,
+    "sigma_effect_full_D_minus_C": 4.0,
+    "sigma_effect_gradual_B_minus_A": 1.0,
+    "values": {
+      "A": 1.0,
+      "B": 2.0,
+      "C": 4.0,
+      "D": 8.0
+    }
+  },
+  "finite_values": true,
+  "participant_chart_fixture": {
+    "bundle_offsets": [
+      -0.2,
+      0.0,
+      0.2
+    ],
+    "fill": "actual_hue",
+    "layout": "4_conditions_by_2_arms",
+    "panel_count": 8,
+    "shapes": {
+      "life-blue": "square",
+      "life-green": "triangle",
+      "life-red": "circle"
+    },
+    "trial_translucent": true,
+    "x": "session_index",
+    "y": "blink_bpm"
+  },
+  "participant_pairing": {
+    "arm_in_seed": false,
+    "base_master_seed": 20260806,
+    "condition_in_seed": false,
+    "participant_index": 0,
+    "physiology_seed": 4006930467,
+    "user_type_id": "green_hue_dominant_broad_bpm"
+  },
+  "plan_counts": {
+    "robust": {
+      "actual": 54000,
+      "autonomous": 43200,
+      "logical": 86400,
+      "shared_random": 10800
+    },
+    "smoke": {
+      "actual": 120,
+      "autonomous": 96,
+      "logical": 192,
+      "shared_random": 24
+    },
+    "standard": {
+      "actual": 10800,
+      "autonomous": 8640,
+      "logical": 17280,
+      "shared_random": 2160
+    }
+  },
+  "positive_participant_count": {
+    "effects_ms": [
+      1.0,
+      -0.25,
+      0.0,
+      2.0,
+      0.5
+    ],
+    "strict_positive_count": 3,
+    "strict_positive_rate": 0.6
+  },
+  "production_implementation_imported": false,
+  "random_cache": {
+    "condition_id_in_key": false,
+    "fields": [
+      "participant_id",
+      "user_type_id",
+      "physiology_seed",
+      "maximum_sessions",
+      "random_output_version",
+      "code_fingerprint"
+    ],
+    "recovery_in_key": false,
+    "shared_condition_count": 4,
+    "sigma_in_key": false
+  },
+  "recommendation": {
+    "baseline": "v2_reference",
+    "formal_spec_adoption": false,
+    "no_passing_alternative_result": "v2_reference_remains_preferred",
+    "opaque_score": false,
+    "passing_alternative": "v2_recovery_sigma050",
+    "preferred_result": "alternative_preferred_for_human_mvp"
+  },
+  "reference_vector_digest": "d2c39e9930250db7b67b7ad8e413944a1d89ea24011e5186b5c355ba55dc2860",
+  "schema_version": "stage_08a31_reference_vectors_v1",
+  "type_failure_detection": {
+    "failed_types": [
+      "type-b",
+      "type-c"
+    ],
+    "means_ms": {
+      "type-a": 0.5,
+      "type-b": -0.1,
+      "type-c": 0.0
+    },
+    "strict_positive": true
+  },
+  "user_type_heatmap_fixture": {
+    "columns": 4,
+    "condition_order": [
+      "v2_reference",
+      "v2_recovery_sigma050",
+      "full_recovery_sigma100",
+      "provisional_f15_sigma050"
+    ],
+    "metrics": [
+      "late_delta_rmssd_advantage_ms",
+      "positive_participant_rate",
+      "selection_enrichment",
+      "lagged_coupling"
+    ],
+    "rows": 9
+  },
+  "versions": {
+    "analysis": "participant_paired_two_by_two_factorial_analysis_v0_1",
+    "condition": "fatigue_recovery_sigma_factorial_condition_v1",
+    "project_version": "0.14.0",
+    "validation_model": "fatigue_recovery_sigma_factorial_validation_v0_1"
+  }
+}

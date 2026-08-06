@@ -15,8 +15,9 @@
 - 8A.1. 固定好み・疲労／探索幅・収束条件ラボ: 完了
 - 8A.2. 自動条件探索・堅牢候補抽出: 完了
 - 8A.3. 自律・プラセボRMSSD適応検証: 完了
-- ローカルstandard validationの実行と結果レビュー: 次工程
-- 必要に応じたローカルrobust validation: standardレビュー後
+- 8A.3.1. 疲労回復方式 × 探索幅追加検証: 完了
+- ローカルstandard追加検証の実行と結果レビュー: 次工程
+- 必要に応じたローカルrobust追加検証: standardレビュー後
 - 8B. 変化する好み・追従性: 上記実験レビュー後
 - 8C. 追加係数比較: 後続
 - 9. Webアプリ: 後続
@@ -30,3 +31,5 @@ Stage 8A.1は参照armを不変のまま保存し、experimental armで選出時
 Stage 8A.2はStage 8A.1 runnerを変更・コピーせず再利用し、ローカルCPUでcoarse→refine→confirmを決定論的に実行する。paired seed、reference cache、atomic checkpoint/resume、不確実性表示、Pareto/trade-off、robust/specialist候補、自己完結HTML reportを保存するが、Coreへ結果を返さず正式Profileを採用しない。次は利用者がpush後にstandard探索をローカル実行し、結果をレビューし、必要な場合だけrobust探索を行う。その後にStage 8Bへ進む。
 
 Stage 8A.3はStage 8A.1の固定仮想ユーザーと閉ループrunner、Stage 8A.2のローカルcheckpoint/report基盤を再利用する。autonomous、別participantのautonomous光系列を再生するyoked placebo、RMSSD非依存randomをpaired比較し、同時点反応と過去ΔRMSSD→将来選択のlagged adaptationを分ける。historyは過去sessionだけ、集計はparticipant単位、跨sessionの主尺度はΔRMSSDとする。次は利用者によるローカルstandard validationと結果レビュー、必要時だけrobust validationである。その後までStage 8B moving preferenceへ進まない。
+
+Stage 8A.3.1はStage 8A.3のparticipant、autonomous/random arm、ΔRMSSD、past-only analysis、checkpoint/reportを再利用する。選出生命etaとsession中rhoを共通にし、非選出session-end全回復の有無×sigma 1.0/0.5の2×2主効果・interactionをparticipant単位で保存する。pure randomはcondition間共有で、yokedはStage 8A.3に維持するが本比較へは含めない。次は利用者がstandardをローカル実行し、透明gateとtrade-offをレビューする。

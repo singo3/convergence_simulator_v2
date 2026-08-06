@@ -13,6 +13,9 @@ FATIGUE_SIGMA_EXPERIMENT_PROFILE_VERSION = (
 UNSELECTED_FULL_RECOVERY_POLICY_VERSION = (
     "unselected_full_recovery_at_session_end_v0_1"
 )
+GRADUAL_REFERENCE_ONLY_SESSION_END_POLICY_VERSION = (
+    "gradual_reference_only_at_session_end_v0_1"
+)
 SELECTED_SESSION_FATIGUE_POLICY_VERSION = (
     "selected_session_saturating_fatigue_v0_1"
 )

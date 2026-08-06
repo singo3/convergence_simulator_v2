@@ -17,7 +17,8 @@
 - Stage 8A.1「固定好み・疲労／探索幅・収束条件ラボ」: 完成
 - Stage 8A.2「自動条件探索・堅牢候補抽出」: 完成
 - Stage 8A.3「自律・反応切離しプラセボ・ランダムRMSSD個人内適応検証」: 完成
-- 現在のGUI主対象: Stage 8A.1、現在のheadless検証主対象: Stage 8A.3
+- Stage 8A.3.1「疲労回復方式 × 探索幅の2×2追加検証」: 完成
+- 現在のGUI主対象: Stage 8A.1、現在のheadless検証主対象: Stage 8A.3.1
 
 正式な信号経路は次のとおりです。
 
@@ -64,6 +65,8 @@ Stage 8A.1はStage 8Aとv2.0 reference armを変更せず、experimental armだ�
 Stage 8A.2はStage 8A.1 runnerをコピーせず再利用する、完全ローカルCPUのheadless実験オーケストレーションです。coarse→refine→confirmで条件を段階的に絞り、paired seed、condition横断reference cache、atomic checkpoint/resume、95% Wilson区間、Pareto frontier、robust/specialist候補、自己完結型`report.html`を生成します。OpenAI、Codex、ChatGPT、外部LLM、外部API、networkを呼びません。候補をDigital Life、Runtime、Gardenへ返さず、`formal_spec_adoption=false`のままtrade-offを保存します。robust gateを通る候補がない場合は無理に一位を作らず`no_robust_candidate`とblockerを出します。
 
 Stage 8A.3は固定反応地形を持つ複数仮想参加者について、本人のRMSSDが将来選択へ入る`autonomous_closed_loop`、別participantのautonomous formal光系列を再生する`response_decoupled_yoked_replay`、RMSSD非依存の`pure_random_open_loop`をpaired比較します。同時点の光−RMSSD反応と、過去ΔRMSSD→将来life/Hue/BPM選択のlagged couplingを分離し、past-sessions-only model、165点counterfactual、selection enrichment、one-step prediction、participant-level paired effectを出力します。Wはsession-local監査値に限定し、セッション間はΔRMSSDで比較します。participant別、user type平均、全体平均、相関図をinline SVGの自己完結HTMLに保存し、`no_clear_effect`を正当な結果とします。
+
+Stage 8A.3.1はStage 8A.3のparticipant、ΔRMSSD、past-only analysis、chart/report、checkpoint/resumeを再利用し、非選出生命のsession-end全回復なし/ありとsigma倍率1.0/0.5の2×2を比較します。選出生命のeta、session中rho、`p_explore`、`epsilon_accept`、q、P/V/tauは4条件共通です。主要比較はautonomous対pure randomで、randomはparticipantごと1回だけ実行して4条件で共有します。participant単位の主効果・interactionと透明なMVP gateを保存しますが、`formal_spec_adoption=false`であり条件を自動で正式採用しません。
 
 現在の `ideal_polar_h10_rri_device_v0_1` は、誤差・欠損・遅延なしの理想的な入力デバイスを表すsimulation assumptionです。実機Polar H10のBLE GATT packet、firmware、電波、pairing、Polar SDKを再現するpacket-level emulatorではありません。
 
@@ -246,6 +249,20 @@ Stage 2のRRI、RMSSD、内部変動成分は仮想ユーザー内部の開発�
 - participant 3-panel session×BPM×actual-Hue×life-shape図、user type/全体/相関図
 - atomic checkpoint/resume、donor checksum検証、self-contained HTML/CSV/JSON
 - Stage 8A.1/8A.2基盤の再利用、OpenAI/API/network/Qtなし、moving preferenceなし
+
+### Stage 8A.3.1
+
+- `fatigue_recovery_sigma_factorial_validation_v0_1`のimmutable A/B/C/D条件
+- gradual/full session-end recovery × sigma 1.0/0.5のparticipant-paired 2×2
+- 4条件で`eta_E=1-0.85^(1/180)`と`rho_E=1-0.90^(1/180)`を共有
+- Aは既存`v2_reference`、Dは既存`provisional_f15_sigma050`とgolden一致
+- autonomous対shared pure random、condition-independent random cacheによる1回実行
+- participant/user type/全体のB−A、D−C、C−A、D−B、interactionと95% bootstrap区間
+- session×BPM×actual Hue×life shape、factor plot、heatmap、paired-lineのinline SVG
+- 不透明な総合scoreを使わないhuman-MVP条件比較と自己完結HTML
+- strict code/spec fingerprint、shared-random checksum、atomic checkpoint/resume
+- Stage 8A.3のyokedを維持しつつ本標準比較からは除外
+- OpenAI/API/network/Qtなし、moving preferenceなし、`formal_spec_adoption=false`
 
 ## Requirements / setup
 
@@ -481,7 +498,23 @@ smokeは48 target sessionsの実装確認だけです。standard/robust本検証
 
 `--conditions-json`、`--validation-config`、`--base-master-seed`、`--participants-per-type`、`--maximum-sessions`、`--permutation-count`、`--retain-details`を使えます。macOS launcherは`自律プラセボ検証_計画確認.command`、`_標準.command`、`_堅牢.command`、`_再開.command`です。外部networkは不要で、run directoryの`report/report.html`とparticipant別HTMLをローカルで開けます。詳細は[Stage 8A.3ローカル実行ガイド](docs/stage-08a3-local-execution-guide.md)を参照してください。
 
-`off_center_green` と `light_insensitive_control` も指定できます。いずれもreal-time待機をせずJSONを標準出力します。package versionは `0.13.0` です。既存JSON contractを変えないため、Stage 3/4/5A/5B.1/6/7.1/8A/8A.1/8A.2 headlessの `project_version` は各Stageの固定値を意図的に維持します。
+Stage 8A.3.1のstandard plan-onlyと120-session smoke:
+
+```bash
+.venv/bin/python -m symbiotic_sim_v2 \
+  --headless-fatigue-recovery-sigma-factorial-validation \
+  --validation-preset standard \
+  --plan-only
+
+.venv/bin/python -m symbiotic_sim_v2 \
+  --headless-fatigue-recovery-sigma-factorial-validation \
+  --validation-preset smoke \
+  --output-directory artifacts/fatigue_recovery_sigma_factorial_smoke
+```
+
+standardはactual 10,800 sessions、robustはactual 54,000 sessionsです。本実装作業では実行せず、利用者が後で`疲労回復探索幅_追加検証_標準.command`または`_堅牢.command`から開始します。中断runは`_再開.command <run_directory>`かCLIの`--resume`でstrictに再開できます。詳細は[Stage 8A.3.1ローカル実行ガイド](docs/stage-08a31-local-execution-guide.md)を参照してください。
+
+`off_center_green` と `light_insensitive_control` も指定できます。いずれもreal-time待機をせずJSONを標準出力します。package versionは `0.14.0` です。既存JSON contractを変えないため、Stage 3/4/5A/5B.1/6/7.1/8A/8A.1/8A.2/8A.3 headlessの `project_version` は各Stageの固定値を意図的に維持します。
 
 既存Stage 1〜5A JSONは変更しません。Stage 5B JSONはholder、生命別E/q/G/k、touch/feedback/qualified B件数と分離digestを表示し、探索状態、Hue、BPM、I、光波形を含めません。
 
@@ -793,10 +826,10 @@ Stage 8A.1はexperiment condition、fatigue trajectory、sigma trajectory、stru
 .venv/bin/python -m compileall -q src tests tools
 QT_QPA_PLATFORM=offscreen .venv/bin/pytest -q
 .venv/bin/ruff check .
-QT_QPA_PLATFORM=offscreen .venv/bin/python -m symbiotic_sim_v2 --smoke-test --auto-close-ms 15000
+QT_QPA_PLATFORM=offscreen .venv/bin/python -m symbiotic_sim_v2 --smoke-test --auto-close-ms 30000
 ```
 
-テストは既存1798件以上のStage 1〜8A.2回帰に加え、Stage 8A.3のarm/participant/seed/yoke/random contract、Bundle/Session record、past-only model、counterfactual、lagged/prediction/RMSSD/permutation/classification、participant aggregation、inline SVG/HTML、checkpoint/resume、48-session real smoke、CLI/launcher、independent reference vector、no-network/no-Qt境界を確認します。
+テストは既存2020件以上のStage 1〜8A.3回帰に加え、Stage 8A.3.1のcondition/fatigue/sigma/shared-random/factorial/recommendation/chart contract、A/D golden equivalence、checkpoint/resume、120-session real smoke、CLI/launcher、independent reference vector、no-network/no-Qt境界を確認します。
 
 Stage 5Aの設計境界は [1体のデジタル生命・第1周](docs/stage-05a-single-digital-life-first-round.md)、式と分類は [Digital Life first-round model v0.1](docs/digital-life-first-round-model_v0.1.md) を参照してください。Stage 4の設計境界は [Garden入力層設計](docs/stage-04-garden-input-layer.md)、モデル値は [Garden input model v0.1](docs/relax-with-light-garden-input-model_v0.1.md)、境界所属の仮定は [RRI window membership policy v0.1](docs/rri-window-membership-policy_v0.1.md) にあります。規範との境界は [規範スコープ](docs/normative-scope.md) を参照してください。
 
@@ -808,4 +841,4 @@ Stage 5Cは [3Bundle関係記憶探索](docs/stage-05c-confirmed-relation-memory
 
 Stage 8Aは [固定好み・複数セッション収束ラボ](docs/stage-08a-fixed-preference-multi-session-convergence.md)、[rolling majority定義](docs/rolling-majority-convergence-definition_v0.1.md)、[固定user landscape](docs/stationary-user-type-landscapes_v0.1.md)、[state handoff](docs/multi-session-state-handoff_v0.1.md)、[session seed policy](docs/session-physiology-seed-policy_v0.1.md) を参照してください。
 
-Stage 8A.1は [疲労・探索幅・収束条件ラボ](docs/stage-08a1-fatigue-exploration-convergence-lab.md)、[experimental fatigue policy](docs/experimental-fatigue-policy_v0.1.md)、[scaled sigma policy](docs/scaled-reference-sigma-policy_v0.1.md)、[構造収束診断](docs/structured-convergence-diagnostics_v0.1.md)、[固定user type v2](docs/stationary-user-type-profiles_v2.md)、[paired seed policy](docs/paired-replicate-seed-policy_v0.1.md)、[出力schema](docs/stage-08a1-experiment-output-schemas.md) を参照してください。Stage 8A.2は [自動条件探索・堅牢候補抽出](docs/stage-08a2-automatic-condition-search.md) と [ローカル実行ガイド](docs/auto-search-local-execution-guide.md) を参照してください。Stage 8A.3は [自律・プラセボRMSSD個人内適応検証](docs/stage-08a3-adaptive-placebo-rmssd-validation.md)、[yoked contract](docs/yoked-replay-placebo-contract_v0.1.md)、[random contract](docs/pure-random-open-loop-contract_v0.1.md)、[lagged coupling](docs/lagged-rmssd-selection-coupling_v0.1.md)、[past-only model](docs/prospective-history-response-model_v0.1.md)、[participant classification](docs/participant-adaptive-effect-classification_v0.1.md)を参照してください。次はローカルstandard validationと結果レビュー、必要時だけrobust validationであり、その後に **Stage 8B: 変化する好み・追従性** へ進みます。本実装作業でstandard/robustやStage 8Bには進みません。
+Stage 8A.1は [疲労・探索幅・収束条件ラボ](docs/stage-08a1-fatigue-exploration-convergence-lab.md)、[experimental fatigue policy](docs/experimental-fatigue-policy_v0.1.md)、[scaled sigma policy](docs/scaled-reference-sigma-policy_v0.1.md)、[構造収束診断](docs/structured-convergence-diagnostics_v0.1.md)、[固定user type v2](docs/stationary-user-type-profiles_v2.md)、[paired seed policy](docs/paired-replicate-seed-policy_v0.1.md)、[出力schema](docs/stage-08a1-experiment-output-schemas.md) を参照してください。Stage 8A.2は [自動条件探索・堅牢候補抽出](docs/stage-08a2-automatic-condition-search.md) と [ローカル実行ガイド](docs/auto-search-local-execution-guide.md) を参照してください。Stage 8A.3は [自律・プラセボRMSSD個人内適応検証](docs/stage-08a3-adaptive-placebo-rmssd-validation.md)を参照してください。Stage 8A.3.1は [2×2追加検証](docs/stage-08a31-fatigue-recovery-sigma-factorial-validation.md)、[分析定義](docs/two-by-two-fatigue-sigma-analysis_v0.1.md)、[human-MVP条件判定](docs/human-mvp-condition-selection_v0.1.md)、[ローカル実行ガイド](docs/stage-08a31-local-execution-guide.md)を参照してください。次は利用者によるローカルstandard追加検証と結果レビュー、必要時だけrobust追加検証です。

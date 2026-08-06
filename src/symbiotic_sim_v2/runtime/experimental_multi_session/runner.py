@@ -21,6 +21,10 @@ from symbiotic_sim_v2.digital_life.relation_memory.state_io import (
 from symbiotic_sim_v2.experiments.fatigue_sigma.condition import (
     FatigueSigmaCondition,
 )
+from symbiotic_sim_v2.experiments.fatigue_sigma.config import (
+    GRADUAL_REFERENCE_ONLY_SESSION_END_POLICY_VERSION,
+    UNSELECTED_FULL_RECOVERY_POLICY_VERSION,
+)
 from symbiotic_sim_v2.experiments.fatigue_sigma.fatigue_policy import (
     SelectedSessionFatiguePolicy,
 )
@@ -61,9 +65,7 @@ type CancelCheck = Callable[[], bool]
 def _life_configs(
     values: Sequence[DigitalLifeConfig] | None,
 ) -> tuple[DigitalLifeConfig, DigitalLifeConfig, DigitalLifeConfig]:
-    canonical = tuple(
-        digital_life_config_for_role(role) for role in ("red", "green", "blue")
-    )
+    canonical = tuple(digital_life_config_for_role(role) for role in ("red", "green", "blue"))
     configs = canonical if values is None else tuple(values)
     if configs != canonical:
         raise ValueError("Stage 8A.1 requires the unchanged red/green/blue roster")
@@ -77,10 +79,7 @@ def _validated_states(
 ) -> Mapping[str, RelationMemoryPersistentState]:
     if values is None:
         return MappingProxyType(
-            {
-                life_id: RelationMemoryPersistentState.fresh(life_id)
-                for life_id in life_ids
-            }
+            {life_id: RelationMemoryPersistentState.fresh(life_id) for life_id in life_ids}
         )
     encoded = relation_memory_state_map_to_dict(
         values,
@@ -100,10 +99,7 @@ class FatigueSigmaSingleConditionRunner:
         condition: FatigueSigmaCondition | None = None,
         *,
         compare_reference_arm: bool = False,
-        initial_persistent_state_by_life: Mapping[
-            str, RelationMemoryPersistentState
-        ]
-        | None = None,
+        initial_persistent_state_by_life: Mapping[str, RelationMemoryPersistentState] | None = None,
         resume_state: FatigueSigmaExperimentState | None = None,
         digital_life_configs: Sequence[DigitalLifeConfig] | None = None,
         experimental_simulation_factory: SimulationFactory = (
@@ -114,6 +110,7 @@ class FatigueSigmaSingleConditionRunner:
         ),
         stationary_user_type_profile_override: StationaryUserTypeProfileV2 | None = None,
         primary_reference_arm: bool = False,
+        fatigue_policy_override: SelectedSessionFatiguePolicy | None = None,
     ) -> None:
         if not callable(experimental_simulation_factory):
             raise TypeError("experimental_simulation_factory must be callable")
@@ -131,15 +128,21 @@ class FatigueSigmaSingleConditionRunner:
                 "stationary_user_type_profile_override must be a "
                 "StationaryUserTypeProfileV2 or null"
             )
-        if resume_state is not None and (
-            stationary_user_type_profile_override is not None or primary_reference_arm
+        if fatigue_policy_override is not None and not isinstance(
+            fatigue_policy_override, SelectedSessionFatiguePolicy
         ):
-            raise ValueError("Stage 8A.1 resume cannot use a Stage 8A.3 injection seam")
+            raise TypeError("fatigue_policy_override must be SelectedSessionFatiguePolicy or null")
+        if resume_state is not None and (
+            stationary_user_type_profile_override is not None
+            or primary_reference_arm
+            or fatigue_policy_override is not None
+        ):
+            raise ValueError("Stage 8A.1 resume cannot use a later-stage injection seam")
+        if primary_reference_arm and fatigue_policy_override is not None:
+            raise ValueError("a primary reference arm cannot override experimental fatigue")
         if primary_reference_arm and compare_reference_arm:
             raise ValueError("a primary reference arm cannot request a second reference arm")
-        if resume_state is not None and not isinstance(
-            resume_state, FatigueSigmaExperimentState
-        ):
+        if resume_state is not None and not isinstance(resume_state, FatigueSigmaExperimentState):
             raise TypeError("resume_state must be a FatigueSigmaExperimentState")
         self._configs = _life_configs(digital_life_configs)
         self._life_ids = tuple(config.digital_life_id for config in self._configs)
@@ -204,19 +207,15 @@ class FatigueSigmaSingleConditionRunner:
         self._virtual_user_template = VirtualUserConfig(
             duration_seconds=SESSION_DURATION_US // 1_000_000
         )
-        self._fatigue_policy = SelectedSessionFatiguePolicy(
+        self._fatigue_policy = fatigue_policy_override or SelectedSessionFatiguePolicy(
             self._condition.selected_session_fatigue_target,
             self._condition.unselected_session_end_recovery_fraction,
         )
-        self._sigma_policy = ScaledReferenceSigmaPolicy(
-            self._condition.sigma_multiplier
-        )
+        self._sigma_policy = ScaledReferenceSigmaPolicy(self._condition.sigma_multiplier)
         self._experimental_factory = experimental_simulation_factory
         self._reference_factory = reference_simulation_factory
         self._current_simulation: AdaptiveRelationMemoryClosedLoopSimulation | None = None
-        self._current_reference_simulation: (
-            AdaptiveRelationMemoryClosedLoopSimulation | None
-        ) = None
+        self._current_reference_simulation: AdaptiveRelationMemoryClosedLoopSimulation | None = None
         self._previous_engine: object | None = None
         self._previous_reference_engine: object | None = None
 
@@ -296,13 +295,11 @@ class FatigueSigmaSingleConditionRunner:
         pair_failure_reason: str | None = None
         if not experimental.valid_for_convergence:
             pair_failure_reason = (
-                "paired_experimental_invalid:"
-                f"{experimental.invalid_reason or 'unknown_reason'}"
+                f"paired_experimental_invalid:{experimental.invalid_reason or 'unknown_reason'}"
             )
         elif reference is not None and not reference.valid_for_convergence:
             pair_failure_reason = (
-                "paired_reference_invalid:"
-                f"{reference.invalid_reason or 'unknown_reason'}"
+                f"paired_reference_invalid:{reference.invalid_reason or 'unknown_reason'}"
             )
         if pair_failure_reason is None:
             try:
@@ -318,9 +315,7 @@ class FatigueSigmaSingleConditionRunner:
                         experimental=False,
                     )
             except Exception as exc:
-                pair_failure_reason = (
-                    f"handoff_validation_error:{type(exc).__name__}:{exc}"
-                )
+                pair_failure_reason = f"handoff_validation_error:{type(exc).__name__}:{exc}"
         if pair_failure_reason is not None:
             experimental = self._invalidate_for_atomic_pair(
                 experimental,
@@ -438,9 +433,7 @@ class FatigueSigmaSingleConditionRunner:
                     sigma_policy=self._sigma_policy,
                 )
             adaptive_digital_life_components(simulation)
-            previous = (
-                self._previous_reference_engine if reference_arm else self._previous_engine
-            )
+            previous = self._previous_reference_engine if reference_arm else self._previous_engine
             if simulation.engine is previous:
                 raise RuntimeError("session factory reused an engine")
             if reference_arm:
@@ -561,10 +554,19 @@ class FatigueSigmaSingleConditionRunner:
                     raise RuntimeError("component-owned fatigue policy differs from final E")
                 selected = fatigue["selected_active_signal_count"]
                 recovered = fatigue["full_recovery_applied"]
-                if (selected == 0) != recovered:
-                    raise RuntimeError("unselected recovery audit is inconsistent")
-                if selected == 0 and after.e != 0.0:
-                    raise RuntimeError("unselected life did not fully recover")
+                policy_version = fatigue["session_end_policy_version"]
+                if policy_version == UNSELECTED_FULL_RECOVERY_POLICY_VERSION:
+                    if (selected == 0) != recovered:
+                        raise RuntimeError("unselected recovery audit is inconsistent")
+                    if selected == 0 and after.e != 0.0:
+                        raise RuntimeError("unselected life did not fully recover")
+                elif policy_version == GRADUAL_REFERENCE_ONLY_SESSION_END_POLICY_VERSION:
+                    if recovered:
+                        raise RuntimeError("gradual-reference-only handoff applied full recovery")
+                    if after.e != fatigue["e_before_session_end_policy"]:
+                        raise RuntimeError("gradual-reference-only handoff changed closing E")
+                else:
+                    raise RuntimeError("session-end fatigue policy is not recognized")
 
     @staticmethod
     def _invalidate_for_atomic_pair(
